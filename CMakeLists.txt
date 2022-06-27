@@ -16,8 +16,6 @@ if (${CMAKE_BUILD_TYPE} STREQUAL "Release")
     set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} " /Ox")
 endif()
 
-include_directories("./")
-
 # Client
 add_subdirectory ("client")
 add_subdirectory ("common")

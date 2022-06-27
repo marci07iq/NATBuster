@@ -1,6 +1,9 @@
+#pragma once
+
+#include <map>
 #include <stdint.h>
 
-#include "../network/network.h"
+#include "opt_base.h"
 
 namespace NATBuster::Common::Transport {
     enum class PacketType {
@@ -36,7 +39,30 @@ namespace NATBuster::Common::Transport {
 #pragma pack(pop)
     };
 
-    class TCPOverUDP {
-        
+
+    class OPTUDP : public OPTBase {
+        //To store packets that have arrived, but are not being reassambled
+        std::map<uint32_t, Network::Packet> _recv_list;
+        std::list<Network::Packet> _reassamble_list;
+
+        std::list<std::pair<uint64_t, Network::Packet>> _transmit_queue;
+
+        uint32_t _tx_seq;
+        uint32_t _rx_seq;
+
+        uint32_t next_seq() {
+            return _tx_seq++;
+        }
+        OPTUDP(
+            OPTPacketCallback packet_callback,
+            OPTRawCallback raw_callback,
+            OPTClosedCallback closed_callback);
+
+    public:
+        void send(Network::Packet packet);
+        void sendRaw(Network::Packet packet);
+
+
+        void close();
     };
 }

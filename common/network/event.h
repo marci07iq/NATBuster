@@ -23,7 +23,7 @@ namespace NATBuster::Common::Network {
         //Keeps looping until:
         //-Stopped
         //-Abandoned
-        //-
+        //-No open sockets left
         static void loop(std::weak_ptr<TCPSEventEmitter> emitter_w);
 
         TCPSEventEmitter(
@@ -50,7 +50,7 @@ namespace NATBuster::Common::Network {
         //Keeps looping until:
         //-Stopped
         //-Abandoned
-        //-
+        //-No open sockets left
         static void loop(std::weak_ptr<TCPCEventEmitter> emitter_w);
 
         TCPCEventEmitter(
@@ -77,7 +77,7 @@ namespace NATBuster::Common::Network {
         //Keeps looping until:
         //-Stopped
         //-Abandoned
-        //-
+        //-No open sockets left
         static void loop(std::weak_ptr<UDPEventEmitter> emitter_w);
 
         UDPEventEmitter(

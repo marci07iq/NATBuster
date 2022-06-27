@@ -1,3 +1,5 @@
+#pragma once
+
 namespace NATBuster::Common::Utils {
     class NonCopyable
     {

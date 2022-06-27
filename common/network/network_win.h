@@ -121,7 +121,7 @@ namespace NATBuster::Common::Network {
 
         TCPCHandle accept();
 
-        static TCPSHandle findConnection(const std::list<TCPSHandle>& sockets, bool block);
+        static TCPSHandle find(const std::list<TCPSHandle>& sockets, int64_t timeout);
 
         ~TCPS();
     };
@@ -142,7 +142,7 @@ namespace NATBuster::Common::Network {
         bool send(Packet data);
         Packet read(uint32_t min_len, uint32_t max_len);
 
-        static TCPCHandle findReadable(const std::list<TCPCHandle>& sockets, bool block);
+        static TCPCHandle find(const std::list<TCPCHandle>& sockets, int64_t timeout);
 
         ~TCPC();
     };
@@ -166,7 +166,7 @@ namespace NATBuster::Common::Network {
         Packet readFilter(uint32_t max_len);
         Packet read(uint32_t max_len, NetworkAddress& address);
 
-        static UDPHandle findReadable(const std::list<UDPHandle>& sockets, bool block);
+        static UDPHandle find(const std::list<UDPHandle>& sockets, int64_t timeout);
 
         ~UDP();
     };

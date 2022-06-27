@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "opt_base.h"
+#include "../network/event.h"
 
 namespace NATBuster::Common::Transport {
     enum class PacketType {
@@ -50,15 +51,26 @@ namespace NATBuster::Common::Transport {
         uint32_t _tx_seq;
         uint32_t _rx_seq;
 
+        Network::UDPEventEmitter _socket;
+
         uint32_t next_seq() {
             return _tx_seq++;
         }
+
         OPTUDP(
             OPTPacketCallback packet_callback,
             OPTRawCallback raw_callback,
-            OPTClosedCallback closed_callback);
+            OPTClosedCallback closed_callback,
+            Network::UDPHandle socket);
 
     public:
+        OPTUDP create(
+            OPTPacketCallback packet_callback,
+            OPTRawCallback raw_callback,
+            OPTClosedCallback closed_callback,
+            Network::UDPHandle socket
+        );
+
         void send(Network::Packet packet);
         void sendRaw(Network::Packet packet);
 

@@ -156,7 +156,7 @@ namespace NATBuster::Common::Network {
         return std::make_shared<TCPC>(clientSocket);
     }
 
-    TCPSHandle TCPS::findConnection(const std::list<TCPSHandle>& sockets, bool block) {
+    TCPSHandle TCPS::findConnection(const std::list<TCPSHandle>& sockets, int64_t timeout) {
         FD_SET collection;
 
         FD_ZERO(&collection);
@@ -170,10 +170,10 @@ namespace NATBuster::Common::Network {
         }
 
         timeval to;
-        to.tv_sec = 0;
-        to.tv_usec = 0;
+        to.tv_sec = timeout / 1000000;
+        to.tv_usec = timeout % 1000000;
 
-        int count = select(0, &collection, NULL, NULL, block ? NULL : (&to));
+        int count = select(0, &collection, NULL, NULL, (timeout < 0) ? NULL : (&to));
 
         if (count == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
@@ -316,7 +316,7 @@ namespace NATBuster::Common::Network {
         return Packet::consume_from(progress, res);
     }
 
-    TCPCHandle TCPC::findReadable(const std::list<TCPCHandle>& sockets, bool block) {
+    TCPCHandle TCPC::findReadable(const std::list<TCPCHandle>& sockets, int64_t timeout) {
         FD_SET collection;
 
         FD_ZERO(&collection);
@@ -330,10 +330,10 @@ namespace NATBuster::Common::Network {
         }
 
         timeval to;
-        to.tv_sec = 0;
-        to.tv_usec = 0;
+        to.tv_sec = timeout / 1000000;
+        to.tv_usec = timeout % 1000000;
 
-        int count = select(0, &collection, NULL, NULL, block ? NULL : (&to));
+        int count = select(0, &collection, NULL, NULL, (timeout < 0) ? NULL : (&to));
 
         if (count == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
@@ -427,7 +427,7 @@ namespace NATBuster::Common::Network {
         return Packet::consume_from(iResult, recv_buf);
     }
 
-    UDPHandle UDP::findReadable(const std::list<UDPHandle>& sockets, bool block) {
+    UDPHandle UDP::findReadable(const std::list<UDPHandle>& sockets, int64_t timeout) {
         FD_SET collection;
 
         FD_ZERO(&collection);
@@ -441,10 +441,10 @@ namespace NATBuster::Common::Network {
         }
 
         timeval to;
-        to.tv_sec = 0;
-        to.tv_usec = 0;
+        to.tv_sec = timeout / 1000000;
+        to.tv_usec = timeout % 1000000;
 
-        int count = select(0, &collection, NULL, NULL, block ? NULL : (&to));
+        int count = select(0, &collection, NULL, NULL, (timeout < 0) ? NULL : (&to));
 
         if (count == SOCKET_ERROR || count == 0) {
             return UDPHandle();

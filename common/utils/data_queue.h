@@ -6,7 +6,7 @@
 
 namespace NATBuster::Common::Utils {
     template<typename T>
-    class DataQueue<T> {
+    class DataQueue {
         std::queue<T> data;
         std::mutex data_lock;
 
@@ -34,6 +34,12 @@ namespace NATBuster::Common::Utils {
             sleeper.wait(data_lock, [] {return data.size() != 0});
 
             return data.pop();
+        }
+
+        size_t count() {
+            std::unique_lock(data_lock);
+
+            return data.size();
         }
     };
 };

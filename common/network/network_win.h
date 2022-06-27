@@ -17,30 +17,13 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 #include "network.h"
-#include "../utils/no_copy.h"
+#include "../utils/copy_protection.h"
 
 namespace NATBuster::Common::Network {
-    enum NetworkErrorCodes {
-        NetworkErrorCodeInitalize,
-        NetworkErrorCodeResolveServerAddress,
-        NetworkErrorCodeResolveClientAddress,
-        NetworkErrorCodeCreateListenSocket,
-        NetworkErrorCodeCreateServerSocket,
-        NetworkErrorCodeCreateClientSocket,
-        NetworkErrorCodeConnectServer,
-        NetworkErrorCodeConnectClient,
-        NetworkErrorCodeServerSendData,
-        NetworkErrorCodeServerReciveData,
-        NetworkErrorCodeClientSendData,
-        NetworkErrorCodeClientReciveData,
-        NetworkErrorCodeBindListenSocket,
-        NetworkErrorCodeServerListen,
-        NetworkErrorCodeServerAccept,
-    };
 
-    void NetworkError(int ID, int WSAError) {
-        std::cerr << "Error code: " << ID << std::endl;
-    }
+    //
+    // Wrap OS sockets into a non-copyable object
+    //
 
     class SocketWrapper : Utils::NonCopyable {
         SOCKET _socket;
@@ -49,11 +32,11 @@ namespace NATBuster::Common::Network {
 
         }
 
-        inline bool valid() {
+        inline bool valid() const {
             return _socket != INVALID_SOCKET;
         }
 
-        inline bool invalid() {
+        inline bool invalid() const {
             return _socket == INVALID_SOCKET;
         }
 
@@ -69,37 +52,58 @@ namespace NATBuster::Common::Network {
             _socket = socket;
         }
 
-        SOCKET get() {
+        inline SOCKET get() {
             return _socket;
         }
 
         ~SocketWrapper() {
-            if (valid()) {
-                closesocket(_socket);
-                _socket = INVALID_SOCKET;
-            }
+            close();
         }
     };
 
-    class WSAContainer {
-        WSADATA _wsa_data;
+    class NetworkAddress {
+        sockaddr_in _address;
+
+        const int _address_length = sizeof(sockaddr_in);
+
+        static_assert(sizeof(sockaddr_in) == sizeof(sockaddr));
     public:
+        NetworkAddress();
 
-        WSAContainer(uint8_t major = 2, uint8_t minor = 2) {
-            //Create an instance of winsock
-            int iResult = WSAStartup(MAKEWORD(major, minor), &_wsa_data);
-            if (iResult != 0) {
-                NetworkError(NetworkErrorCodeInitalize, iResult);
-                return;
-            }
+        NetworkAddress(std::string name, uint16_t port);
+
+        inline sockaddr* get() {
+            return (sockaddr*)&_address;
         }
 
-        WSADATA get() const {
-            return _wsa_data;
+        inline const sockaddr* get() const {
+            return (sockaddr*)&_address;
         }
 
-        ~WSAContainer()  {
-            WSACleanup();
+        inline int size() const {
+            return _address_length;
+        }
+
+        inline uint32_t get_ipv4_int() const {
+            return _address.sin_addr.s_addr;
+        }
+
+        inline std::string get_ipv4() const {
+            char* res = inet_ntoa(_address.sin_addr);
+
+            return std::string(res);
+        }
+
+        inline uint16_t get_port() const {
+            return _address.sin_port;
+        }
+
+        inline bool operator==(const NetworkAddress& rhs) const {
+            return memcmp(&_address, &rhs._address, sizeof(sockaddr_in)) == 0;
+        }
+
+        inline bool operator!=(const NetworkAddress& rhs) const {
+            return memcmp(&_address, &rhs._address, sizeof(sockaddr_in)) != 0;
         }
     };
 
@@ -112,9 +116,12 @@ namespace NATBuster::Common::Network {
     public:
         TCPS(std::string name, uint16_t port);
 
+        bool valid();
+        void close();
+
         TCPCHandle accept();
 
-        static TCPSHandle findConnection(std::vector<TCPSHandle> sockets);
+        static TCPSHandle findConnection(const std::list<TCPSHandle>& sockets, bool block);
 
         ~TCPS();
     };
@@ -129,17 +136,39 @@ namespace NATBuster::Common::Network {
         TCPC(std::string name, uint16_t port);
         TCPC(SOCKET client);
 
-        bool send(Packet data);
-
-        bool isOpen();
-
+        bool valid();
         void close();
 
-        Packet read();
+        bool send(Packet data);
+        Packet read(uint32_t min_len, uint32_t max_len);
 
-        static TCPCHandle findReadable(std::vector<TCPCHandle> sockets);
+        static TCPCHandle findReadable(const std::list<TCPCHandle>& sockets, bool block);
 
         ~TCPC();
+    };
+
+    //
+    // UDP
+    //
+
+    class UDP {
+        SocketWrapper _socket;
+        NetworkAddress _remote_address;
+        NetworkAddress _local_address;
+    public:
+        UDP(std::string remote_name, uint16_t remote_port, uint16_t local_port = 0);
+        UDP(NetworkAddress remote_address, NetworkAddress local_address);
+
+        bool valid();
+        void close();
+
+        bool send(Packet data);
+        Packet readFilter(uint32_t max_len);
+        Packet read(uint32_t max_len, NetworkAddress& address);
+
+        static UDPHandle findReadable(const std::list<UDPHandle>& sockets, bool block);
+
+        ~UDP();
     };
 }
 

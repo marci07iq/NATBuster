@@ -6,6 +6,8 @@
 
 #include "../utils/data_queue.h"
 
+#include "../utils/event.h"
+
 namespace NATBuster::Common::Network {
     class TCPS;
     class TCPC;
@@ -14,6 +16,10 @@ namespace NATBuster::Common::Network {
     typedef std::shared_ptr<TCPS> TCPSHandle;
     typedef std::shared_ptr<TCPC> TCPCHandle;
     typedef std::shared_ptr<UDP> UDPHandle;
+
+    using TCPSEventEmitter = Utils::SocketEventEmitter<TCPS>;
+    using TCPCEventEmitter = Utils::SocketEventEmitter<TCPC>;
+    using UDPEventEmitter = Utils::SocketEventEmitter<UDP>;
 
     enum NetworkErrorCodes {
         //Initilaise network subsystem

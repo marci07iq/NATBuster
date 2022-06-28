@@ -76,6 +76,76 @@ namespace NATBuster::Common::Network {
         _address.sin_port = htons(port);
     }
 
+    template <typename MY_HWND>
+    bool SocketBase<MY_HWND>::check(Timeout timeout) {
+        FD_SET collection;
+
+        FD_ZERO(&collection);
+
+        if (_socket.valid()) {
+            FD_SET(sw.get(), &collection);
+        }
+
+        int count = select(0, &collection, NULL, NULL, to.to_native());
+
+        if (count == SOCKET_ERROR) {
+            NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
+            return false;
+        }
+
+        if (count == 0) {
+            return false;
+        }
+
+        if (sw.valid()) {
+            if (FD_ISSET(socket->_socket.get(), &collection)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    template <typename MY_HWND>
+    MY_HWND SocketBase<MY_HWND>::find(const std::list<MY_HWND>& sockets, Timeout timeout) {
+        FD_SET collection;
+
+        FD_ZERO(&collection);
+
+        for (auto&& socket : sockets) {
+            SocketWrapper& sw = socket->_socket;
+
+            if (sw.valid()) {
+                FD_SET(sw.get(), &collection);
+            }
+        }
+
+        timeval to = timeout.to_native();
+
+        int count = select(0, &collection, NULL, NULL, (timeout.infinite()) ? NULL : (&to));
+
+        if (count == SOCKET_ERROR) {
+            NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
+            return TCPSHandle();
+        }
+
+        if (count == 0) {
+            return TCPSHandle();
+        }
+
+        for (auto&& socket : sockets) {
+            SocketWrapper& sw = socket->_socket;
+
+            if (sw.valid()) {
+                if (FD_ISSET(socket->_socket.get(), &collection)) {
+                    return socket;
+                }
+            }
+        }
+        return TCPSHandle();
+    }
+
+
     //
     // TCP Server OS implementation
     // 
@@ -101,39 +171,31 @@ namespace NATBuster::Common::Network {
         }
 
         // Create the server listen socket
-        _listen_socket.set(::socket(result->ai_family, result->ai_socktype, result->ai_protocol));
-        if (_listen_socket.invalid()) {
+        _socket.set(::socket(result->ai_family, result->ai_socktype, result->ai_protocol));
+        if (_socket.invalid()) {
             NetworkError(NetworkErrorCodeCreateListenSocket, WSAGetLastError());
             freeaddrinfo(result);
             return;
         }
 
         // Bind the listen socket
-        iResult = ::bind(_listen_socket.get(), result->ai_addr, (int)result->ai_addrlen);
+        iResult = ::bind(_socket.get(), result->ai_addr, (int)result->ai_addrlen);
         if (iResult == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeBindListenSocket, WSAGetLastError());
             freeaddrinfo(result);
-            _listen_socket.close();
+            _socket.close();
             return;
         }
 
         freeaddrinfo(result);
 
         // Set socket to listening mode
-        iResult = ::listen(_listen_socket.get(), SOMAXCONN);
+        iResult = ::listen(_socket.get(), SOMAXCONN);
         if (iResult == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeListen, WSAGetLastError());
-            _listen_socket.close();
+            _socket.close();
             return;
         }
-    }
-
-    bool TCPS::valid() {
-        return _listen_socket.valid();
-    }
-
-    void TCPS::close() {
-        _listen_socket.close();
     }
 
     TCPCHandle TCPS::accept() {
@@ -141,13 +203,13 @@ namespace NATBuster::Common::Network {
         SOCKET clientSocket;
 
         // Accept a client socket
-        clientSocket = ::accept(_listen_socket.get(), NULL, NULL);
+        clientSocket = ::accept(_socket.get(), NULL, NULL);
         if (clientSocket == INVALID_SOCKET) {
             int error = WSAGetLastError();
             NetworkError(NetworkErrorCodeAccept, error);
             //Connection closed by remote before it could be accepted: Not a fatal error
             if (error != WSAECONNRESET) {
-                _listen_socket.close();
+                _socket.close();
             }
 
             return std::shared_ptr<TCPC>();
@@ -156,48 +218,8 @@ namespace NATBuster::Common::Network {
         return std::make_shared<TCPC>(clientSocket);
     }
 
-    TCPSHandle TCPS::findConnection(const std::list<TCPSHandle>& sockets, int64_t timeout) {
-        FD_SET collection;
-
-        FD_ZERO(&collection);
-
-        for (auto&& socket : sockets) {
-            SocketWrapper& sw = socket->_listen_socket;
-
-            if (sw.valid()) {
-                FD_SET(sw.get(), &collection);
-            }
-        }
-
-        timeval to;
-        to.tv_sec = timeout / 1000000;
-        to.tv_usec = timeout % 1000000;
-
-        int count = select(0, &collection, NULL, NULL, (timeout < 0) ? NULL : (&to));
-
-        if (count == SOCKET_ERROR) {
-            NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
-            return TCPSHandle();
-        }
-
-        if (count == 0) {
-            return TCPSHandle();
-        }
-
-        for (auto&& socket : sockets) {
-            SocketWrapper& sw = socket->_listen_socket;
-
-            if (sw.valid()) {
-                if (FD_ISSET(socket->_listen_socket.get(), &collection)) {
-                    return socket;
-                }
-            }
-        }
-        return TCPSHandle();
-    }
-
     TCPS::~TCPS() {
-        _listen_socket.close();
+        _socket.close();
     }
 
     //
@@ -226,16 +248,16 @@ namespace NATBuster::Common::Network {
         // Find potential addresses
         for (addrinfo* ptr = result; ptr != NULL; ptr = ptr->ai_next) {
             // Create socket
-            _client_socket.set(::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol));
-            if (_client_socket.invalid()) {
+            _socket.set(::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol));
+            if (_socket.invalid()) {
                 NetworkError(NetworkErrorCodeCreateClientSocket, WSAGetLastError());
                 return;
             }
 
             // Connect to server.
-            iResult = ::connect(_client_socket.get(), ptr->ai_addr, (int)ptr->ai_addrlen);
+            iResult = ::connect(_socket.get(), ptr->ai_addr, (int)ptr->ai_addrlen);
             if (iResult == SOCKET_ERROR) {
-                _client_socket.close();
+                _socket.close();
                 continue;
             }
             break;
@@ -243,43 +265,35 @@ namespace NATBuster::Common::Network {
 
         freeaddrinfo(result);
 
-        if (_client_socket.invalid()) {
+        if (_socket.invalid()) {
             NetworkError(NetworkErrorCodeConnect, 0);
             return;
         }
     }
 
-    TCPC::TCPC(SOCKET client) : _client_socket(client) {
+    TCPC::TCPC(SOCKET client) : SocketBase<TCPCHandle>(client) {
 
-    }
-
-    bool TCPC::valid() {
-        return _client_socket.valid();
-    }
-
-    void TCPC::close() {
-        _client_socket.close();
     }
 
     bool TCPC::send(Packet data) {
-        if (_client_socket.invalid()) return false;
+        if (_socket.invalid()) return false;
 
         int progress = 0;
 
         while (progress < data.size()) {
             //Send bytes till all sent
-            int iSendResult = ::send(_client_socket.get(), (char*)(data.get() + progress), data.size() - progress, 0);
+            int iSendResult = ::send(_socket.get(), (char*)(data.get() + progress), data.size() - progress, 0);
 
             //Stop if error
             if (iSendResult == SOCKET_ERROR) {
                 NetworkError(NetworkErrorCodeSendData, WSAGetLastError());
-                _client_socket.close();
+                _socket.close();
                 return false;
             }
 
             //Stop if no progress was made
             if (iSendResult == 0) {
-                _client_socket.close();
+                _socket.close();
                 return false;
             }
 
@@ -295,7 +309,7 @@ namespace NATBuster::Common::Network {
 
         //Even if min 0 requested, still do one round
         do {
-            int recv_len = recv(_client_socket.get(), (char*)res, max_len, 0);
+            int recv_len = recv(_socket.get(), (char*)res, max_len, 0);
 
             //Error
             if (recv_len == SOCKET_ERROR) {
@@ -314,46 +328,6 @@ namespace NATBuster::Common::Network {
         } while (progress < min_len);
 
         return Packet::consume_from(progress, res);
-    }
-
-    TCPCHandle TCPC::findReadable(const std::list<TCPCHandle>& sockets, int64_t timeout) {
-        FD_SET collection;
-
-        FD_ZERO(&collection);
-
-        for (auto&& socket : sockets) {
-            SocketWrapper& sw = socket->_client_socket;
-
-            if (sw.valid()) {
-                FD_SET(sw.get(), &collection);
-            }
-        }
-
-        timeval to;
-        to.tv_sec = timeout / 1000000;
-        to.tv_usec = timeout % 1000000;
-
-        int count = select(0, &collection, NULL, NULL, (timeout < 0) ? NULL : (&to));
-
-        if (count == SOCKET_ERROR) {
-            NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
-            return TCPCHandle();
-        }
-
-        if (count == 0) {
-            return TCPCHandle();
-        }
-
-        for (auto&& socket : sockets) {
-            SocketWrapper& sw = socket->_client_socket;
-
-            if (sw.valid()) {
-                if (FD_ISSET(socket->_client_socket.get(), &collection)) {
-                    return socket;
-                }
-            }
-        }
-        return TCPCHandle();
     }
 
     //
@@ -381,14 +355,6 @@ namespace NATBuster::Common::Network {
             _socket.close();
             return;
         }
-    }
-
-    bool UDP::valid() {
-        return _socket.valid();
-    }
-
-    void UDP::close() {
-        _socket.close();
     }
 
     bool UDP::send(Packet data) {
@@ -427,45 +393,10 @@ namespace NATBuster::Common::Network {
         return Packet::consume_from(iResult, recv_buf);
     }
 
-    UDPHandle UDP::findReadable(const std::list<UDPHandle>& sockets, int64_t timeout) {
-        FD_SET collection;
-
-        FD_ZERO(&collection);
-
-        for (auto&& socket : sockets) {
-            SocketWrapper& sw = socket->_socket;
-
-            if (sw.valid()) {
-                FD_SET(sw.get(), &collection);
-            }
-        }
-
-        timeval to;
-        to.tv_sec = timeout / 1000000;
-        to.tv_usec = timeout % 1000000;
-
-        int count = select(0, &collection, NULL, NULL, (timeout < 0) ? NULL : (&to));
-
-        if (count == SOCKET_ERROR || count == 0) {
-            return UDPHandle();
-        }
-
-        for (auto&& socket : sockets) {
-            SocketWrapper& sw = socket->_socket;
-
-            if (sw.valid()) {
-                if (FD_ISSET(socket->_socket.get(), &collection)) {
-                    return socket;
-                }
-            }
-        }
-        return UDPHandle();
-    }
-
     UDP::~UDP() {
         _socket.close();
     }
-    
+
 }
 
 #endif

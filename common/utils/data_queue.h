@@ -27,11 +27,11 @@ namespace NATBuster::Common::Utils {
             //Wake a consumer
             sleeper.notify_one();
         }
-        
+
         T get() {
             std::unique_lock(data_lock);
 
-            sleeper.wait(data_lock, [] {return data.size() != 0});
+            sleeper.wait(data_lock, []() {return data.size() != 0});
 
             return data.pop();
         }

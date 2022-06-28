@@ -107,21 +107,39 @@ namespace NATBuster::Common::Network {
         }
     };
 
+    template <typename MY_HWND>
+    class SocketBase : public Utils::AbstractBase {
+    protected:
+        SocketWrapper _socket;
+
+        SocketBase() {
+
+        }
+        SocketBase(SOCKET socket) : _socket(socket) {
+
+        }
+
+    public:
+        inline bool valid() {
+            return _socket.valid();
+        }
+        inline void close() {
+            return _socket.close();
+        }
+
+        bool check(Timeout timeout);
+        static MY_HWND find(const std::list<MY_HWND>& sockets, Timeout timeout);
+    };
+
     //
     // TCP Server OS implementation
     // 
 
-    class TCPS {
-        SocketWrapper _listen_socket;
+    class TCPS : public SocketBase<TCPSHandle> {
     public:
         TCPS(std::string name, uint16_t port);
 
-        bool valid();
-        void close();
-
         TCPCHandle accept();
-
-        static TCPSHandle find(const std::list<TCPSHandle>& sockets, int64_t timeout);
 
         ~TCPS();
     };
@@ -130,19 +148,15 @@ namespace NATBuster::Common::Network {
     // TCP Client OS implementation
     //
 
-    class TCPC {
-        SocketWrapper _client_socket;
+    class TCPC : public SocketBase<TCPCHandle> {
+    private:
+        TCPC(SOCKET client);
+        friend class TCPS;
     public:
         TCPC(std::string name, uint16_t port);
-        TCPC(SOCKET client);
-
-        bool valid();
-        void close();
 
         bool send(Packet data);
         Packet read(uint32_t min_len, uint32_t max_len);
-
-        static TCPCHandle find(const std::list<TCPCHandle>& sockets, int64_t timeout);
 
         ~TCPC();
     };
@@ -151,22 +165,16 @@ namespace NATBuster::Common::Network {
     // UDP
     //
 
-    class UDP {
-        SocketWrapper _socket;
+    class UDP : public SocketBase<UDPHandle> {
         NetworkAddress _remote_address;
         NetworkAddress _local_address;
     public:
         UDP(std::string remote_name, uint16_t remote_port, uint16_t local_port = 0);
         UDP(NetworkAddress remote_address, NetworkAddress local_address);
 
-        bool valid();
-        void close();
-
         bool send(Packet data);
         Packet readFilter(uint32_t max_len);
         Packet read(uint32_t max_len, NetworkAddress& address);
-
-        static UDPHandle find(const std::list<UDPHandle>& sockets, int64_t timeout);
 
         ~UDP();
     };

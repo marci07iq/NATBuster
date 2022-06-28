@@ -24,4 +24,11 @@ namespace NATBuster::Common::Utils {
 
         ~NonStack() = delete;
     };
+
+    class AbstractBase {
+    protected:
+        AbstractBase() = default;
+        AbstractBase(const AbstractBase&) = default;
+        AbstractBase(AbstractBase&&) = default;
+    };
 };

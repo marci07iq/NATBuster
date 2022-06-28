@@ -3,18 +3,9 @@
 #ifdef WIN32
 
 #include <iostream>
-
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <iphlpapi.h>
 #include <stdio.h>
 
-#pragma comment(lib, "Ws2_32.lib")
+#include "../os.h"
 
 #include "network.h"
 #include "../utils/copy_protection.h"
@@ -127,8 +118,8 @@ namespace NATBuster::Common::Network {
             return _socket.close();
         }
 
-        bool check(Timeout timeout);
-        static MY_HWND find(const std::list<MY_HWND>& sockets, Timeout timeout);
+        Utils::EventResponse<Utils::Void> check(Time::Timeout timeout);
+        static Utils::EventResponse<MY_HWND> find(const std::list<MY_HWND>& sockets, Time::Timeout timeout);
     };
 
     //

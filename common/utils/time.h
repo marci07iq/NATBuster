@@ -1,13 +1,14 @@
 #include <chrono>
 #include <stdint.h>
 
-#ifdef WIN32
-#include "windows.h"
-#endif
+#include "../os.h"
 
 namespace NATBuster::Common::Time
 {
     typedef uint64_t time_type_us;
+    typedef int64_t time_delta_type_us;
+    static const time_delta_type_us TIME_DELTA_INFINTE = -1;
+    static const time_delta_type_us TIME_DELTA_ZERO = 0;
 
     time_type_us now() {
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -18,18 +19,14 @@ namespace NATBuster::Common::Time
 
 #ifdef WIN32
     struct Timeout {
-        static const int64_t INFINTE = -1;
-        static const int64_t ZERO = 0;
-
-        const int64_t _timeout_us;
+        const time_delta_type_us _timeout_us;
 
         const timeval _timeout_os;
 
-        Timeout(int64_t timeout_us) : _timeout_us(timeout_us), _timeout_os({
+        Timeout(time_delta_type_us timeout_us) : _timeout_us(timeout_us), _timeout_os({
                 .tv_sec = long(_timeout_us / 1000000),
                 .tv_usec = long(_timeout_us % 1000000)
             }) {
-
         }
 
         inline bool infinite() {

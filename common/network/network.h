@@ -17,10 +17,6 @@ namespace NATBuster::Common::Network {
     typedef std::shared_ptr<TCPC> TCPCHandle;
     typedef std::shared_ptr<UDP> UDPHandle;
 
-    using TCPSEventEmitter = Utils::SocketEventEmitter<TCPS>;
-    using TCPCEventEmitter = Utils::SocketEventEmitter<TCPC>;
-    using UDPEventEmitter = Utils::SocketEventEmitter<UDP>;
-
     enum NetworkErrorCodes {
         //Initilaise network subsystem
         NetworkErrorCodeInitalize,
@@ -78,6 +74,33 @@ namespace NATBuster::Common::Network {
             return _data.get();
         }
     };
+
+    class PacketView {
+        const Packet _data;
+        const uint32_t _offset;
+    public:
+        PacketView(Packet data, uint32_t offset) : _data(data), _offset(offset) {
+
+        }
+
+        inline uint32_t size() const {
+            return _data.size() - _offset;
+        }
+
+        inline uint8_t* get() const {
+            return _data.get() + _offset;
+        }
+    };
+
+    bool operator==(const PacketView& lhs, const PacketView& rhs) {
+        if (lhs.size() != rhs.size()) return false;
+        return 0 == memcmp(lhs.get(), rhs.get(), lhs.size());
+    }
+
+    bool operator!=(const PacketView& lhs, const PacketView& rhs) {
+        if (lhs.size() != rhs.size()) return true;
+        return 0 != memcmp(lhs.get(), rhs.get(), lhs.size());
+    }
 };
 
 #include "network_win.h"

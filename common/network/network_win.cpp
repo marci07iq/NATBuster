@@ -3,6 +3,11 @@
 #include "network_win.h"
 
 namespace NATBuster::Common::Network {
+    //Log errors
+    void NetworkError(NetworkErrorCodes internal_id, int os_id) {
+        std::cerr << "Error code: " << internal_id << ", " << os_id << std::endl;
+    }
+
     namespace WSA {
         //Class to hold the WSA instance
         class WSAContainer;
@@ -37,12 +42,6 @@ namespace NATBuster::Common::Network {
 
         const WSAWrapper WSAContainer::wsa(2, 2);
     }
-
-    //Log errors
-    void NetworkError(NetworkErrorCodes internal_id, int os_id) {
-        std::cerr << "Error code: " << internal_id << ", " << os_id << std::endl;
-    }
-
     NetworkAddress::NetworkAddress() {
         ZeroMemory(&_address, sizeof(sockaddr_in));
     }
@@ -77,37 +76,37 @@ namespace NATBuster::Common::Network {
     }
 
     template <typename MY_HWND>
-    bool SocketBase<MY_HWND>::check(Timeout timeout) {
+    Utils::EventResponse<Utils::Void> SocketBase<MY_HWND>::check(Time::Timeout timeout) {
         FD_SET collection;
 
         FD_ZERO(&collection);
 
         if (_socket.valid()) {
-            FD_SET(sw.get(), &collection);
+            FD_SET(_socket.get(), &collection);
         }
 
-        int count = select(0, &collection, NULL, NULL, to.to_native());
+        int count = select(0, &collection, NULL, NULL, timeout.to_native());
 
         if (count == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
-            return false;
+            return Utils::EventResponse<void>(Utils::EventResponseType::SystemError);
         }
 
         if (count == 0) {
-            return false;
+            return Utils::EventResponse<void>(Utils::EventResponseType::Timeout);
         }
 
-        if (sw.valid()) {
-            if (FD_ISSET(socket->_socket.get(), &collection)) {
-                return true;
+        if (_socket.valid()) {
+            if (FD_ISSET(_socket.get(), &collection)) {
+                return Utils::EventResponse<void>(Utils::EventResponseType::OK);
             }
         }
 
-        return false;
+        return Utils::EventResponse<void>(Utils::EventResponseType::UnexpectedError);
     }
 
     template <typename MY_HWND>
-    MY_HWND SocketBase<MY_HWND>::find(const std::list<MY_HWND>& sockets, Timeout timeout) {
+    Utils::EventResponse<MY_HWND> SocketBase<MY_HWND>::find(const std::list<MY_HWND>& sockets, Time::Timeout timeout) {
         FD_SET collection;
 
         FD_ZERO(&collection);
@@ -126,11 +125,11 @@ namespace NATBuster::Common::Network {
 
         if (count == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
-            return TCPSHandle();
+            return Utils::EventResponse<void>(Utils::EventResponseType::SystemError);
         }
 
         if (count == 0) {
-            return TCPSHandle();
+            return Utils::EventResponse<void>(Utils::EventResponseType::Timeout);
         }
 
         for (auto&& socket : sockets) {
@@ -138,11 +137,12 @@ namespace NATBuster::Common::Network {
 
             if (sw.valid()) {
                 if (FD_ISSET(socket->_socket.get(), &collection)) {
-                    return socket;
+                    return Utils::EventResponse<void>(Utils::EventResponseType::OK, socket);
                 }
             }
         }
-        return TCPSHandle();
+
+        return Utils::EventResponse<void>(Utils::EventResponseType::UnexpectedError);
     }
 
 
@@ -215,7 +215,9 @@ namespace NATBuster::Common::Network {
             return std::shared_ptr<TCPC>();
         }
 
-        return std::make_shared<TCPC>(clientSocket);
+        TCPC* newSocket = new TCPC(clientSocket);
+
+        return TCPCHandle(newSocket);
     }
 
     TCPS::~TCPS() {

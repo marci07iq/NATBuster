@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "opt_base.h"
-#include "../network/event.h"
+#include "../utils/event.h"
 
 namespace NATBuster::Common::Transport {
     enum class PacketType {
@@ -40,6 +40,16 @@ namespace NATBuster::Common::Transport {
 #pragma pack(pop)
     };
 
+    struct OPTUDPSettings {
+        uint16_t _max_mtu = 1500; //Max MTU of the UDP packet to send
+        bool _fec_on = false; //Enable forward error correction
+        Time::time_type_us ping_interval = 5000000; //5sec
+        Time::time_type_us max_pong = 30000000; //30sec
+        float ping_rt_mul = 1.5f;
+        float jitter_rt_mul = 1.5f;
+        //Re-transmits occur after ping*ping_rt_mul + jitter*jitter_rt_mul
+        float ping_average_weight = 0.01;
+    };
 
     class OPTUDP : public OPTBase {
         //To store packets that have arrived, but are not being reassambled
@@ -51,30 +61,35 @@ namespace NATBuster::Common::Transport {
         uint32_t _tx_seq;
         uint32_t _rx_seq;
 
-        Network::UDPEventEmitter _socket;
+        //Running average of ACK pings
+        float _ping = 0.1;
+        //Running average of ACK ping squares
+        float _ping2 = 0.01;
+        //Jitter = sqrt(ping2 - ping**2)
+
+        OPTUDPSettings _settings;
+        Network::Packet _magic;
+
+        Utils::SocketEventEmitter<Network::UDP, Utils::Void> _socket;
+
 
         uint32_t next_seq() {
             return _tx_seq++;
         }
 
-        OPTUDP(
-            OPTPacketCallback packet_callback,
-            OPTRawCallback raw_callback,
-            OPTClosedCallback closed_callback,
-            Network::UDPHandle socket);
-
     public:
         OPTUDP create(
-            OPTPacketCallback packet_callback,
-            OPTRawCallback raw_callback,
-            OPTClosedCallback closed_callback,
-            Network::UDPHandle socket
+            Network::UDPHandle socket,
+            Network::Packet magic,
+            OPTUDPSettings settings
         );
+
+        bool valid();
+        void close();
+
+        bool check(Time::Timeout timeout);
 
         void send(Network::Packet packet);
         void sendRaw(Network::Packet packet);
-
-
-        void close();
     };
 }

@@ -31,7 +31,7 @@ namespace NATBuster::Common::Utils {
         T get() {
             std::unique_lock(data_lock);
 
-            sleeper.wait(data_lock, []() {return data.size() != 0});
+            sleeper.wait(data_lock, []() {return data.size() != 0; });
 
             return data.pop();
         }

@@ -163,18 +163,20 @@ namespace NATBuster::Common::Transport {
                             }
                         }
                     }
-                        //Data packet
+                    //Data packet
                     case PacketType::PKT_MID:
                     case PacketType::PKT_START:
                     case PacketType::PKT_END:
                     case PacketType::PKT_SINGLE:
                         //Safe even at roll-around
+                    {
                         int32_t advance = pkt->content.packet.seq - emitter->_rx_seq;
                         if (advance >= 0) {
                             emitter->_receive_map.insert({ pkt->content.packet.seq , packet });
                             emitter->try_reassemble();
                         }
-                        break;
+                    }
+                    break;
 
                     case PacketType::UDP_PIPE:
                         emitter->_raw_callback(packet);
@@ -274,7 +276,7 @@ namespace NATBuster::Common::Transport {
     void OPTUDP::send(Network::Packet packet) {
         std::lock_guard _lg(_tx_lock);
 
-        
+
     }
     void OPTUDP::sendRaw(Network::Packet packet) {
         std::lock_guard _lg(_tx_lock);

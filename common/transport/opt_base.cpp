@@ -5,7 +5,7 @@ namespace NATBuster::Common::Transport {
     OPTBase::OPTBase(
         OPTPacketCallback packet_callback,
         OPTRawCallback raw_callback,
-        OPTRawCallback error_callback,
+        OPTErrorCallback error_callback,
         OPTClosedCallback closed_callback) :
         _packet_callback(packet_callback),
         _raw_callback(raw_callback),

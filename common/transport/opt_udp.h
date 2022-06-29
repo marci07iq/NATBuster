@@ -101,10 +101,10 @@ namespace NATBuster::Common::Transport {
 
         Network::UDPHandle _socket;
 
-        uint32_t next_seq() {
+        uint32_t next_seq(int n = 1) {
             std::lock_guard lg(_tx_lock);
             uint32_t ret = _tx_seq;
-            _tx_seq+=packet_decoder::seq_rt_cnt;
+            _tx_seq+=packet_decoder::seq_rt_cnt * n;
             return ret;
         }
 
@@ -140,7 +140,7 @@ namespace NATBuster::Common::Transport {
 
         void stop();
 
-        void send(Network::Packet packet);
-        void sendRaw(Network::Packet packet);
+        void send(Network::Packet data);
+        void sendRaw(Network::Packet data);
     };
 }

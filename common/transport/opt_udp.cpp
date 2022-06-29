@@ -3,6 +3,7 @@
 #include <set>
 #include <vector>
 
+#include "network.h"
 #include "opt_udp.h"
 #include "../utils/random.h"
 
@@ -273,12 +274,62 @@ namespace NATBuster::Common::Transport {
         _socket->close();
     }
 
-    void OPTUDP::send(Network::Packet packet) {
-        std::lock_guard _lg(_tx_lock);
+    void OPTUDP::send(Network::Packet data) {
+        //Type and seq
+        uint32_t max_packet_length = _settings._max_mtu - 5;
 
+        uint32_t packets_left = (data.size() - 1) / max_packet_length + 1;
+
+        uint32_t progress = 0;
+
+        uint32_t seq = next_seq(packets_left);
+
+        while (progress < data.size()) {
+            uint32_t data_left = data.size() - progress;
+            uint32_t packet_data = (data_left - 1) / (packets_left)+1;
+
+            Network::Packet packet;
+
+            //1 byte header
+            packet.create_empty(packet_data + 5);
+
+            packet_decoder* pview = packet_decoder::view(packet);
+
+            pview->type = (uint8_t)((progress == 0) ?
+                ((packet_data == data_left) ? PacketType::PKT_SINGLE : PacketType::PKT_START) :
+                ((packet_data == data_left) ? PacketType::PKT_END : PacketType::PKT_MID));
+
+            memcpy(pview->content.packet.data, &data.get()[progress], packet_data);
+
+            packets_left--;
+            progress += packet_data;
+
+            struct transmit_packet tx_packet = {
+                .transmits = std::vector<Time::time_type_us>({ Time::now() }),
+                .packet = packet,
+            };
+
+            //Can't have ACK arrive before the packet was added to the queue
+            {
+                std::lock_guard _lg(_tx_lock);
+                _transmit_queue.push_back(tx_packet);
+            }
+            _socket->send(packet);
+        }
 
     }
-    void OPTUDP::sendRaw(Network::Packet packet) {
-        std::lock_guard _lg(_tx_lock);
+    void OPTUDP::sendRaw(Network::Packet data) {
+        Network::Packet packet;
+
+        //1 byte header
+        packet.create_empty(data.size() + 1);
+
+        packet_decoder* pview = packet_decoder::view(packet);
+
+        pview->type = PacketType::UDP_PIPE;
+
+        memcpy(pview->content.raw.data, data.get(), data.size());
+
+        _socket->send(packet);
     }
 };

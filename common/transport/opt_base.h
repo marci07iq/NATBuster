@@ -8,17 +8,20 @@
 namespace NATBuster::Common::Transport {
     typedef std::function<void(Network::Packet)> OPTPacketCallback;
     typedef std::function<void(Network::Packet)> OPTRawCallback;
+    typedef std::function<void()> OPTErrorCallback;
     typedef std::function<void()> OPTClosedCallback;
 
     //Ordered packet transport
     class OPTBase : Utils::NonCopyable {
+    protected:
         OPTPacketCallback _packet_callback;
         OPTRawCallback _raw_callback;
+        OPTErrorCallback _error_callback;
         OPTClosedCallback _closed_callback;
-    protected:
         OPTBase(
             OPTPacketCallback packet_callback,
             OPTRawCallback raw_callback,
+            OPTErrorCallback error_callback,
             OPTClosedCallback closed_callback);
 
     public:

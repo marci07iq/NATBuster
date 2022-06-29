@@ -94,11 +94,11 @@ namespace NATBuster::Common::Utils
     concept Eventable = requires(SRC t, Time::Timeout to)
     {
         //Validity check. If false, the event emitter returns
-        { t.valid() } -> std::same_as<bool>;
+        { t->valid() } -> std::same_as<bool>;
         //Close function, for when the event emitter needs to exit
-        { t.close() } -> std::same_as<void>;
+        { t->close() } -> std::same_as<void>;
         //Gets the next response
-        { t.check(to) } -> std::same_as<EventResponse<VAL>>;
+        { t->check(to) } -> std::same_as<EventResponse<VAL>>;
     };
 
     //Wrap an object satisfying the 
@@ -112,10 +112,12 @@ namespace NATBuster::Common::Utils
         requires Eventable<EVENT_SRC, RESULT_TYPE>
     class SocketEventEmitter
     {
+    public:
         using EventCallback = std::function<void(std::shared_ptr<SocketEventEmitter>, RESULT_TYPE)>;
         using TimerEventCallback = std::function<void(std::shared_ptr<SocketEventEmitter>)>;
         using ShutdownEventCallback = std::function<void()>;
 
+    private:
         const EventCallback _event_callback;
         const EventCallback _error_callback;
         const TimerEventCallback _timer_callback;
@@ -154,13 +156,14 @@ namespace NATBuster::Common::Utils
         //By the time shutdown callback is called, the object could be dead
         //So copy it out now
         ShutdownEventCallback shutdown_callback_copy;
+        Time::time_type_us next_timer;
         {
             std::shared_ptr<SocketEventEmitter<EVENT_SRC, RESULT_TYPE>> emitter = emitter_w.lock();
             if (!emitter) return;
             shutdown_callback_copy = emitter->_shutdown_callback;
+            next_timer = Time::now() + emitter->_period;
         }
 
-        Time::time_type_us next_timer = Time::now() + _period;
 
         while (true) {
             //Check if object still exists
@@ -180,7 +183,7 @@ namespace NATBuster::Common::Utils
 
 
             Time::Timeout to(
-                (_period < 0) ?
+                (emitter->_period < 0) ?
                 (Time::TIME_DELTA_INFINTE) :
                 ((timeout_us < 0) ? 0 : timeout_us));
 
@@ -189,13 +192,13 @@ namespace NATBuster::Common::Utils
 
             if (result.timeout()) {
                 next_timer = Time::now();
-                emitter->_timer_callback();
+                emitter->_timer_callback(emitter);
             }
             if (result.error()) {
-                emitter->_error_callback(result.get());
+                emitter->_error_callback(emitter, result.get());
             }
             if (result.ok()) {
-                emitter->_event_callback(result.get());
+                emitter->_event_callback(emitter, result.get());
             }
 
         }

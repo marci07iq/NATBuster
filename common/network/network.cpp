@@ -27,6 +27,12 @@ namespace NATBuster::Common::Network {
         return Packet(length, consume_data);
     }
 
+    Packet Packet::create_empty(uint32_t length) {
+        uint8_t* mem = new uint8_t[length];
+        memset(mem, 0, length);
+        return Packet::consume_from(length, mem);
+    }
+
     /*Packet::Packet(const Packet& other) : _length(other.size()) {
         uint8_t* new_data = new uint8_t(other.size());
 

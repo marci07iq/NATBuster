@@ -62,6 +62,7 @@ namespace NATBuster::Common::Network {
         static Packet copy_from(uint32_t length, uint8_t* copy_data);
         static Packet copy_from(const Packet& packet);
         static Packet consume_from(uint32_t length, uint8_t* consume_data);
+        static Packet create_empty(uint32_t length);
 
 
         //Packet(const Packet& other);

@@ -11,4 +11,6 @@ file(GLOB_RECURSE COMMON_HDRS CONFIGURE_DEPENDS *.h)
 
 add_library(Common STATIC ${COMMON_SRCS} ${COMMON_HDRS})
 
+target_link_libraries(Common PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+
 include_directories(Common ${ROOT_INCLUDE_DIRS})

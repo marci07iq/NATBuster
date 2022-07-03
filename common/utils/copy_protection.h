@@ -1,6 +1,7 @@
 #pragma once
 
 namespace NATBuster::Common::Utils {
+    //Class that cant be copied
     class NonCopyable
     {
     public:
@@ -12,6 +13,23 @@ namespace NATBuster::Common::Utils {
         ~NonCopyable() = default; /// Protected non-virtual destructor
     };
 
+    //Class that cant be copied or move
+    class MoveableNonCopyable
+    {
+    public:
+        MoveableNonCopyable(const MoveableNonCopyable&) = delete;
+        MoveableNonCopyable& operator = (const MoveableNonCopyable&) = delete;
+
+
+        MoveableNonCopyable(MoveableNonCopyable&&) = default;
+        MoveableNonCopyable& operator= (MoveableNonCopyable&) = default;
+    protected:
+        MoveableNonCopyable() = default;
+        ~MoveableNonCopyable() = default; /// Protected non-virtual destructor
+    };
+
+    //Class that can only be created via pointer case (T*)(other)
+    //Intended for mapping structs as "views" onto binary data blob
     class NonStack
     {
     private:
@@ -24,6 +42,7 @@ namespace NATBuster::Common::Utils {
 
         ~NonStack() = delete;
     };
+
 
     class AbstractBase {
     protected:

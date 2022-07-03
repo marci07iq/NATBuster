@@ -7,7 +7,7 @@
 #include "../utils/event.h"
 
 namespace NATBuster::Common::Transport {
-    enum class PacketType {
+    enum class PacketType : uint8_t {
         MGMT_HELLO = 1, //Followed by 64 byte pre-shared magic
 
         MGMT_PING = 2, //Followed by a 64 byte random nonce
@@ -45,9 +45,15 @@ namespace NATBuster::Common::Transport {
 
             //Need as non const ref, so caller must maintain ownership of Packet
             static inline packet_decoder* view(Network::Packet& packet) {
-                return (packet_decoder*)packet.get();
+                return (packet_decoder*)(packet.get());
             }
         };
+
+        static_assert(offsetof(packet_decoder, type) == 0);
+        static_assert(offsetof(packet_decoder, content.ping.bytes) == 1);
+        static_assert(offsetof(packet_decoder, content.packet.seq) == 1);
+        static_assert(offsetof(packet_decoder, content.packet.data) == 5);
+        static_assert(offsetof(packet_decoder, content.raw.data) == 1);
 #pragma pack(pop)
     };
 

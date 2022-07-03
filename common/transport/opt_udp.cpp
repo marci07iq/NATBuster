@@ -3,7 +3,7 @@
 #include <set>
 #include <vector>
 
-#include "network.h"
+#include "../network/network.h"
 #include "opt_udp.h"
 #include "../utils/random.h"
 
@@ -326,7 +326,7 @@ namespace NATBuster::Common::Transport {
 
         packet_decoder* pview = packet_decoder::view(packet);
 
-        pview->type = PacketType::UDP_PIPE;
+        pview->type = (uint8_t)PacketType::UDP_PIPE;
 
         memcpy(pview->content.raw.data, data.get(), data.size());
 

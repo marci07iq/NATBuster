@@ -1,9 +1,8 @@
 #pragma once
 
-#include <cstdint>
-
-#include <openssl/sha.h>
+#include <map>
+#include <string>
 
 namespace NATBuster::Common::Crypto {
     
-}
+};

@@ -15,7 +15,7 @@ namespace NATBuster::Common::Crypto {
         
         PEMRaw();
 
-        void save(std::string filename)
+        void save(std::string filename);
 
         ~PEMRaw();
     };

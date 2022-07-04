@@ -48,52 +48,21 @@ namespace NATBuster::Common::Crypto {
         if (_key != NULL) return false;
 
         //Parameter generation ctx
-        EVP_PKEY_CTX* param_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
-        if (NULL == param_ctx) {
+        EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id((int)nid, NULL);
+        if (NULL == ctx) {
             return false;
         }
 
-        if (1 != EVP_PKEY_paramgen_init(param_ctx)) {
-            EVP_PKEY_CTX_free(param_ctx);
+        if (1 != EVP_PKEY_keygen_init(ctx)) {
+            EVP_PKEY_CTX_free(ctx);
+            return false;
+        }
+        if (1 != EVP_PKEY_keygen(ctx, &_key)) {
+            EVP_PKEY_CTX_free(ctx);
             return false;
         }
 
-        if (1 != EVP_PKEY_CTX_set_ec_paramgen_curve_nid(param_ctx, (int)nid)) {
-            EVP_PKEY_CTX_free(param_ctx);
-            return false;
-        }
-
-
-        EVP_PKEY* params = NULL;
-        if (!EVP_PKEY_paramgen(param_ctx, &params)) {
-            EVP_PKEY_CTX_free(param_ctx);
-            return false;
-        }
-
-        EVP_PKEY_CTX* key_ctx = EVP_PKEY_CTX_new(params, NULL);
-        if (NULL == key_ctx) {
-            EVP_PKEY_free(params);
-            EVP_PKEY_CTX_free(param_ctx);
-            return false;
-        }
-
-
-        if (1 != EVP_PKEY_keygen_init(key_ctx)) {
-            EVP_PKEY_CTX_free(key_ctx);
-            EVP_PKEY_free(params);
-            EVP_PKEY_CTX_free(param_ctx);
-            return false;
-        }
-        if (1 != EVP_PKEY_keygen(key_ctx, &_key)) {
-            EVP_PKEY_CTX_free(key_ctx);
-            EVP_PKEY_free(params);
-            EVP_PKEY_CTX_free(param_ctx);
-            return false;
-        }
-
-        EVP_PKEY_CTX_free(key_ctx);
-        EVP_PKEY_free(params);
-        EVP_PKEY_CTX_free(param_ctx);
+        EVP_PKEY_CTX_free(ctx);
 
         return true;
 
@@ -104,7 +73,7 @@ namespace NATBuster::Common::Crypto {
     }
 
     bool PKey::generate_ed25519() {
-        return  generate(PKeyAlgo::Ed25519);
+        return generate(PKeyAlgo::Ed25519);
     }
 
     bool PKey::load_file_private(std::string filename) {
@@ -246,5 +215,42 @@ namespace NATBuster::Common::Crypto {
         EVP_MD_CTX_free(md_ctx);
 
         return res == 1;
+    }
+
+    bool PKey::ecdhe(PKey& key_other, uint8_t*& secret, uint32_t& secret_len) {
+        EVP_PKEY_CTX* ctx;
+        if (NULL == (ctx = EVP_PKEY_CTX_new(_key, NULL))) return false;
+
+        if (1 != EVP_PKEY_derive_init(ctx)) {
+            EVP_PKEY_CTX_free(ctx);
+            return false;
+        }
+
+        if (1 != EVP_PKEY_derive_set_peer(ctx, key_other._key)) {
+            EVP_PKEY_CTX_free(ctx);
+            return false;
+        }
+
+        size_t secret_len_szt;
+        if (1 != EVP_PKEY_derive(ctx, NULL, &secret_len_szt)) {
+            EVP_PKEY_CTX_free(ctx);
+            return false;
+        }
+
+        secret = new uint8_t[secret_len_szt];
+        if (secret == NULL) {
+            EVP_PKEY_CTX_free(ctx);
+            return false;
+        }
+
+        if (1 != (EVP_PKEY_derive(ctx, secret, &secret_len_szt))) {
+            EVP_PKEY_CTX_free(ctx);
+            return false;
+        }
+
+        secret_len = secret_len_szt;
+
+        EVP_PKEY_CTX_free(ctx);
+        return true;
     }
 };

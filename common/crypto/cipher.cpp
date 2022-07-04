@@ -161,7 +161,7 @@ namespace NATBuster::Common::Crypto {
 
         if (aad != nullptr && aad_len == 0) {
             if (!EVP_DecryptUpdate(_ctx, NULL, &len, aad, aad_len))
-                throw 1;
+                return false;
         }
 
         //Data starts at 16 offset, auth tag before
@@ -172,7 +172,7 @@ namespace NATBuster::Common::Crypto {
 
         //Set expected auth tag
         if (!EVP_CIPHER_CTX_ctrl(_ctx, EVP_CTRL_GCM_SET_TAG, 16, (void*)in))
-            throw 1;
+            return false;
 
         int ret = EVP_DecryptFinal_ex(_ctx, out + cum_len, &len);
         cum_len += len;

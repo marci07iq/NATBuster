@@ -42,45 +42,13 @@ namespace NATBuster::Common::Crypto {
 
         bool export_public(uint8_t*& out, uint32_t& out_len);
 
+        //Ed25519 key only
         bool sign(const uint8_t* data, const uint32_t data_len, uint8_t*& sig_out, uint32_t& sig_out_len);
 
+        //Ed25519 key only
         bool verify(const uint8_t* data, const uint32_t data_len, const uint8_t* sig, const uint32_t sig_len);
 
-        bool ecdhe(PKey& key_other, uint8_t*& secret, uint32_t& secret_len) {
-            EVP_PKEY_CTX* ctx;
-            if (NULL == (ctx = EVP_PKEY_CTX_new(_key, NULL))) return false;
-
-            if (1 != EVP_PKEY_derive_init(ctx)) {
-                EVP_PKEY_CTX_free(ctx);
-                return false;
-            }
-
-			if (1 != EVP_PKEY_derive_set_peer(ctx, key_other._key)) {
-                EVP_PKEY_CTX_free(ctx);
-                return false;
-            }
-
-            size_t secret_len_szt;
-			if (1 != EVP_PKEY_derive(ctx, NULL, &secret_len_szt)) {
-                EVP_PKEY_CTX_free(ctx);
-                return false;
-            }
-            
-            secret = new uint8_t[secret_len];
-            if (secret == NULL) {
-                EVP_PKEY_CTX_free(ctx);
-                return false;
-            }
-
-			if (1 != (EVP_PKEY_derive(ctx, secret, &secret_len_szt))) {
-                EVP_PKEY_CTX_free(ctx);
-                return false;
-            }
-
-            secret_len = secret_len_szt;
-
-			EVP_PKEY_CTX_free(ctx);
-			return true;
-        }
+        //Ec25519 key only
+        bool ecdhe(PKey& key_other, uint8_t*& secret, uint32_t& secret_len);
     };
 };

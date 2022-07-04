@@ -48,6 +48,8 @@ namespace NATBuster::Common::Crypto {
         if(_key != nullptr) EVP_PKEY_free(_key);
         _key = other._key;
         other._key = nullptr;
+
+        return *this;
     }
 
     bool PKey::loaded() {

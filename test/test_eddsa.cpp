@@ -32,7 +32,7 @@ int main() {
         if (!key_a.sign((const uint8_t*)data, 64, a_aign, a_sign_len)) goto error;
 
         if (a_aign == nullptr) goto error;
-        if (a_sign_len == nullptr) goto error;
+        if (a_sign_len == 0) goto error;
 
         if (!key_a_pub.verify((const uint8_t*)data, 64, a_aign, a_sign_len)) goto error;
 

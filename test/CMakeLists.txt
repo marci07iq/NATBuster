@@ -9,7 +9,7 @@ foreach (testsourcefile ${tests})
     get_filename_component(testname ${testsourcefile} NAME_WLE)
     message("${testname} | ${testsourcefile}")
     add_executable("${testname}" ${testsourcefile})
-    add_test(NAME ${testname} COMMAND ${testname})
+    add_test(NAME "NATBuster.${testname}" COMMAND ${testname})
     target_link_libraries("${testname}" OpenSSL::SSL OpenSSL::Crypto Common)
 endforeach (testsourcefile ${srcs})
 

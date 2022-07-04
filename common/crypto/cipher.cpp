@@ -91,6 +91,8 @@ namespace NATBuster::Common::Crypto {
 
         _iv.parts.packet = other._iv.parts.packet;
         other._iv.parts.packet = 0;
+
+        return *this;
     }
 
     uint8_t CipherAES256GCMPacket::iv_size() {

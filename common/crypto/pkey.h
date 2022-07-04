@@ -24,6 +24,10 @@ namespace NATBuster::Common::Crypto {
         static int key_password_cb(char* buf, int size, int rwflag, void* u);
 
     public:
+        PKey() {
+
+        }
+
         PKey(PKey&& other);
 
         PKey& operator=(PKey&& other);

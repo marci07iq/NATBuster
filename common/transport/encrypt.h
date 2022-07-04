@@ -37,7 +37,7 @@ namespace NATBuster::Common::Transport {
         //Public key of remote device. Give in constructor to trust.
         Crypto::PKey _remote_public;
     public:
-        EncryptOPT(std::shared_ptr<OPTBase> underlying, Crypto::PKey&& remote_public) : _underyling(underlying), _remote_public(remote_public) {
+        EncryptOPT(std::shared_ptr<OPTBase> underlying, Crypto::PKey&& remote_public) : _underyling(underlying), _remote_public(std::move(remote_public)) {
 
         }
 

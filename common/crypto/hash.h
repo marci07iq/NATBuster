@@ -6,6 +6,7 @@
 
 #include <openssl/sha.h>
 
+#include "../utils/blob.h"
 #include "../utils/copy_protection.h"
 
 namespace NATBuster::Common::Crypto {
@@ -29,8 +30,7 @@ namespace NATBuster::Common::Crypto {
 
         uint8_t* out_alloc();
 
-        bool calc(const uint8_t* in, const uint32_t in_len, uint8_t* out, const uint32_t out_len);
-        bool calc_alloc(const uint8_t* in, const uint32_t in_len, uint8_t*& out, uint32_t& out_len);
+        bool calc(const Utils::BlobView& in, Utils::BlobView& out);
 
         ~Hash();
     };

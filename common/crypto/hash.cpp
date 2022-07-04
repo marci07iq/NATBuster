@@ -39,6 +39,8 @@ namespace NATBuster::Common::Crypto {
         if (_algo != nullptr) EVP_MD_free(_algo);
         _algo = other._algo;
         other._algo = nullptr;
+
+        return *this;
     }
 
     uint32_t Hash::out_size() {
@@ -49,41 +51,22 @@ namespace NATBuster::Common::Crypto {
         return new uint8_t[out_size()];
     }
 
-    bool Hash::calc(const uint8_t* in, uint32_t in_len, uint8_t* out, uint32_t out_len) {
+    bool Hash::calc(const Utils::BlobView& in, Utils::BlobView& out) {
         /* Initialise the digest operation */
         if (!EVP_DigestInit_ex(_ctx, _algo, nullptr))
             return false;
 
-        if (!EVP_DigestUpdate(_ctx, in, in_len))
+        if (!EVP_DigestUpdate(_ctx, in.get(), in.size()))
             return false;
 
+        out.resize(EVP_MD_get_size(_algo));
+
         uint32_t write_len;
-        if (!EVP_DigestFinal_ex(_ctx, out, &write_len))
+        if (!EVP_DigestFinal_ex(_ctx, out.get(), &write_len))
             return false;
 
         //Check for buffer overruns
-        assert(write_len <= out_len);
-        return write_len == out_len;
-    }
-
-    bool Hash::calc_alloc(const uint8_t* in, uint32_t in_len, uint8_t*& out, uint32_t& out_len) {
-        /* Initialise the digest operation */
-        if (!EVP_DigestInit_ex(_ctx, _algo, nullptr))
-            return false;
-
-        if (!EVP_DigestUpdate(_ctx, in, in_len))
-            return false;
-
-        out_len = EVP_MD_get_size(_algo);
-
-        out = new uint8_t[out_len];
-
-        uint32_t write_len;
-        if (!EVP_DigestFinal_ex(_ctx, out, &write_len))
-            return false;
-
-        //Check for buffer overruns
-        return write_len == out_len;
+        return write_len == out.size();
     }
 
     Hash::~Hash() {

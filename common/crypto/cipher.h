@@ -7,6 +7,7 @@
 #include <openssl/evp.h>
 
 #include "../utils/copy_protection.h"
+#include "../utils/blob.h"
 
 namespace NATBuster::Common::Crypto {
     /*enum class CipherAlgo : uint8_t {

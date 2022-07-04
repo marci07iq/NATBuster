@@ -27,35 +27,31 @@ namespace NATBuster::Common::Transport {
         UDP_PIPE = 48, //Deliver as - is
     };
 
-    extern "C" {
-        
-
 #pragma pack(push, 1)
-        struct packet_decoder : Utils::NonStack {
-            static const uint32_t seq_rt_mask = 0x3f;
-            static const uint32_t seq_rt_cnt = 64;
-            static const uint32_t seq_num_mask = ~seq_rt_mask;
+    struct packet_decoder : Utils::NonStack {
+        static const uint32_t seq_rt_mask = 0x3f;
+        static const uint32_t seq_rt_cnt = 64;
+        static const uint32_t seq_num_mask = ~seq_rt_mask;
 
-            uint8_t type;
-            union {
-                struct ping_data { uint8_t bytes[64]; } ping;
-                struct packet_data { uint32_t seq; uint8_t data[1]; } packet;
-                struct raw_data { uint8_t data[1]; } raw;
-            } content;
+        uint8_t type;
+        union {
+            struct ping_data { uint8_t bytes[64]; } ping;
+            struct packet_data { uint32_t seq; uint8_t data[1]; } packet;
+            struct raw_data { uint8_t data[1]; } raw;
+        } content;
 
-            //Need as non const ref, so caller must maintain ownership of Packet
-            static inline packet_decoder* view(Network::Packet& packet) {
-                return (packet_decoder*)(packet.get());
-            }
-        };
-
-        static_assert(offsetof(packet_decoder, type) == 0);
-        static_assert(offsetof(packet_decoder, content.ping.bytes) == 1);
-        static_assert(offsetof(packet_decoder, content.packet.seq) == 1);
-        static_assert(offsetof(packet_decoder, content.packet.data) == 5);
-        static_assert(offsetof(packet_decoder, content.raw.data) == 1);
-#pragma pack(pop)
+        //Need as non const ref, so caller must maintain ownership of Packet
+        static inline packet_decoder* view(Network::Packet& packet) {
+            return (packet_decoder*)(packet.get());
+        }
     };
+
+    static_assert(offsetof(packet_decoder, type) == 0);
+    static_assert(offsetof(packet_decoder, content.ping.bytes) == 1);
+    static_assert(offsetof(packet_decoder, content.packet.seq) == 1);
+    static_assert(offsetof(packet_decoder, content.packet.data) == 5);
+    static_assert(offsetof(packet_decoder, content.raw.data) == 1);
+#pragma pack(pop)
 
     struct OPTUDPSettings {
         uint16_t _max_mtu = 1500; //Max MTU of the UDP packet to send
@@ -89,7 +85,7 @@ namespace NATBuster::Common::Transport {
         std::mutex _system_lock;
 
         //Use the low 6 bits for a re-transmit counter
-        
+
         //Next packet to send out
         uint32_t _tx_seq = 0;
         //Next packet we are expecting in
@@ -110,7 +106,7 @@ namespace NATBuster::Common::Transport {
         uint32_t next_seq(int n = 1) {
             std::lock_guard lg(_tx_lock);
             uint32_t ret = _tx_seq;
-            _tx_seq+=packet_decoder::seq_rt_cnt * n;
+            _tx_seq += packet_decoder::seq_rt_cnt * n;
             return ret;
         }
 

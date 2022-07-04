@@ -53,7 +53,7 @@ namespace NATBuster::Common::Network {
             //Resolve host name to IP
             hostent* server_ip = gethostbyname(name.c_str());
 
-            if (server_ip == NULL) {
+            if (server_ip == nullptr) {
                 NetworkError(NetworkErrorCodeResolveAddress, WSAGetLastError());
                 return;
             }
@@ -85,7 +85,7 @@ namespace NATBuster::Common::Network {
             FD_SET(_socket.get(), &collection);
         }
 
-        int count = select(0, &collection, NULL, NULL, timeout.to_native());
+        int count = select(0, &collection, nullptr, nullptr, timeout.to_native());
 
         if (count == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
@@ -121,7 +121,7 @@ namespace NATBuster::Common::Network {
 
         timeval to = timeout.to_native();
 
-        int count = select(0, &collection, NULL, NULL, (timeout.infinite()) ? NULL : (&to));
+        int count = select(0, &collection, nullptr, nullptr, (timeout.infinite()) ? nullptr : (&to));
 
         if (count == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
@@ -163,8 +163,8 @@ namespace NATBuster::Common::Network {
 
         // Resolve the server address and port
         std::string port_s = std::to_string(port);
-        addrinfo* result = NULL;
-        iResult = ::getaddrinfo(NULL, port_s.c_str(), &hints, &result);
+        addrinfo* result = nullptr;
+        iResult = ::getaddrinfo(nullptr, port_s.c_str(), &hints, &result);
         if (iResult != 0) {
             NetworkError(NetworkErrorCodeResolveAddress, iResult);
             return;
@@ -203,7 +203,7 @@ namespace NATBuster::Common::Network {
         SOCKET clientSocket;
 
         // Accept a client socket
-        clientSocket = ::accept(_socket.get(), NULL, NULL);
+        clientSocket = ::accept(_socket.get(), nullptr, nullptr);
         if (clientSocket == INVALID_SOCKET) {
             int error = WSAGetLastError();
             NetworkError(NetworkErrorCodeAccept, error);
@@ -240,7 +240,7 @@ namespace NATBuster::Common::Network {
 
         // Resolve the server address and port
         std::string port_s = std::to_string(port);
-        addrinfo* result = NULL;
+        addrinfo* result = nullptr;
         iResult = ::getaddrinfo(name.c_str(), port_s.c_str(), &hints, &result);
         if (iResult != 0) {
             NetworkError(NetworkErrorCodeResolveAddress, iResult);
@@ -248,7 +248,7 @@ namespace NATBuster::Common::Network {
         }
 
         // Find potential addresses
-        for (addrinfo* ptr = result; ptr != NULL; ptr = ptr->ai_next) {
+        for (addrinfo* ptr = result; ptr != nullptr; ptr = ptr->ai_next) {
             // Create socket
             _socket.set(::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol));
             if (_socket.invalid()) {

@@ -16,8 +16,8 @@ namespace NATBuster::Common::Crypto {
 
 
     /*class Cipher : Utils::AbstractBase {
-        EVP_CIPHER_CTX* _ctx = NULL;
-        EVP_CIPHER* _algo = NULL;
+        EVP_CIPHER_CTX* _ctx = nullptr;
+        EVP_CIPHER* _algo = nullptr;
     public:
         Cipher(CipherAlgo algo);
 
@@ -39,8 +39,8 @@ namespace NATBuster::Common::Crypto {
     //Ciphertext contains encrypted data and auth tag
     //Set up one of these classes with identical parameters on both ends
     class CipherAES256GCMPacket : Utils::NonCopyable {
-        EVP_CIPHER_CTX* _ctx = NULL;
-        EVP_CIPHER* _algo = NULL;
+        EVP_CIPHER_CTX* _ctx = nullptr;
+        EVP_CIPHER* _algo = nullptr;
 
         uint8_t _key[32];
 
@@ -59,6 +59,10 @@ namespace NATBuster::Common::Crypto {
         
     public:
         CipherAES256GCMPacket();
+
+        CipherAES256GCMPacket(CipherAES256GCMPacket&& other);
+
+        CipherAES256GCMPacket& operator=(CipherAES256GCMPacket&& other);
 
         uint8_t iv_size();
         void set_iv_common(uint32_t common);

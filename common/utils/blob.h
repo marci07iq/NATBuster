@@ -6,7 +6,8 @@
 #include "copy_protection.h"
 
 namespace NATBuster::Common::Utils {
-    class Blob : Utils::NonCopyable {
+    class Blob : Utils::MoveableNonCopyable
+    {
         uint8_t* _buffer;
         uint32_t _offset;
         uint32_t _capacity;
@@ -14,7 +15,7 @@ namespace NATBuster::Common::Utils {
 
         inline void dbg_self_test() const {
 #ifndef NDEBUG
-            assert(_buffer != NULL);
+            assert(_buffer != nullptr);
             assert(_offset <= _capacity);
             assert(_size <= _capacity);
             assert(_offset + _size <= _capacity);
@@ -38,16 +39,43 @@ namespace NATBuster::Common::Utils {
 
         }
 
+        Blob(Blob&& other) {
+            _buffer = other._buffer;
+            _offset = other._offset;
+            _capacity = other._capacity;
+            _size = other._size;
+
+            other._buffer = nullptr;
+            other._offset = 0;
+            other._capacity = 0;
+            other._size = 0;
+        }
+
+        Blob& operator=(Blob&& other) {
+            //Wipe self content
+            clear();
+
+            _buffer = other._buffer;
+            _offset = other._offset;
+            _capacity = other._capacity;
+            _size = other._size;
+
+            other._buffer = nullptr;
+            other._offset = 0;
+            other._capacity = 0;
+            other._size = 0;
+        }
+
         //Factory to consume an existing buffer
         static Blob consume(uint8_t* data_consume, uint32_t len) {
             return Blob(data_consume, len);
         }
 
-        static Blob concat(std::initializer_list<const Blob&> list) {
+        static Blob concat(std::initializer_list<Blob*> list) {
             uint32_t new_offset = 0;
             uint32_t new_len = 0;
             for (auto& it : list) {
-                new_len += it.size();
+                new_len += it->size();
             }
             //New end gap
             uint32_t new_cap = new_offset + new_len + 0;
@@ -56,9 +84,9 @@ namespace NATBuster::Common::Utils {
 
             uint32_t progress = new_offset;
 
-            for (auto& it : list) {
-                memcpy(buffer + progress, it.get(), it.size());
-                new_len += it.size();
+            for (auto it : list) {
+                memcpy(buffer + progress, it->get(), it->size());
+                new_len += it->size();
             }
 
             return Blob(buffer, new_cap, new_len, new_offset);

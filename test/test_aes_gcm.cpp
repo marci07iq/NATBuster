@@ -27,12 +27,12 @@ int main() {
         const char* data = "Fg=/F76UztD/fU64rcUZgI/Tö9oHHZvUTRd+Ug8=HKJZViztF)UVgjGOU;FUTZgkhBU";
         const uint32_t data_len = 37;
 
-        uint8_t* cipher = NULL;
+        uint8_t* cipher = nullptr;
         uint32_t cipher_len = 0;
 
         if(!encrypt.encrypt_alloc((const uint8_t*)data, data_len, cipher, cipher_len, nullptr, 0)) goto error;
 
-        uint8_t* plaintext = NULL;
+        uint8_t* plaintext = nullptr;
         uint32_t plaintext_len = 0;
 
         if(!decrypt.decrypt_alloc(cipher, cipher_len, plaintext, plaintext_len, nullptr, 0)) goto error;
@@ -56,14 +56,14 @@ int main() {
         delete[] plaintext;
         delete[] cipher;
 
-        cipher = NULL;
-        plaintext = NULL;
+        cipher = nullptr;
+        plaintext = nullptr;
 
         return 0;
     }
 
 error:
-    printf("%s", ERR_error_string(ERR_get_error(), NULL));
+    printf("%s", ERR_error_string(ERR_get_error(), nullptr));
 
     return 1;
 }

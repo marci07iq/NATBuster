@@ -20,7 +20,25 @@ namespace NATBuster::Common::Crypto {
     Hash::Hash(HashAlgo algo) {
         _ctx = EVP_MD_CTX_new();
 
-        _algo = EVP_MD_fetch(NULL, HashAlgoNames[(uint8_t)algo].openssl_name, NULL);
+        _algo = EVP_MD_fetch(nullptr, HashAlgoNames[(uint8_t)algo].openssl_name, nullptr);
+    }
+
+    Hash::Hash(Hash&& other) {
+        _ctx = other._ctx;
+        other._ctx = nullptr;
+
+        _algo = other._algo;
+        other._algo = nullptr;
+    }
+
+    Hash& Hash::operator=(Hash&& other) {
+        if (_ctx != nullptr) EVP_MD_CTX_free(_ctx);
+        _ctx = other._ctx;
+        other._ctx = nullptr;
+
+        if (_algo != nullptr) EVP_MD_free(_algo);
+        _algo = other._algo;
+        other._algo = nullptr;
     }
 
     uint32_t Hash::out_size() {
@@ -33,7 +51,7 @@ namespace NATBuster::Common::Crypto {
 
     bool Hash::calc(const uint8_t* in, uint32_t in_len, uint8_t* out, uint32_t out_len) {
         /* Initialise the digest operation */
-        if (!EVP_DigestInit_ex(_ctx, _algo, NULL))
+        if (!EVP_DigestInit_ex(_ctx, _algo, nullptr))
             return false;
 
         if (!EVP_DigestUpdate(_ctx, in, in_len))
@@ -50,7 +68,7 @@ namespace NATBuster::Common::Crypto {
 
     bool Hash::calc_alloc(const uint8_t* in, uint32_t in_len, uint8_t*& out, uint32_t& out_len) {
         /* Initialise the digest operation */
-        if (!EVP_DigestInit_ex(_ctx, _algo, NULL))
+        if (!EVP_DigestInit_ex(_ctx, _algo, nullptr))
             return false;
 
         if (!EVP_DigestUpdate(_ctx, in, in_len))
@@ -69,11 +87,11 @@ namespace NATBuster::Common::Crypto {
     }
 
     Hash::~Hash() {
-        if (_algo != NULL) {
+        if (_algo != nullptr) {
             EVP_MD_free(_algo);
         }
 
-        if (_ctx != NULL) {
+        if (_ctx != nullptr) {
             EVP_MD_CTX_free(_ctx);
         }
     }

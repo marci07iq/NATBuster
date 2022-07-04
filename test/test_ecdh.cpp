@@ -13,8 +13,8 @@ int main() {
         NATBuster::Common::Crypto::PKey key_b;
         if (!key_b.generate_ec25519()) goto error;
 
-        uint8_t* a_public = NULL;
-        uint8_t* b_public = NULL;
+        uint8_t* a_public = nullptr;
+        uint8_t* b_public = nullptr;
 
         uint32_t a_public_len;
         uint32_t b_public_len;
@@ -25,8 +25,8 @@ int main() {
         if (a_public_len == 0) goto error;
         if (b_public_len == 0) goto error;
 
-        if (a_public == NULL) goto error;
-        if (b_public == NULL) goto error;
+        if (a_public == nullptr) goto error;
+        if (b_public == nullptr) goto error;
 
         NATBuster::Common::Crypto::PKey key_a_pub;
         if (!key_a_pub.load_public(a_public, a_public_len)) goto error;
@@ -34,8 +34,8 @@ int main() {
         NATBuster::Common::Crypto::PKey key_b_pub;
         if (!key_b_pub.load_public(b_public, b_public_len)) goto error;
 
-        uint8_t* ab_secret = NULL;
-        uint8_t* ba_secret = NULL;
+        uint8_t* ab_secret = nullptr;
+        uint8_t* ba_secret = nullptr;
 
         uint32_t ab_secret_len;
         uint32_t ba_secret_len;
@@ -43,8 +43,8 @@ int main() {
         if (!key_a.ecdhe(key_b_pub, ab_secret, ab_secret_len)) goto error;
         if (!key_b.ecdhe(key_a_pub, ba_secret, ba_secret_len)) goto error;
 
-        if (ab_secret == NULL) goto error;
-        if (ba_secret == NULL) goto error;
+        if (ab_secret == nullptr) goto error;
+        if (ba_secret == nullptr) goto error;
 
         if (ab_secret_len != ba_secret_len) goto error;
 
@@ -63,7 +63,7 @@ int main() {
     }
 
 error:
-    printf("%s", ERR_error_string(ERR_get_error(), NULL));
+    printf("%s", ERR_error_string(ERR_get_error(), nullptr));
 
     return 1;
 }

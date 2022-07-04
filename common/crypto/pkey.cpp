@@ -39,17 +39,28 @@ namespace NATBuster::Common::Crypto {
         return len;
     }
 
+    PKey::PKey(PKey&& other) {
+        _key = other._key;
+        other._key = nullptr;
+    }
+
+    PKey& PKey::operator=(PKey&& other) {
+        if(_key != nullptr) EVP_PKEY_free(_key);
+        _key = other._key;
+        other._key = nullptr;
+    }
+
     bool PKey::loaded() {
-        return _key != NULL;
+        return _key != nullptr;
     }
 
     bool PKey::generate(PKeyAlgo nid) {
         //Override protection
-        if (_key != NULL) return false;
+        if (_key != nullptr) return false;
 
         //Parameter generation ctx
-        EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id((int)nid, NULL);
-        if (NULL == ctx) {
+        EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id((int)nid, nullptr);
+        if (nullptr == ctx) {
             return false;
         }
 
@@ -78,49 +89,49 @@ namespace NATBuster::Common::Crypto {
 
     bool PKey::load_file_private(std::string filename) {
         //Dont overwrite
-        if (_key != NULL) return false;
+        if (_key != nullptr) return false;
 
         //Read file
         FILE* fp = fopen(filename.c_str(), "r");
-        if (fp == NULL) return false;
+        if (fp == nullptr) return false;
 
         //Read key
-        _key = PEM_read_PrivateKey(fp, NULL, key_password_cb, NULL);
+        _key = PEM_read_PrivateKey(fp, nullptr, key_password_cb, nullptr);
 
         //Close file
         fclose(fp);
 
-        return (_key != NULL);
+        return (_key != nullptr);
     }
 
     bool PKey::load_public(const uint8_t* out, uint32_t out_len) {
         //Dont overwrite
-        if (_key != NULL) return false;
+        if (_key != nullptr) return false;
 
         //Create BIO
         BIO* mem = BIO_new(BIO_s_mem());
         BIO_write(mem, out, out_len);
 
         //Read key
-        _key = PEM_read_bio_PUBKEY(mem, NULL, key_password_cb, NULL);
+        _key = PEM_read_bio_PUBKEY(mem, nullptr, key_password_cb, nullptr);
 
         //Free BIO
         BIO_free(mem);
 
-        return (_key != NULL);
+        return (_key != nullptr);
     }
 
     bool PKey::save_file_private(std::string filename) {
         //Need to have a key
-        if (_key == NULL) return false;
+        if (_key == nullptr) return false;
 
         //Open file
         FILE* fp = fopen(filename.c_str(), "w");
-        if (fp == NULL) return false;
+        if (fp == nullptr) return false;
 
         //Write key
         //TODO: Add password support
-        int res = PEM_write_PKCS8PrivateKey(fp, _key, NULL, NULL, 0, NULL, NULL);
+        int res = PEM_write_PKCS8PrivateKey(fp, _key, nullptr, nullptr, 0, nullptr, nullptr);
 
         //Close file
         fclose(fp);
@@ -130,11 +141,11 @@ namespace NATBuster::Common::Crypto {
 
     bool PKey::save_file_public(std::string filename) {
         //Need to have a key
-        if (_key == NULL) return false;
+        if (_key == nullptr) return false;
 
         //Open file
         FILE* fp = fopen(filename.c_str(), "w");
-        if (fp == NULL) return false;
+        if (fp == nullptr) return false;
 
         //Write key
         int res = PEM_write_PUBKEY(fp, _key);
@@ -147,7 +158,7 @@ namespace NATBuster::Common::Crypto {
 
     bool PKey::export_public(uint8_t*& out, uint32_t& out_len) {
         //Need to have a key
-        if (_key == NULL) return false;
+        if (_key == nullptr) return false;
 
         //Create BIO buffer
         BIO* mem = BIO_new(BIO_s_mem());
@@ -173,14 +184,14 @@ namespace NATBuster::Common::Crypto {
         //TODO: Error check;
         EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
 
-        if (1 != EVP_DigestSignInit(md_ctx, NULL, NULL, NULL, _key)) {
+        if (1 != EVP_DigestSignInit(md_ctx, nullptr, nullptr, nullptr, _key)) {
             EVP_MD_CTX_free(md_ctx);
             return false;
         }
 
         size_t siglen;
 
-        if (1 != EVP_DigestSign(md_ctx, NULL, &siglen, data, data_len)) {
+        if (1 != EVP_DigestSign(md_ctx, nullptr, &siglen, data, data_len)) {
             EVP_MD_CTX_free(md_ctx);
             return false;
         }
@@ -203,7 +214,7 @@ namespace NATBuster::Common::Crypto {
         //TODO: Error check;
         EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
 
-        if (1 != EVP_DigestVerifyInit(md_ctx, NULL, NULL, NULL, _key)) {
+        if (1 != EVP_DigestVerifyInit(md_ctx, nullptr, nullptr, nullptr, _key)) {
             EVP_MD_CTX_free(md_ctx);
             return false;
         }
@@ -219,7 +230,7 @@ namespace NATBuster::Common::Crypto {
 
     bool PKey::ecdhe(PKey& key_other, uint8_t*& secret, uint32_t& secret_len) {
         EVP_PKEY_CTX* ctx;
-        if (NULL == (ctx = EVP_PKEY_CTX_new(_key, NULL))) return false;
+        if (nullptr == (ctx = EVP_PKEY_CTX_new(_key, nullptr))) return false;
 
         if (1 != EVP_PKEY_derive_init(ctx)) {
             EVP_PKEY_CTX_free(ctx);
@@ -232,13 +243,13 @@ namespace NATBuster::Common::Crypto {
         }
 
         size_t secret_len_szt;
-        if (1 != EVP_PKEY_derive(ctx, NULL, &secret_len_szt)) {
+        if (1 != EVP_PKEY_derive(ctx, nullptr, &secret_len_szt)) {
             EVP_PKEY_CTX_free(ctx);
             return false;
         }
 
         secret = new uint8_t[secret_len_szt];
-        if (secret == NULL) {
+        if (secret == nullptr) {
             EVP_PKEY_CTX_free(ctx);
             return false;
         }

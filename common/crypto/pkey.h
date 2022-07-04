@@ -19,11 +19,15 @@ namespace NATBuster::Common::Crypto {
     };
 
     class PKey : Utils::NonCopyable {
-        EVP_PKEY* _key = NULL;
+        EVP_PKEY* _key = nullptr;
 
         static int key_password_cb(char* buf, int size, int rwflag, void* u);
 
     public:
+        PKey(PKey&& other);
+
+        PKey& operator=(PKey&& other);
+
         bool loaded();
 
         bool generate(PKeyAlgo nid);

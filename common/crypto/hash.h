@@ -16,10 +16,14 @@ namespace NATBuster::Common::Crypto {
 
 
     class Hash : Utils::NonCopyable {
-        EVP_MD_CTX* _ctx = NULL;
-        EVP_MD* _algo = NULL;
+        EVP_MD_CTX* _ctx = nullptr;
+        EVP_MD* _algo = nullptr;
     public:
         Hash(HashAlgo algo);
+
+        Hash(Hash&& other);
+
+        Hash& operator=(Hash&& other);
 
         uint32_t out_size();
 

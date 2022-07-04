@@ -13,7 +13,7 @@ namespace NATBuster::Common::Crypto {
 
     /*struct cipher_algo_params {
         const char* openssl_name;
-        //cipher_ossl_param* openssl_params = NULL;
+        //cipher_ossl_param* openssl_params = nullptr;
     };
 
     //Same order as the CipherAlgo
@@ -34,15 +34,15 @@ namespace NATBuster::Common::Crypto {
     Cipher::Cipher(CipherAlgo algo) {
         _ctx = EVP_CIPHER_CTX_new();
 
-        _algo = EVP_CIPHER_fetch(NULL, CipherAlgoNames[(uint8_t)algo].openssl_name, NULL);
+        _algo = EVP_CIPHER_fetch(nullptr, CipherAlgoNames[(uint8_t)algo].openssl_name, nullptr);
     }
 
     Cipher::~Cipher() {
-        if (_algo != NULL) {
+        if (_algo != nullptr) {
             EVP_CIPHER_free(_algo);
         }
 
-        if (_ctx != NULL) {
+        if (_ctx != nullptr) {
             EVP_CIPHER_CTX_free(_ctx);
         }
     }*/
@@ -50,7 +50,47 @@ namespace NATBuster::Common::Crypto {
     CipherAES256GCMPacket::CipherAES256GCMPacket() {
         _ctx = EVP_CIPHER_CTX_new();
 
-        _algo = EVP_CIPHER_fetch(NULL, "AES-256-GCM", NULL);
+        _algo = EVP_CIPHER_fetch(nullptr, "AES-256-GCM", nullptr);
+    }
+
+    CipherAES256GCMPacket::CipherAES256GCMPacket(CipherAES256GCMPacket&& other) {
+        _ctx = other._ctx;
+        other._ctx = nullptr;
+
+        _algo = other._algo;
+        other._algo = nullptr;
+
+        for (int i = 0; i < 32; i++) {
+            _key[i] = other._key[i];
+            other._key[i] = 0;
+        }
+
+        _iv.parts.common = other._iv.parts.common;
+        other._iv.parts.common = 0;
+
+        _iv.parts.packet = other._iv.parts.packet;
+        other._iv.parts.packet = 0;
+    }
+
+    CipherAES256GCMPacket& CipherAES256GCMPacket::operator=(CipherAES256GCMPacket&& other) {
+        if (_ctx != nullptr) EVP_CIPHER_CTX_free(_ctx);
+        _ctx = other._ctx;
+        other._ctx = nullptr;
+
+        if (_algo != nullptr) EVP_CIPHER_free(_algo);
+        _algo = other._algo;
+        other._algo = nullptr;
+
+        for (int i = 0; i < 32; i++) {
+            _key[i] = other._key[i];
+            other._key[i] = 0;
+        }
+
+        _iv.parts.common = other._iv.parts.common;
+        other._iv.parts.common = 0;
+
+        _iv.parts.packet = other._iv.parts.packet;
+        other._iv.parts.packet = 0;
     }
 
     uint8_t CipherAES256GCMPacket::iv_size() {
@@ -86,13 +126,13 @@ namespace NATBuster::Common::Crypto {
     ) {
         assert(out_len == enc_size(in_len));
 
-        if (1 != EVP_EncryptInit_ex(_ctx, _algo, NULL, NULL, NULL))
+        if (1 != EVP_EncryptInit_ex(_ctx, _algo, nullptr, nullptr, nullptr))
             return false;
 
-        if (1 != EVP_CIPHER_CTX_ctrl(_ctx, EVP_CTRL_GCM_SET_IVLEN, 12, NULL))
+        if (1 != EVP_CIPHER_CTX_ctrl(_ctx, EVP_CTRL_GCM_SET_IVLEN, 12, nullptr))
             return false;
 
-        if (1 != EVP_EncryptInit_ex(_ctx, NULL, NULL, _key, _iv.bytes))
+        if (1 != EVP_EncryptInit_ex(_ctx, nullptr, nullptr, _key, _iv.bytes))
             return false;
 
         //Auth tag goes at the beginning
@@ -101,7 +141,7 @@ namespace NATBuster::Common::Crypto {
 
         //Add Additional Authentication Data if needed
         if (aad != nullptr && aad_len != 0) {
-            if (1 != EVP_EncryptUpdate(_ctx, NULL, &len, aad, aad_len))
+            if (1 != EVP_EncryptUpdate(_ctx, nullptr, &len, aad, aad_len))
                 return false;
         }
 
@@ -147,20 +187,20 @@ namespace NATBuster::Common::Crypto {
     ) {
         assert(out_len == dec_size(in_len));
 
-        if (!EVP_DecryptInit_ex(_ctx, _algo, NULL, NULL, NULL))
+        if (!EVP_DecryptInit_ex(_ctx, _algo, nullptr, nullptr, nullptr))
             return false;
 
-        if (!EVP_CIPHER_CTX_ctrl(_ctx, EVP_CTRL_GCM_SET_IVLEN, 12, NULL))
+        if (!EVP_CIPHER_CTX_ctrl(_ctx, EVP_CTRL_GCM_SET_IVLEN, 12, nullptr))
             return false;
 
-        if (!EVP_DecryptInit_ex(_ctx, NULL, NULL, _key, _iv.bytes))
+        if (!EVP_DecryptInit_ex(_ctx, nullptr, nullptr, _key, _iv.bytes))
             return false;
 
         int len = 0;
         int cum_len = 0;
 
         if (aad != nullptr && aad_len == 0) {
-            if (!EVP_DecryptUpdate(_ctx, NULL, &len, aad, aad_len))
+            if (!EVP_DecryptUpdate(_ctx, nullptr, &len, aad, aad_len))
                 return false;
         }
 
@@ -198,11 +238,11 @@ namespace NATBuster::Common::Crypto {
     }
 
     CipherAES256GCMPacket::~CipherAES256GCMPacket() {
-        if (_algo != NULL) {
+        if (_algo != nullptr) {
             EVP_CIPHER_free(_algo);
         }
 
-        if (_ctx != NULL) {
+        if (_ctx != nullptr) {
             EVP_CIPHER_CTX_free(_ctx);
         }
     }

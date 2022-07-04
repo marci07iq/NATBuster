@@ -10,7 +10,7 @@ int main() {
         NATBuster::Common::Crypto::PKey key_a;
         if (!key_a.generate_ed25519()) goto error;
 
-        uint8_t* a_public = NULL;
+        uint8_t* a_public = nullptr;
         
         uint32_t a_public_len;
         
@@ -18,12 +18,12 @@ int main() {
         
         if (a_public_len == 0) goto error;
        
-        if (a_public == NULL) goto error;
+        if (a_public == nullptr) goto error;
         
         NATBuster::Common::Crypto::PKey key_a_pub;
         if (!key_a_pub.load_public(a_public, a_public_len)) goto error;
 
-        uint8_t* a_aign = NULL;
+        uint8_t* a_aign = nullptr;
 
         uint32_t a_sign_len;
 
@@ -31,8 +31,8 @@ int main() {
 
         if (!key_a.sign((const uint8_t*)data, 64, a_aign, a_sign_len)) goto error;
 
-        if (a_aign == NULL) goto error;
-        if (a_sign_len == NULL) goto error;
+        if (a_aign == nullptr) goto error;
+        if (a_sign_len == nullptr) goto error;
 
         if (!key_a_pub.verify((const uint8_t*)data, 64, a_aign, a_sign_len)) goto error;
 
@@ -47,7 +47,7 @@ int main() {
     }
 
 error:
-    printf("%s", ERR_error_string(ERR_get_error(), NULL));
+    printf("%s", ERR_error_string(ERR_get_error(), nullptr));
 
     return 1;
 }

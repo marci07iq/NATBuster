@@ -2,13 +2,50 @@
 
 namespace NATBuster::Common::Utils {
     
+    BlobView::BlobView() {
+
+    }
+
+    BlobSliceView BlobView::slice(uint32_t start, uint32_t len) {
+        return BlobSliceView(this, start, len);
+    }
+
+    BlobSliceView BlobView::slice_left(uint32_t split) {
+        assert(split <= size());
+        return BlobSliceView(this, 0, split);
+    }
+    
+    BlobSliceView BlobView::slice_right(uint32_t split) {
+        assert(split <= size());
+        return BlobSliceView(this, split, size() - split);
+    }
+
+    const BlobCSliceView BlobView::slice(uint32_t start, uint32_t len) const {
+        return BlobCSliceView(this, start, len);
+    }
+
+    const BlobCSliceView BlobView::slice_left(uint32_t split) const {
+        assert(split <= size());
+        return BlobCSliceView(this, 0, split);
+    }
+
+    const BlobCSliceView BlobView::slice_right(uint32_t split) const {
+        assert(split <= size());
+        return BlobCSliceView(this, split, size() - split);
+    }
+
     //Consume a buffer, holding the data, but with pre and post gaps
-    Blob::Blob(uint8_t* buffer_consume, uint32_t buffer_size, uint32_t data_size, uint32_t data_offset) : _buffer(buffer_consume), _offset(data_offset), _capacity(buffer_size), _size(data_size) {
+    Blob::Blob(uint8_t* buffer_consume, uint32_t buffer_size, uint32_t data_size, uint32_t data_pre_gap) :
+        _buffer(buffer_consume),
+        _pre_gap(data_pre_gap),
+        _capacity(buffer_size),
+        _size(data_size) {
 
     }
 
     //Consume a buffer, holding the data with no gaps
-    Blob::Blob(uint8_t* buffer_consume, uint32_t buffer_size) : Blob(buffer_consume, buffer_size, buffer_size, 0) {
+    Blob::Blob(uint8_t* buffer_consume, uint32_t buffer_size) :
+        Blob(buffer_consume, buffer_size, buffer_size, 0) {
 
     }
 
@@ -17,12 +54,12 @@ namespace NATBuster::Common::Utils {
     }
     Blob::Blob(Blob&& other) {
         _buffer = other._buffer;
-        _offset = other._offset;
+        _pre_gap = other._pre_gap;
         _capacity = other._capacity;
         _size = other._size;
 
         other._buffer = nullptr;
-        other._offset = 0;
+        other._pre_gap = 0;
         other._capacity = 0;
         other._size = 0;
     }
@@ -31,12 +68,12 @@ namespace NATBuster::Common::Utils {
         clear();
 
         _buffer = other._buffer;
-        _offset = other._offset;
+        _pre_gap = other._pre_gap;
         _capacity = other._capacity;
         _size = other._size;
 
         other._buffer = nullptr;
-        other._offset = 0;
+        other._pre_gap = 0;
         other._capacity = 0;
         other._size = 0;
 
@@ -49,9 +86,9 @@ namespace NATBuster::Common::Utils {
     }
     Blob Blob::factory_copy(uint8_t* buffer_copy, uint32_t buffer_size, uint32_t pre_gap, uint32_t end_gap) {
         uint32_t capacity = pre_gap + buffer_size + end_gap;
-        uint8_t* buffer = new uint8_t[capacity];
+        uint8_t* buffer = Blob::alloc(capacity);
 
-        memcpy(buffer + pre_gap, buffer_copy, buffer_size);
+        Blob::bufcpy(buffer, capacity, pre_gap, buffer_copy, buffer_size, 0, buffer_size);
 
         return Blob(buffer, capacity, buffer_size, pre_gap);
     }
@@ -59,37 +96,37 @@ namespace NATBuster::Common::Utils {
         return factory_copy((uint8_t*)(str.c_str()), str.size(), 0, 0);
     }
 
-    Blob Blob::concat(std::initializer_list<Blob*> list) {
-        uint32_t new_offset = 0;
+    Blob Blob::concat(std::initializer_list<BlobView*> list, uint32_t pre_gap, uint32_t end_gap) {
         uint32_t new_len = 0;
-        for (auto& it : list) {
+        for (auto it : list) {
             new_len += it->size();
         }
-        //New end gap
-        uint32_t new_cap = new_offset + new_len + 0;
+        //New capacity
+        uint32_t new_cap = pre_gap + new_len + end_gap;
 
-        uint8_t* buffer = new uint8_t[new_len];
+        uint8_t* buffer = Blob::alloc(new_len);
 
-        uint32_t progress = new_offset;
+        //Write progress
+        uint32_t progress = pre_gap;
 
         for (auto it : list) {
-            memcpy(buffer + progress, it->get(), it->size());
-            new_len += it->size();
+            Blob::bufcpy(buffer, new_len, progress, it->get(), it->size(), 0, it->size());
+            progress += it->size();
         }
 
-        return Blob(buffer, new_cap, new_len, new_offset);
+        return Blob(buffer, new_cap, new_len, pre_gap);
     }
 
-    void Blob::grow(uint32_t min_pre_gap, uint32_t min_end_gap, bool smart) {
+    void Blob::grow_gap(uint32_t min_pre_gap, uint32_t min_end_gap, bool smart) {
         dbg_self_test();
 
-        uint32_t new_offset = (_offset < min_pre_gap) ?
+        uint32_t new_pre_gap = (_pre_gap < min_pre_gap) ?
             (
                 smart ?
-                (min_pre_gap + (min_pre_gap - _offset)) :
+                (min_pre_gap + (min_pre_gap - _pre_gap)) :
                 min_pre_gap
                 ) :
-            _offset;
+            _pre_gap;
 
         uint32_t old_end_gap = get_end_gap();
 
@@ -101,26 +138,26 @@ namespace NATBuster::Common::Utils {
                 ) :
             old_end_gap;
 
-        uint32_t new_capacity = new_offset + _size + new_end_gap;
+        uint32_t new_capacity = new_pre_gap + _size + new_end_gap;
         if (new_capacity > _capacity) {
 
-            uint8_t* new_buffer = new uint8_t[new_capacity];
+            uint8_t* new_buffer = Blob::alloc(new_capacity);
 
             //Don't bother copying the part of the buffer that is not in the actively used region.
-            memcpy(new_buffer + new_offset, _buffer + _offset, _size);
+            Blob::bufcpy(new_buffer, new_capacity, new_pre_gap, _buffer, _capacity, _pre_gap, _size);
 
             delete[] _buffer;
             _buffer = nullptr;
 
             _buffer = new_buffer;
             _capacity = new_capacity;
-            _offset = new_offset;
+            _pre_gap = new_pre_gap;
             assert(new_end_gap == get_end_gap());
         }
 
         dbg_self_test();
 
-        assert(min_pre_gap <= _offset);
+        assert(min_pre_gap <= _pre_gap);
         assert(min_end_gap <= get_end_gap());
     }
     
@@ -128,55 +165,63 @@ namespace NATBuster::Common::Utils {
     void Blob::resize(int32_t new_start, uint32_t new_end) {
         dbg_self_test();
 
-        uint32_t min_pre_gap = (new_start < 0) ? 0 : new_start;
+        uint32_t min_pre_gap = (new_start < 0) ? (-new_start) : 0;
         uint32_t min_end_gap = (new_end < _size) ? 0 : (new_end - _size);
 
-        grow(min_pre_gap, min_end_gap, true);
+        grow_gap(min_pre_gap, min_end_gap, true);
 
         //Move start and end
-        _offset = _offset + new_start;
+        _pre_gap = _pre_gap + new_start;
         _size = new_end - new_start;
 
         dbg_self_test();
     }
 
-    void Blob::add_blob_before(const Blob& other) {
+    void Blob::add_blob_before(const BlobView& other) {
         dbg_self_test();
-        other.dbg_self_test();
 
         grow_pre_gap(other.size(), true);
-        assert(other.size() <= _offset);
+        assert(other.size() <= _pre_gap);
 
-        memcpy(_buffer + (_offset - other.size()), other.get(), other.size());
-        _offset = _offset - other.size();
+        Blob::bufcpy(
+            _buffer, _capacity, _pre_gap - other.size(),
+            other.get(), other.size(), 0,
+            other.size());
+        _pre_gap = _pre_gap - other.size();
         _size = other.size() + _size;
 
         dbg_self_test();
     }
-    void Blob::add_blob_after(const Blob& other) {
+    void Blob::add_blob_after(const BlobView& other) {
         dbg_self_test();
-        other.dbg_self_test();
 
         grow_end_gap(other.size(), true);
-        assert(_offset + _size + other.size() <= _capacity);
+        assert(_pre_gap + _size + other.size() <= _capacity);
 
-        memcpy(_buffer + _offset + _size, other.get(), other.size());
+        Blob::bufcpy(
+            _buffer, _capacity, _pre_gap + _size,
+            other.get(), other.size(), 0,
+            other.size());
         _size = _size + other.size();
 
         dbg_self_test();
     }
-    void Blob::sandwich(const Blob& left, const Blob& right) {
+    void Blob::sandwich(const BlobView& left, const BlobView& right) {
         dbg_self_test();
-        left.dbg_self_test();
-        right.dbg_self_test();
-
-        grow(left.size(), right.size(), true);
-        assert(left.size() <= _offset);
+        
+        grow_gap(left.size(), right.size(), true);
+        assert(left.size() <= _pre_gap);
         assert(right.size() <= get_end_gap());
 
-        memcpy(_buffer + (_offset - left.size()), left.get(), left.size());
-        memcpy(_buffer + _offset + _size, right.get(), right.size());
-        _offset = _offset - left.size();
+        Blob::bufcpy(
+            _buffer, _capacity, _pre_gap - left.size(),
+            left.get(), left.size(), 0,
+            left.size());
+        Blob::bufcpy(
+            _buffer, _capacity, _pre_gap + _size,
+            right.get(), right.size(), 0,
+            right.size());
+        _pre_gap = _pre_gap - left.size();
         _size = left.size() + _size + right.size();
 
         dbg_self_test();
@@ -188,7 +233,7 @@ namespace NATBuster::Common::Utils {
             _buffer = nullptr;
         }
 
-        _offset = 0;
+        _pre_gap = 0;
         _size = 0;
         _capacity = 0;
     }

@@ -24,40 +24,35 @@ int main() {
         encrypt.set_iv_packet(iv_packet_0);
         decrypt.set_iv_packet(iv_packet_0);
 
-        const char* data = "Fg=/F76UztD/fU64rcUZgI/Tö9oHHZvUTRd+Ug8=HKJZViztF)UVgjGOU;FUTZgkhBU";
-        const uint32_t data_len = 37;
+        {
+            NATBuster::Common::Utils::Blob data = NATBuster::Common::Utils::Blob::factory_string("Fg=/F76UztD/fU64rcUZgI/Tö9oHHZvUTRd+Ug8=HKJZViztF)UVgjGOU;FUTZgkhBU");
+            NATBuster::Common::Utils::Blob cipher = NATBuster::Common::Utils::Blob();
+            NATBuster::Common::Utils::Blob aad = NATBuster::Common::Utils::Blob();
 
-        uint8_t* cipher = nullptr;
-        uint32_t cipher_len = 0;
+            if (!encrypt.encrypt(data, cipher, aad)) goto error;
 
-        if(!encrypt.encrypt_alloc((const uint8_t*)data, data_len, cipher, cipher_len, nullptr, 0)) goto error;
+            NATBuster::Common::Utils::Blob plaintext = NATBuster::Common::Utils::Blob();
 
-        uint8_t* plaintext = nullptr;
-        uint32_t plaintext_len = 0;
+            if (!decrypt.decrypt(cipher, plaintext, aad)) goto error;
 
-        if(!decrypt.decrypt_alloc(cipher, cipher_len, plaintext, plaintext_len, nullptr, 0)) goto error;
+            if (plaintext.size() != data.size()) goto error;
+            if (0 != memcmp(data.get(), plaintext.get(), data.size())) goto error;
+        }
 
-        if (plaintext_len != data_len) goto error;
+        {
+            NATBuster::Common::Utils::Blob data = NATBuster::Common::Utils::Blob::factory_string("=/IuzbVUZVZTr7Gztc=(%R987Gut(%HgLKHOI=t/RTVIU//%Tv%UTiZGfOUZvKHTCiz5fjVVJD");
+            NATBuster::Common::Utils::Blob cipher = NATBuster::Common::Utils::Blob();
+            NATBuster::Common::Utils::Blob aad = NATBuster::Common::Utils::Blob();
 
-        if (0 != memcmp(data, plaintext, data_len)) goto error;
+            if (!encrypt.encrypt(data, cipher, aad)) goto error;
 
-        delete[] plaintext;
-        delete[] cipher;
+            NATBuster::Common::Utils::Blob plaintext = NATBuster::Common::Utils::Blob();
 
-        const char* data2 = "=/IuzbVUZVZTr7Gztc=(%R987Gut(%HgLKHOI=t/RTVIU//%Tv%UTiZGfOUZvKHTCiz5fjVVJD";
-        const uint32_t data2_len = 37;
+            if (!decrypt.decrypt(cipher, plaintext, aad)) goto error;
 
-        if (!encrypt.encrypt_alloc((const uint8_t*)data2, data2_len, cipher, cipher_len, nullptr, 0)) goto error;
-
-        if (!decrypt.decrypt_alloc(cipher, cipher_len, plaintext, plaintext_len, nullptr, 0)) goto error;
-
-        if (0 != memcmp(data2, plaintext, data2_len)) goto error;
-
-        delete[] plaintext;
-        delete[] cipher;
-
-        cipher = nullptr;
-        plaintext = nullptr;
+            if (plaintext.size() != data.size()) goto error;
+            if (0 != memcmp(data.get(), plaintext.get(), data.size())) goto error;
+        }
 
         return 0;
     }

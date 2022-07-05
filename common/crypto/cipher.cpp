@@ -122,12 +122,10 @@ namespace NATBuster::Common::Crypto {
     }
 
     bool CipherAES256GCMPacket::encrypt(
-        const uint8_t* in, const uint32_t in_len,
-        uint8_t* out, const uint32_t out_len,
-        const uint8_t* aad, const uint32_t aad_len
+        const Utils::BlobView& in,
+        Utils::BlobView& out,
+        const Utils::BlobView& aad
     ) {
-        assert(out_len == enc_size(in_len));
-
         if (1 != EVP_EncryptInit_ex(_ctx, _algo, nullptr, nullptr, nullptr))
             return false;
 
@@ -137,58 +135,54 @@ namespace NATBuster::Common::Crypto {
         if (1 != EVP_EncryptInit_ex(_ctx, nullptr, nullptr, _key, _iv.bytes))
             return false;
 
-        //Auth tag goes at the beginning
-        int cum_len = 16;
-        int len = 0;
-
+        int len;
         //Add Additional Authentication Data if needed
-        if (aad != nullptr && aad_len != 0) {
-            if (1 != EVP_EncryptUpdate(_ctx, nullptr, &len, aad, aad_len))
+        if (aad.size() != 0) {
+            if (1 != EVP_EncryptUpdate(_ctx, nullptr, &len, aad.get(), aad.size()))
                 return false;
         }
 
+        //Allocate output space
+        out.resize(in.size() + 16);
+        //View for the checksum
+        Utils::BlobSliceView checksum = out.slice(0, 16);
+        //View for the cipher text
+        Utils::BlobSliceView cipher = out.slice(16, in.size());
+
         //Encrypt data
-        if (1 != EVP_EncryptUpdate(_ctx, out + cum_len, &len, in, in_len))
+        if (1 != EVP_EncryptUpdate(_ctx, cipher.get(), &len, in.get(), in.size()))
             return false;
 
-        cum_len += len;
-        assert(cum_len <= out_len);
+        int total_len = len;
+        assert(total_len <= cipher.size());
+
+        Utils::BlobSliceView cipher_remain = cipher.slice_right(total_len);
 
         //Encrypt data (finalise)
         //For GCM, this doesnt actually produce any more bytes.
         //For block aligned, it would add padding
-        if (1 != EVP_EncryptFinal_ex(_ctx, out + cum_len, &len))
+        if (1 != EVP_EncryptFinal_ex(_ctx, cipher_remain.get(), &len))
             return false;
 
-        cum_len += len;
-        assert(cum_len <= out_len);
+        total_len += len;
+        assert(total_len == cipher.size());
 
         //Get auth tag, to the beginning of out
-        if (1 != EVP_CIPHER_CTX_ctrl(_ctx, EVP_CTRL_GCM_GET_TAG, 16, out))
+        if (1 != EVP_CIPHER_CTX_ctrl(_ctx, EVP_CTRL_GCM_GET_TAG, 16, checksum.get()))
             return false;
 
         //Reset for next packet
         EVP_CIPHER_CTX_reset(_ctx);
         _iv.parts.packet++;
 
-        return cum_len == out_len;
+        return true;
     }
-    bool CipherAES256GCMPacket::encrypt_alloc(
-        const uint8_t* in, const uint32_t in_len,
-        uint8_t*& out, uint32_t& out_len,
-        const uint8_t* aad, const uint32_t aad_len
-    ) {
-        out = new uint8_t[out_len = enc_size(in_len)];
-        return encrypt(in, in_len, out, out_len, aad, aad_len);
-    }
-
+    
     bool CipherAES256GCMPacket::decrypt(
-        const uint8_t* in, const uint32_t in_len,
-        uint8_t* out, const uint32_t out_len,
-        const uint8_t* aad, const uint32_t aad_len
+        const Utils::BlobView& in,
+        Utils::BlobView& out,
+        const Utils::BlobView& aad
     ) {
-        assert(out_len == dec_size(in_len));
-
         if (!EVP_DecryptInit_ex(_ctx, _algo, nullptr, nullptr, nullptr))
             return false;
 
@@ -198,27 +192,35 @@ namespace NATBuster::Common::Crypto {
         if (!EVP_DecryptInit_ex(_ctx, nullptr, nullptr, _key, _iv.bytes))
             return false;
 
-        int len = 0;
-        int cum_len = 0;
+        //View for the checksum
+        const Utils::BlobCSliceView checksum = in.slice_left(16);
+        //View for the cipher text
+        const Utils::BlobCSliceView cipher = in.slice_right(16);
+        //Allocate output space
+        out.resize(cipher.size());
 
-        if (aad != nullptr && aad_len == 0) {
-            if (!EVP_DecryptUpdate(_ctx, nullptr, &len, aad, aad_len))
+
+        int len;
+        if (aad.size() != 0) {
+            if (!EVP_DecryptUpdate(_ctx, nullptr, &len, aad.get(), aad.size()))
                 return false;
         }
 
         //Data starts at 16 offset, auth tag before
-        if (!EVP_DecryptUpdate(_ctx, out, &len, in + 16, in_len - 16))
+        if (!EVP_DecryptUpdate(_ctx, out.get(), &len, cipher.get(), cipher.size()))
             return false;
-        cum_len += len;
-        assert(cum_len <= out_len);
+        int total_len = len;
+        assert(total_len <= out.size());
 
         //Set expected auth tag
-        if (!EVP_CIPHER_CTX_ctrl(_ctx, EVP_CTRL_GCM_SET_TAG, 16, (void*)in))
+        if (!EVP_CIPHER_CTX_ctrl(_ctx, EVP_CTRL_GCM_SET_TAG, 16, (void*)checksum.get()))
             return false;
 
-        int ret = EVP_DecryptFinal_ex(_ctx, out + cum_len, &len);
-        cum_len += len;
-        assert(cum_len <= out_len);
+        Utils::BlobSliceView out_remain = out.slice_right(total_len);
+
+        int ret = EVP_DecryptFinal_ex(_ctx, out_remain.get(), &len);
+        total_len += len;
+        assert(total_len == out.size());
 
         //Reset for next packet
         EVP_CIPHER_CTX_reset(_ctx);
@@ -226,18 +228,11 @@ namespace NATBuster::Common::Crypto {
 
         //Successfully verified
         if (ret > 0) {
-            return out_len == cum_len;
+            return true;
         }
         return false;
     }
-    bool CipherAES256GCMPacket::decrypt_alloc(
-        const uint8_t* in, const uint32_t in_len,
-        uint8_t*& out, uint32_t& out_len,
-        const uint8_t* aad, const uint32_t aad_len
-    ) {
-        out = new uint8_t[out_len = dec_size(in_len)];
-        return decrypt(in, in_len, out, out_len, aad, aad_len);
-    }
+    
 
     CipherAES256GCMPacket::~CipherAES256GCMPacket() {
         if (_algo != nullptr) {

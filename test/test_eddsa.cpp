@@ -12,34 +12,30 @@ int main() {
         if (!key_a.generate_ed25519()) goto error;
 
         NATBuster::Common::Utils::Blob a_public = NATBuster::Common::Utils::Blob();
-        NATBuster::Common::Utils::BlobView a_public_view = NATBuster::Common::Utils::BlobView(&a_public);
         
-        if (!key_a.export_public(a_public_view)) goto error;
+        if (!key_a.export_public(a_public)) goto error;
         
-        if (a_public_view.size() == 0) goto error;
+        if (a_public.size() == 0) goto error;
        
         NATBuster::Common::Crypto::PKey key_a_pub;
-        if (!key_a_pub.load_public(a_public_view)) goto error;
+        if (!key_a_pub.load_public(a_public)) goto error;
 
         NATBuster::Common::Utils::Blob a_sign = NATBuster::Common::Utils::Blob();
-        NATBuster::Common::Utils::BlobView a_sign_view = NATBuster::Common::Utils::BlobView(&a_sign);
 
         NATBuster::Common::Utils::Blob data = NATBuster::Common::Utils::Blob::factory_string("Some test data to sign");
-        NATBuster::Common::Utils::BlobView data_view = NATBuster::Common::Utils::BlobView(&data);
 
-        if (!key_a.sign(data_view, a_sign_view)) goto error;
+        if (!key_a.sign(data, a_sign)) goto error;
 
-        if (a_sign_view.size() == 0) goto error;
+        if (a_sign.size() == 0) goto error;
 
-        if (!key_a_pub.verify(data_view, a_sign_view)) goto error;
+        if (!key_a_pub.verify(data, a_sign)) goto error;
 
-        NATBuster::Common::Utils::print_hex(a_sign_view);
+        NATBuster::Common::Utils::print_hex(a_sign);
         std::cout << std::endl;
 
         NATBuster::Common::Utils::Blob data2 = NATBuster::Common::Utils::Blob::factory_string("Some fake data to sign");
-        NATBuster::Common::Utils::BlobView data2_view = NATBuster::Common::Utils::BlobView(&data2);
 
-        if (key_a_pub.verify(data2_view, a_sign_view)) goto error;
+        if (key_a_pub.verify(data2, a_sign)) goto error;
 
         return 0;
     }

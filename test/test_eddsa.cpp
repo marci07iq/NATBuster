@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include "../common/crypto/pkey.h"
+#include "../common/utils/hex.h"
 
 #include <openssl/err.h>
 
@@ -10,43 +11,41 @@ int main() {
         NATBuster::Common::Crypto::PKey key_a;
         if (!key_a.generate_ed25519()) goto error;
 
-        uint8_t* a_public = nullptr;
+        NATBuster::Common::Utils::Blob a_public = NATBuster::Common::Utils::Blob();
+        NATBuster::Common::Utils::BlobView a_public_view = NATBuster::Common::Utils::BlobView(&a_public);
         
-        uint32_t a_public_len;
+        if (!key_a.export_public(a_public_view)) goto error;
         
-        if (!key_a.export_public(a_public, a_public_len)) goto error;
-        
-        if (a_public_len == 0) goto error;
+        if (a_public_view.size() == 0) goto error;
        
-        if (a_public == nullptr) goto error;
-        
         NATBuster::Common::Crypto::PKey key_a_pub;
-        if (!key_a_pub.load_public(a_public, a_public_len)) goto error;
+        if (!key_a_pub.load_public(a_public_view)) goto error;
 
-        uint8_t* a_aign = nullptr;
+        NATBuster::Common::Utils::Blob a_sign = NATBuster::Common::Utils::Blob();
+        NATBuster::Common::Utils::BlobView a_sign_view = NATBuster::Common::Utils::BlobView(&a_sign);
 
-        uint32_t a_sign_len;
+        NATBuster::Common::Utils::Blob data = NATBuster::Common::Utils::Blob::factory_string("Some test data to sign");
+        NATBuster::Common::Utils::BlobView data_view = NATBuster::Common::Utils::BlobView(&data);
 
-        const char* data = "EhnfJjHhTRVJ6%(HVE32FgJI(NKGDF+DHJVBFrRECHu(gUZgUfZTvZTfd/%DZTVZD65it";
+        if (!key_a.sign(data_view, a_sign_view)) goto error;
 
-        if (!key_a.sign((const uint8_t*)data, 64, a_aign, a_sign_len)) goto error;
+        if (a_sign_view.size() == 0) goto error;
 
-        if (a_aign == nullptr) goto error;
-        if (a_sign_len == 0) goto error;
+        if (!key_a_pub.verify(data_view, a_sign_view)) goto error;
 
-        if (!key_a_pub.verify((const uint8_t*)data, 64, a_aign, a_sign_len)) goto error;
-
-        const char* hex = "0123456789ABCDEF";
-
-        for (int i = 0; i < a_sign_len; i++) {
-            std::cout << hex[a_aign[i] >> 4] << hex[a_aign[i] & 0xf] << ":";
-        }
+        NATBuster::Common::Utils::print_hex(a_sign_view);
         std::cout << std::endl;
-        
+
+        NATBuster::Common::Utils::Blob data2 = NATBuster::Common::Utils::Blob::factory_string("Some fake data to sign");
+        NATBuster::Common::Utils::BlobView data2_view = NATBuster::Common::Utils::BlobView(&data2);
+
+        if (key_a_pub.verify(data2_view, a_sign_view)) goto error;
+
         return 0;
     }
 
 error:
+    printf("\n\n============ ERROR =============\n");
     printf("%s", ERR_error_string(ERR_get_error(), nullptr));
 
     return 1;

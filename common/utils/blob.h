@@ -1,3 +1,4 @@
+#pragma once
 
 #include <assert.h>
 #include <cstdint>
@@ -7,6 +8,8 @@
 #include "copy_protection.h"
 
 namespace NATBuster::Common::Utils {
+    class BlobView;
+
     class Blob : Utils::NonCopyable
     {
         uint8_t* _buffer;
@@ -14,9 +17,11 @@ namespace NATBuster::Common::Utils {
         uint32_t _capacity;
         uint32_t _size;
 
+        friend class BlobView;
+
         inline void dbg_self_test() const {
 #ifndef NDEBUG
-            assert(_buffer != nullptr);
+            assert(_buffer != nullptr || (_capacity == 0 && _size == 0));
             assert(_offset <= _capacity);
             assert(_size <= _capacity);
             assert(_offset + _size <= _capacity);
@@ -55,6 +60,10 @@ namespace NATBuster::Common::Utils {
 
         //Start and end coordinates wrt old buffer indices
         void resize(int32_t new_start, uint32_t new_end);
+        //End coordinates wrt old buffer indices
+        inline void resize(uint32_t new_end) {
+            resize(0, new_end);
+        }
 
         void add_blob_after(const Blob& other);
         void add_blob_before(const Blob& other);
@@ -83,11 +92,20 @@ namespace NATBuster::Common::Utils {
     class BlobView {
         Blob* _blob;
 
+        //WRT Blob "active area": 0 at beginning of Blob::get()
         uint32_t _start;
         uint32_t _len;
 
     public:
+        //Sub section
         BlobView(Blob* blob, uint32_t start, uint32_t len) : _blob(blob), _start(start), _len(len) {
+            //Check 
+            assert(0 <= _start);
+            assert(_start + _len <= blob->size());
+        }
+
+        //Full
+        BlobView(Blob* blob) : BlobView(blob, 0, blob->size()) {
 
         }
 
@@ -95,7 +113,7 @@ namespace NATBuster::Common::Utils {
             uint32_t new_end = _start + new_len;
 
             if (_blob->size() <= new_end) {
-                _blob->grow_end_gap(new_end - _blob->size(), true);
+                _blob->resize(0, new_end);
             }
 
             _len = new_len;

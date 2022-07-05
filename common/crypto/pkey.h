@@ -11,6 +11,7 @@
 #include <openssl/pem.h>
 
 #include "../utils/copy_protection.h"
+#include "../utils/blob.h"
 
 namespace NATBuster::Common::Crypto {
     enum class PKeyAlgo : int {
@@ -42,21 +43,21 @@ namespace NATBuster::Common::Crypto {
 
         bool load_file_private(std::string filename);
 
-        bool load_public(const uint8_t* out, uint32_t out_len);
+        bool load_public(const Utils::BlobView& in);
 
         bool save_file_private(std::string filename);
 
         bool save_file_public(std::string filename);
 
-        bool export_public(uint8_t*& out, uint32_t& out_len);
+        bool export_public(Utils::BlobView& out);
 
         //Ed25519 key only
-        bool sign(const uint8_t* data, const uint32_t data_len, uint8_t*& sig_out, uint32_t& sig_out_len);
+        bool sign(const Utils::BlobView& data_in, Utils::BlobView& sig_out);
 
         //Ed25519 key only
-        bool verify(const uint8_t* data, const uint32_t data_len, const uint8_t* sig, const uint32_t sig_len);
+        bool verify(const Utils::BlobView& data_in, const Utils::BlobView& sig_in);
 
         //Ec25519 key only
-        bool ecdhe(PKey& key_other, uint8_t*& secret, uint32_t& secret_len);
+        bool ecdhe(PKey& key_other, Utils::BlobView& secret_out);
     };
 };

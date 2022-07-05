@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <array>
 
+#include <openssl/evp.h>
 #include <openssl/sha.h>
 
 #include "../utils/blob.h"
@@ -28,7 +29,7 @@ namespace NATBuster::Common::Crypto {
 
         uint32_t out_size();
 
-        uint8_t* out_alloc();
+        //uint8_t* out_alloc();
 
         bool calc(const Utils::BlobView& in, Utils::BlobView& out);
 

@@ -47,9 +47,9 @@ namespace NATBuster::Common::Crypto {
         return EVP_MD_get_size(_algo);
     }
 
-    uint8_t* Hash::out_alloc() {
+    /*uint8_t* Hash::out_alloc() {
         return new uint8_t[out_size()];
-    }
+    }*/
 
     bool Hash::calc(const Utils::BlobView& in, Utils::BlobView& out) {
         /* Initialise the digest operation */
@@ -66,6 +66,7 @@ namespace NATBuster::Common::Crypto {
             return false;
 
         //Check for buffer overruns
+        assert(write_len == out.size());
         return write_len == out.size();
     }
 

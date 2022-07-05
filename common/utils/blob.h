@@ -8,11 +8,31 @@
 #include "copy_protection.h"
 
 namespace NATBuster::Common::Utils {
+    class _ConstBlobView;
+    typedef const _ConstBlobView ConstBlobView;
+    class BlobView;
+
     class Blob;
     class BlobSliceView;
-    class BlobCSliceView;
+    class ConstBlobSliceView;
 
-    class BlobView {
+    class _ConstBlobView {
+    public:
+        _ConstBlobView();
+
+        virtual const uint8_t* getr() const = 0;
+
+        virtual const uint32_t size() const = 0;
+
+        const ConstBlobSliceView slice(uint32_t start, uint32_t len) const;
+
+        //Part of this BlobView before the split
+        const ConstBlobSliceView slice_left(uint32_t split) const;
+        //Part of this BlobView after the split
+        const ConstBlobSliceView slice_right(uint32_t split) const;
+    };
+
+    class BlobView : public ConstBlobView {
     public:
         BlobView();
 
@@ -20,11 +40,7 @@ namespace NATBuster::Common::Utils {
 
         virtual void resize_min(uint32_t min_len) = 0;
 
-        virtual uint8_t* get() = 0;
-
-        virtual const uint8_t* get() const = 0;
-
-        virtual const uint32_t size() const = 0;
+        virtual uint8_t* getw() = 0;
 
         BlobSliceView slice(uint32_t start, uint32_t len);
 
@@ -32,13 +48,6 @@ namespace NATBuster::Common::Utils {
         BlobSliceView slice_left(uint32_t split);
         //Part of this BlobView after the split
         BlobSliceView slice_right(uint32_t split);
-
-        const BlobCSliceView slice(uint32_t start, uint32_t len) const;
-
-        //Part of this BlobView before the split
-        const BlobCSliceView slice_left(uint32_t split) const;
-        //Part of this BlobView after the split
-        const BlobCSliceView slice_right(uint32_t split) const;
     };
 
     class Blob : public BlobView
@@ -100,7 +109,7 @@ namespace NATBuster::Common::Utils {
         //Factory from std::string. Doesn't stop at null, termination, stops at str.size()
         static Blob factory_string(const std::string& str);
 
-        static Blob concat(std::initializer_list<BlobView*> list, uint32_t pre_gap = 0, uint32_t end_gap = 0);
+        static Blob concat(std::initializer_list<ConstBlobView*> list, uint32_t pre_gap = 0, uint32_t end_gap = 0);
 
         //Pre-allocate space before and after the current active area
         void grow_gap(uint32_t min_pre_gap, uint32_t min_end_gap, bool smart = true);
@@ -125,16 +134,16 @@ namespace NATBuster::Common::Utils {
             }
         }
 
-        void add_blob_after(const BlobView& other);
-        void add_blob_before(const BlobView& other);
-        void sandwich(const BlobView& left, const BlobView& right);
+        void add_blob_after(const ConstBlobView& other);
+        void add_blob_before(const ConstBlobView& other);
+        void sandwich(const ConstBlobView& left, const BlobView& right);
 
-        inline uint8_t* get() {
+        inline uint8_t* getw() {
             dbg_self_test();
             if (_buffer == nullptr) return nullptr;
             return _buffer + _pre_gap;
         }
-        inline const uint8_t* get() const {
+        inline const uint8_t* getr() const {
             dbg_self_test();
             if (_buffer == nullptr) return nullptr;
             return _buffer + _pre_gap;
@@ -163,7 +172,7 @@ namespace NATBuster::Common::Utils {
             resize(len);
 
             //Check 
-            assert(_start + _len <= blob->size());
+            assert(_start + _len <= _blob->size());
 
         }
 
@@ -186,12 +195,12 @@ namespace NATBuster::Common::Utils {
             }
         }
 
-        uint8_t* get() {
-            return _blob->get() + _start;
+        uint8_t* getw() {
+            return _blob->getw() + _start;
         }
 
-        const uint8_t* get() const {
-            return _blob->get() + _start;
+        const uint8_t* getr() const {
+            return _blob->getr() + _start;
         }
 
         const uint32_t size() const {
@@ -200,8 +209,8 @@ namespace NATBuster::Common::Utils {
     };
 
     //To pass a blob for read/writing
-    class BlobCSliceView : public BlobView {
-        const BlobView* _blob;
+    class ConstBlobSliceView : public ConstBlobView {
+        const ConstBlobView* _blob;
 
         //WRT Blob "active area": 0 at beginning of Blob::get()
         uint32_t _start;
@@ -209,32 +218,19 @@ namespace NATBuster::Common::Utils {
 
     public:
         //Sub section
-        BlobCSliceView(const BlobView* blob, uint32_t start, uint32_t len) : _blob(blob), _start(start), _len(len) {
+        ConstBlobSliceView(const ConstBlobView* blob, uint32_t start, uint32_t len) : _blob(blob), _start(start), _len(len) {
             //Check 
             assert(_start + _len <= blob->size());
 
         }
 
         //Full
-        BlobCSliceView(const BlobView* blob) : BlobCSliceView(blob, 0, blob->size()) {
+        ConstBlobSliceView(const BlobView* blob) : ConstBlobSliceView(blob, 0, blob->size()) {
 
         }
 
-        void resize(uint32_t new_len) {
-            throw 1;
-        }
-
-        void resize_min(uint32_t min_len) {
-            throw 1;
-        }
-
-        uint8_t* get() {
-            throw 1;
-            return nullptr;
-        }
-
-        const uint8_t* get() const {
-            return _blob->get() + _start;
+        const uint8_t* getr() const {
+            return _blob->getr() + _start;
         }
 
         const uint32_t size() const {

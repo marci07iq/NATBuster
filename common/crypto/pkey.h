@@ -43,7 +43,7 @@ namespace NATBuster::Common::Crypto {
 
         bool load_file_private(std::string filename);
 
-        bool load_public(const Utils::BlobView& in);
+        bool load_public(const Utils::ConstBlobView& in);
 
         bool save_file_private(std::string filename);
 
@@ -52,10 +52,10 @@ namespace NATBuster::Common::Crypto {
         bool export_public(Utils::BlobView& out);
 
         //Ed25519 key only
-        bool sign(const Utils::BlobView& data_in, Utils::BlobView& sig_out);
+        bool sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out);
 
         //Ed25519 key only
-        bool verify(const Utils::BlobView& data_in, const Utils::BlobView& sig_in);
+        bool verify(const Utils::ConstBlobView& data_in, const Utils::ConstBlobView& sig_in);
 
         //Ec25519 key only
         bool ecdhe(PKey& key_other, Utils::BlobView& secret_out);

@@ -51,18 +51,18 @@ namespace NATBuster::Common::Crypto {
         return new uint8_t[out_size()];
     }*/
 
-    bool Hash::calc(const Utils::BlobView& in, Utils::BlobView& out) {
+    bool Hash::calc(const Utils::ConstBlobView& in, Utils::BlobView& out) {
         /* Initialise the digest operation */
         if (!EVP_DigestInit_ex(_ctx, _algo, nullptr))
             return false;
 
-        if (!EVP_DigestUpdate(_ctx, in.get(), in.size()))
+        if (!EVP_DigestUpdate(_ctx, in.getr(), in.size()))
             return false;
 
         out.resize(EVP_MD_get_size(_algo));
 
         uint32_t write_len;
-        if (!EVP_DigestFinal_ex(_ctx, out.get(), &write_len))
+        if (!EVP_DigestFinal_ex(_ctx, out.getw(), &write_len))
             return false;
 
         //Check for buffer overruns

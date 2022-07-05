@@ -25,7 +25,7 @@ int main() {
         decrypt.set_iv_packet(iv_packet_0);
 
         {
-            NATBuster::Common::Utils::Blob data = NATBuster::Common::Utils::Blob::factory_string("Fg=/F76UztD/fU64rcUZgI/Tö9oHHZvUTRd+Ug8=HKJZViztF)UVgjGOU;FUTZgkhBU");
+            const NATBuster::Common::Utils::Blob data = NATBuster::Common::Utils::Blob::factory_string("Fg=/F76UztD/fU64rcUZgI/Tö9oHHZvUTRd+Ug8=HKJZViztF)UVgjGOU;FUTZgkhBU");
             NATBuster::Common::Utils::Blob cipher = NATBuster::Common::Utils::Blob();
             NATBuster::Common::Utils::Blob aad = NATBuster::Common::Utils::Blob();
 
@@ -36,11 +36,11 @@ int main() {
             if (!decrypt.decrypt(cipher, plaintext, aad)) goto error;
 
             if (plaintext.size() != data.size()) goto error;
-            if (0 != memcmp(data.get(), plaintext.get(), data.size())) goto error;
+            if (0 != memcmp(data.getr(), plaintext.getr(), data.size())) goto error;
         }
 
         {
-            NATBuster::Common::Utils::Blob data = NATBuster::Common::Utils::Blob::factory_string("=/IuzbVUZVZTr7Gztc=(%R987Gut(%HgLKHOI=t/RTVIU//%Tv%UTiZGfOUZvKHTCiz5fjVVJD");
+            const NATBuster::Common::Utils::Blob data = NATBuster::Common::Utils::Blob::factory_string("=/IuzbVUZVZTr7Gztc=(%R987Gut(%HgLKHOI=t/RTVIU//%Tv%UTiZGfOUZvKHTCiz5fjVVJD");
             NATBuster::Common::Utils::Blob cipher = NATBuster::Common::Utils::Blob();
             NATBuster::Common::Utils::Blob aad = NATBuster::Common::Utils::Blob();
 
@@ -51,7 +51,7 @@ int main() {
             if (!decrypt.decrypt(cipher, plaintext, aad)) goto error;
 
             if (plaintext.size() != data.size()) goto error;
-            if (0 != memcmp(data.get(), plaintext.get(), data.size())) goto error;
+            if (0 != memcmp(data.getr(), plaintext.getr(), data.size())) goto error;
         }
 
         return 0;

@@ -31,7 +31,7 @@ namespace NATBuster::Common::Crypto {
 
         //uint8_t* out_alloc();
 
-        bool calc(const Utils::BlobView& in, Utils::BlobView& out);
+        bool calc(const Utils::ConstBlobView& in, Utils::BlobView& out);
 
         ~Hash();
     };

@@ -2,6 +2,26 @@
 
 namespace NATBuster::Common::Utils {
     
+    _ConstBlobView::_ConstBlobView() {
+
+    }
+
+    const ConstBlobSliceView _ConstBlobView::slice(uint32_t start, uint32_t len) const {
+        return ConstBlobSliceView(this, start, len);
+    }
+
+    const ConstBlobSliceView _ConstBlobView::slice_left(uint32_t split) const {
+        assert(split <= size());
+        return ConstBlobSliceView(this, 0, split);
+    }
+
+    const ConstBlobSliceView _ConstBlobView::slice_right(uint32_t split) const {
+        assert(split <= size());
+        return ConstBlobSliceView(this, split, size() - split);
+    }
+
+
+
     BlobView::BlobView() {
 
     }
@@ -20,19 +40,8 @@ namespace NATBuster::Common::Utils {
         return BlobSliceView(this, split, size() - split);
     }
 
-    const BlobCSliceView BlobView::slice(uint32_t start, uint32_t len) const {
-        return BlobCSliceView(this, start, len);
-    }
+    
 
-    const BlobCSliceView BlobView::slice_left(uint32_t split) const {
-        assert(split <= size());
-        return BlobCSliceView(this, 0, split);
-    }
-
-    const BlobCSliceView BlobView::slice_right(uint32_t split) const {
-        assert(split <= size());
-        return BlobCSliceView(this, split, size() - split);
-    }
 
     //Consume a buffer, holding the data, but with pre and post gaps
     Blob::Blob(uint8_t* buffer_consume, uint32_t buffer_size, uint32_t data_size, uint32_t data_pre_gap) :
@@ -96,7 +105,7 @@ namespace NATBuster::Common::Utils {
         return factory_copy((uint8_t*)(str.c_str()), str.size(), 0, 0);
     }
 
-    Blob Blob::concat(std::initializer_list<BlobView*> list, uint32_t pre_gap, uint32_t end_gap) {
+    Blob Blob::concat(std::initializer_list<ConstBlobView*> list, uint32_t pre_gap, uint32_t end_gap) {
         uint32_t new_len = 0;
         for (auto it : list) {
             new_len += it->size();
@@ -110,7 +119,7 @@ namespace NATBuster::Common::Utils {
         uint32_t progress = pre_gap;
 
         for (auto it : list) {
-            Blob::bufcpy(buffer, new_len, progress, it->get(), it->size(), 0, it->size());
+            Blob::bufcpy(buffer, new_len, progress, it->getr(), it->size(), 0, it->size());
             progress += it->size();
         }
 
@@ -177,7 +186,7 @@ namespace NATBuster::Common::Utils {
         dbg_self_test();
     }
 
-    void Blob::add_blob_before(const BlobView& other) {
+    void Blob::add_blob_before(const ConstBlobView& other) {
         dbg_self_test();
 
         grow_pre_gap(other.size(), true);
@@ -185,14 +194,14 @@ namespace NATBuster::Common::Utils {
 
         Blob::bufcpy(
             _buffer, _capacity, _pre_gap - other.size(),
-            other.get(), other.size(), 0,
+            other.getr(), other.size(), 0,
             other.size());
         _pre_gap = _pre_gap - other.size();
         _size = other.size() + _size;
 
         dbg_self_test();
     }
-    void Blob::add_blob_after(const BlobView& other) {
+    void Blob::add_blob_after(const ConstBlobView& other) {
         dbg_self_test();
 
         grow_end_gap(other.size(), true);
@@ -200,13 +209,13 @@ namespace NATBuster::Common::Utils {
 
         Blob::bufcpy(
             _buffer, _capacity, _pre_gap + _size,
-            other.get(), other.size(), 0,
+            other.getr(), other.size(), 0,
             other.size());
         _size = _size + other.size();
 
         dbg_self_test();
     }
-    void Blob::sandwich(const BlobView& left, const BlobView& right) {
+    void Blob::sandwich(const ConstBlobView& left, const BlobView& right) {
         dbg_self_test();
         
         grow_gap(left.size(), right.size(), true);
@@ -215,11 +224,11 @@ namespace NATBuster::Common::Utils {
 
         Blob::bufcpy(
             _buffer, _capacity, _pre_gap - left.size(),
-            left.get(), left.size(), 0,
+            left.getr(), left.size(), 0,
             left.size());
         Blob::bufcpy(
             _buffer, _capacity, _pre_gap + _size,
-            right.get(), right.size(), 0,
+            right.getr(), right.size(), 0,
             right.size());
         _pre_gap = _pre_gap - left.size();
         _size = left.size() + _size + right.size();

@@ -44,7 +44,7 @@ int main() {
 
         if (ab_secret.size() == 0) goto error;
 
-        if (memcmp(ab_secret.get(), ba_secret.get(), ab_secret.size()) != 0) goto error;
+        if (memcmp(ab_secret.getr(), ba_secret.getr(), ab_secret.size()) != 0) goto error;
 
         NATBuster::Common::Utils::print_hex(ab_secret);
 

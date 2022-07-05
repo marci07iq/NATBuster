@@ -106,13 +106,13 @@ namespace NATBuster::Common::Crypto {
         return (_key != nullptr);
     }
 
-    bool PKey::load_public(const Utils::BlobView& in) {
+    bool PKey::load_public(const Utils::ConstBlobView& in) {
         //Dont overwrite
         if (_key != nullptr) return false;
 
         //Create BIO
         BIO* mem = BIO_new(BIO_s_mem());
-        BIO_write(mem, in.get(), in.size());
+        BIO_write(mem, in.getr(), in.size());
 
         //Read key
         _key = PEM_read_bio_PUBKEY(mem, nullptr, key_password_cb, nullptr);
@@ -172,7 +172,7 @@ namespace NATBuster::Common::Crypto {
         out.resize(BIO_ctrl_pending(mem));
 
         //Copy out
-        BIO_read(mem, out.get(), out.size());
+        BIO_read(mem, out.getw(), out.size());
         assert(BIO_eof(mem));
 
         //Free mem
@@ -181,7 +181,7 @@ namespace NATBuster::Common::Crypto {
         return res == 1;
     }
 
-    bool PKey::sign(const Utils::BlobView& data_in, Utils::BlobView& sig_out) {
+    bool PKey::sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out) {
         //TODO: Error check;
         EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
 
@@ -192,14 +192,14 @@ namespace NATBuster::Common::Crypto {
 
         size_t siglen;
 
-        if (1 != EVP_DigestSign(md_ctx, nullptr, &siglen, data_in.get(), data_in.size())) {
+        if (1 != EVP_DigestSign(md_ctx, nullptr, &siglen, data_in.getr(), data_in.size())) {
             EVP_MD_CTX_free(md_ctx);
             return false;
         }
 
         sig_out.resize(siglen);
 
-        if (1 != EVP_DigestSign(md_ctx, sig_out.get(), &siglen, data_in.get(), data_in.size())) {
+        if (1 != EVP_DigestSign(md_ctx, sig_out.getw(), &siglen, data_in.getr(), data_in.size())) {
             EVP_MD_CTX_free(md_ctx);
             return false;
         }
@@ -211,7 +211,7 @@ namespace NATBuster::Common::Crypto {
         return true;
     }
 
-    bool PKey::verify(const Utils::BlobView& data_in, const Utils::BlobView& sig_in) {
+    bool PKey::verify(const Utils::ConstBlobView& data_in, const Utils::ConstBlobView& sig_in) {
         //TODO: Error check;
         EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
 
@@ -220,7 +220,7 @@ namespace NATBuster::Common::Crypto {
             return false;
         }
 
-        int res = EVP_DigestVerify(md_ctx, sig_in.get(), sig_in.size(), data_in.get(), data_in.size());
+        int res = EVP_DigestVerify(md_ctx, sig_in.getr(), sig_in.size(), data_in.getr(), data_in.size());
 
         EVP_MD_CTX_free(md_ctx);
 
@@ -249,7 +249,7 @@ namespace NATBuster::Common::Crypto {
 
         secret_out.resize(secret_len_szt);
         
-        if (1 != (EVP_PKEY_derive(ctx, secret_out.get(), &secret_len_szt))) {
+        if (1 != (EVP_PKEY_derive(ctx, secret_out.getw(), &secret_len_szt))) {
             EVP_PKEY_CTX_free(ctx);
             return false;
         }

@@ -76,15 +76,15 @@ namespace NATBuster::Common::Crypto {
         uint32_t dec_size(uint32_t enc_size);
 
         bool encrypt(
-            const Utils::BlobView& in,
+            const Utils::ConstBlobView& in,
             Utils::BlobView& out,
-            const Utils::BlobView& aad
+            const Utils::ConstBlobView& aad
         );
 
         bool decrypt(
-            const Utils::BlobView& in,
+            const Utils::ConstBlobView& in,
             Utils::BlobView& out,
-            const Utils::BlobView& aad
+            const Utils::ConstBlobView& aad
         );
 
         ~CipherAES256GCMPacket();

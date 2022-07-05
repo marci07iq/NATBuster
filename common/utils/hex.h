@@ -6,5 +6,5 @@
 #include "blob.h"
 
 namespace NATBuster::Common::Utils {
-    void print_hex(const BlobView& data, std::ostream& dst = std::cout, char sep = ':');
+    void print_hex(const ConstBlobView& data, std::ostream& dst = std::cout, char sep = ':');
 };

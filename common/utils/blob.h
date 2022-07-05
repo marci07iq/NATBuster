@@ -24,12 +24,12 @@ namespace NATBuster::Common::Utils {
 
         virtual const uint32_t size() const = 0;
 
-        const ConstBlobSliceView slice(uint32_t start, uint32_t len) const;
+        const ConstBlobSliceView cslice(uint32_t start, uint32_t len) const;
 
         //Part of this BlobView before the split
-        const ConstBlobSliceView slice_left(uint32_t split) const;
+        const ConstBlobSliceView cslice_left(uint32_t split) const;
         //Part of this BlobView after the split
-        const ConstBlobSliceView slice_right(uint32_t split) const;
+        const ConstBlobSliceView cslice_right(uint32_t split) const;
     };
 
     class BlobView : public ConstBlobView {

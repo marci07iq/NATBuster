@@ -6,11 +6,13 @@ file(GLOB tests CONFIGURE_DEPENDS
 )
 
 foreach (testsourcefile ${tests})
-    get_filename_component(testname ${testsourcefile} NAME_WLE)
-    message("${testname} | ${testsourcefile}")
-    add_executable("${testname}" ${testsourcefile})
-    add_test(NAME "NATBuster.${testname}" COMMAND ${testname})
-    target_link_libraries("${testname}" OpenSSL::SSL OpenSSL::Crypto Common)
+    get_filename_component(filename ${testsourcefile} NAME_WLE)
+    string(SUBSTRING ${filename} 5 -1 testname)
+    #message("${testname} | ${testsourcefile}")
+    add_executable("${filename}" ${testsourcefile})
+    add_test(NAME "NATBuster.${testname}" COMMAND ${filename})
+    target_link_libraries("${filename}" OpenSSL::SSL OpenSSL::Crypto Common)
+    
 endforeach (testsourcefile ${srcs})
 
 include_directories(Client ${ROOT_INCLUDE_DIRS})

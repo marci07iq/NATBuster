@@ -6,16 +6,16 @@ namespace NATBuster::Common::Utils {
 
     }
 
-    const ConstBlobSliceView _ConstBlobView::slice(uint32_t start, uint32_t len) const {
+    const ConstBlobSliceView _ConstBlobView::cslice(uint32_t start, uint32_t len) const {
         return ConstBlobSliceView(this, start, len);
     }
 
-    const ConstBlobSliceView _ConstBlobView::slice_left(uint32_t split) const {
+    const ConstBlobSliceView _ConstBlobView::cslice_left(uint32_t split) const {
         assert(split <= size());
         return ConstBlobSliceView(this, 0, split);
     }
 
-    const ConstBlobSliceView _ConstBlobView::slice_right(uint32_t split) const {
+    const ConstBlobSliceView _ConstBlobView::cslice_right(uint32_t split) const {
         assert(split <= size());
         return ConstBlobSliceView(this, split, size() - split);
     }
@@ -113,7 +113,7 @@ namespace NATBuster::Common::Utils {
         //New capacity
         uint32_t new_cap = pre_gap + new_len + end_gap;
 
-        uint8_t* buffer = Blob::alloc(new_len);
+        uint8_t* buffer = Blob::alloc(new_cap);
 
         //Write progress
         uint32_t progress = pre_gap;

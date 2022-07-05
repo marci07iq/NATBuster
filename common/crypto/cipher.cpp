@@ -193,9 +193,9 @@ namespace NATBuster::Common::Crypto {
             return false;
 
         //View for the checksum
-        const Utils::ConstBlobView& checksum = in.slice_left(16);
+        const Utils::ConstBlobView& checksum = in.cslice_left(16);
         //View for the cipher text
-        const Utils::ConstBlobView& cipher = in.slice_right(16);
+        const Utils::ConstBlobView& cipher = in.cslice_right(16);
         //Allocate output space
         out.resize(cipher.size());
 

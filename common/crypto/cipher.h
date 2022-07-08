@@ -16,33 +16,51 @@ namespace NATBuster::Common::Crypto {
     };*/
 
 
-    /*class Cipher : Utils::AbstractBase {
+    class CipherPacketStream : Utils::NonCopyable {
+    protected:
         EVP_CIPHER_CTX* _ctx = nullptr;
         EVP_CIPHER* _algo = nullptr;
+        CipherPacketStream(EVP_CIPHER_CTX* ctx, EVP_CIPHER* algo);
     public:
-        Cipher(CipherAlgo algo);
+        CipherPacketStream(CipherPacketStream&& other) noexcept;
+        CipherPacketStream& operator=(CipherPacketStream&& other) noexcept;
 
-        virtual uint8_t iv_size();
-        virtual uint32_t enc_size(uint32_t raw_size);
-        virtual uint32_t dec_size(uint32_t enc_size);
+        //size of the IVs
+        virtual uint32_t iv_size() = 0;
+        //Set IV bytes
+        virtual void set_iv(const uint8_t* bytes, uint32_t size) = 0;
 
-        bool encrypt(const uint8_t* in, const uint32_t in_len, uint8_t* out, const uint32_t out_len);
-        bool encrypt_alloc(const uint8_t* in, const uint32_t in_len, uint8_t*& out, uint32_t& out_len);
+        //Get key size
+        virtual uint32_t key_size() = 0;
+        //Set key bytes
+        virtual void set_key(const uint8_t* key, uint32_t size) = 0;
 
-        bool decrypt(const uint8_t* in, const uint32_t in_len, uint8_t* out, const uint32_t out_len);
-        bool decrypt_alloc(const uint8_t* in, const uint32_t in_len, uint8_t*& out, uint32_t& out_len);
 
-        virtual ~Cipher();
-    };*/
+        //Size of encypted data of raw_size plaintext
+        virtual uint32_t enc_size(uint32_t raw_size) = 0;
+        //Size of decrypted data of enc_size ciphertext
+        virtual uint32_t dec_size(uint32_t enc_size) = 0;
+
+        virtual bool encrypt(
+            const Utils::ConstBlobView& in,
+            Utils::BlobView& out,
+            const Utils::ConstBlobView& aad
+        ) = 0;
+
+        virtual bool decrypt(
+            const Utils::ConstBlobView& in,
+            Utils::BlobView& out,
+            const Utils::ConstBlobView& aad
+        ) = 0;
+
+        virtual ~CipherPacketStream();
+    };
 
     //Wrapper for a packet based AES-256-GCM cypher. 
     //IV usage as packet counter inspired by [RFC5647]
     //Ciphertext contains encrypted data and auth tag
     //Set up one of these classes with identical parameters on both ends
-    class CipherAES256GCMPacket : Utils::NonCopyable {
-        EVP_CIPHER_CTX* _ctx = nullptr;
-        EVP_CIPHER* _algo = nullptr;
-
+    class CipherAES256GCMPacketStream : public CipherPacketStream {
         uint8_t _key[32];
 
 #pragma pack(push, 1)
@@ -59,18 +77,18 @@ namespace NATBuster::Common::Crypto {
         static_assert(sizeof(_iv) == 12);
         
     public:
-        CipherAES256GCMPacket();
+        CipherAES256GCMPacketStream();
 
-        CipherAES256GCMPacket(CipherAES256GCMPacket&& other);
+        CipherAES256GCMPacketStream(CipherAES256GCMPacketStream&& other) noexcept;
+        CipherAES256GCMPacketStream& operator=(CipherAES256GCMPacketStream&& other) noexcept;
 
-        CipherAES256GCMPacket& operator=(CipherAES256GCMPacket&& other);
-
-        uint8_t iv_size();
+        uint32_t iv_size();
+        void set_iv(const uint8_t* bytes, uint32_t size);
         void set_iv_common(uint32_t common);
         void set_iv_packet(uint64_t packet);
 
-        uint8_t key_size();
-        void set_key(uint8_t key[32]);
+        uint32_t key_size();
+        void set_key(const uint8_t* key, uint32_t size);
 
         uint32_t enc_size(uint32_t raw_size);
         uint32_t dec_size(uint32_t enc_size);
@@ -87,6 +105,6 @@ namespace NATBuster::Common::Crypto {
             const Utils::ConstBlobView& aad
         );
 
-        ~CipherAES256GCMPacket();
+        ~CipherAES256GCMPacketStream();
     };
 }

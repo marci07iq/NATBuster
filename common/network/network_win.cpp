@@ -46,7 +46,7 @@ namespace NATBuster::Common::Network {
         ZeroMemory(&_address, sizeof(sockaddr_in));
     }
 
-    NetworkAddress::NetworkAddress(std::string name, uint16_t port) {
+    NetworkAddress::NetworkAddress(const std::string& name, uint16_t port) {
         ZeroMemory(&_address, sizeof(sockaddr_in));
 
         if (name.length()) {
@@ -150,7 +150,7 @@ namespace NATBuster::Common::Network {
     // TCP Server OS implementation
     // 
 
-    TCPS::TCPS(std::string name, uint16_t port) {
+    TCPS::TCPS(const std::string& name, uint16_t port) {
         int iResult;
 
         // Protocol
@@ -228,7 +228,7 @@ namespace NATBuster::Common::Network {
     // TCP Client OS implementation
     //
 
-    TCPC::TCPC(std::string name, uint16_t port) {
+    TCPC::TCPC(const std::string& name, uint16_t port) {
         int iResult;
 
         // Protocol
@@ -277,14 +277,14 @@ namespace NATBuster::Common::Network {
 
     }
 
-    bool TCPC::send(Packet data) {
+    bool TCPC::send(const Utils::ConstBlobView& data) {
         if (_socket.invalid()) return false;
 
         int progress = 0;
 
         while (progress < data.size()) {
             //Send bytes till all sent
-            int iSendResult = ::send(_socket.get(), (char*)(data.get() + progress), data.size() - progress, 0);
+            int iSendResult = ::send(_socket.get(), (char*)(data.getr() + progress), data.size() - progress, 0);
 
             //Stop if error
             if (iSendResult == SOCKET_ERROR) {
@@ -304,39 +304,43 @@ namespace NATBuster::Common::Network {
         return true;
     }
 
-    Packet TCPC::read(uint32_t min_len, uint32_t max_len) {
-        uint8_t* res = new uint8_t(max_len);
-
+    bool TCPC::read(Utils::BlobView& data, uint32_t min_len, uint32_t max_len) {
+        //Allow writing to the entire area
+        //Pre-allocates buffer
+        data.resize(max_len);
+        
         int progress = 0;
 
         //Even if min 0 requested, still do one round
         do {
-            int recv_len = recv(_socket.get(), (char*)res, max_len, 0);
+            Utils::BlobSliceView write_area = data.slice_right(progress);
+
+            int recv_len = recv(_socket.get(), (char*)write_area.getw(), write_area.size(), 0);
 
             //Error
             if (recv_len == SOCKET_ERROR) {
                 NetworkError(NetworkErrorCodeReciveData, WSAGetLastError());
-                delete[] res;
-                return Packet();
+                return false;
             }
 
             //Connection gracefully closed
             if (recv_len == 0) {
-                delete[] res;
-                return Packet();
+                return false;
             }
 
             progress += recv_len;
         } while (progress < min_len);
 
-        return Packet::consume_from(progress, res);
+        data.resize(progress);
+
+        return true;
     }
 
     //
     // UDP
     //
 
-    UDP::UDP(std::string name, uint16_t remote_port, uint16_t local_port) : UDP(NetworkAddress(name, remote_port), NetworkAddress("", local_port)) {
+    UDP::UDP(const std::string& name, uint16_t remote_port, uint16_t local_port) : UDP(NetworkAddress(name, remote_port), NetworkAddress("", local_port)) {
 
     }
 
@@ -359,10 +363,10 @@ namespace NATBuster::Common::Network {
         }
     }
 
-    bool UDP::send(Packet data) {
+    bool UDP::send(const Utils::ConstBlobView& data) {
         // Send a datagram to the receiver
         int iResult = ::sendto(_socket.get(),
-            (char*)data.get(), data.size(), 0, _remote_address.get(), _remote_address.size());
+            (char*)data.getr(), data.size(), 0, _remote_address.get(), _remote_address.size());
         if (iResult == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSendData, WSAGetLastError());
             _socket.close();
@@ -371,28 +375,31 @@ namespace NATBuster::Common::Network {
         return true;
     }
 
-    Packet UDP::readFilter(uint32_t max_len) {
+    bool UDP::readFilter(Utils::BlobView& data, uint32_t max_len) {
         NetworkAddress src;
-        Packet res = read(max_len, src);
+        bool res = read(data, src, max_len);
+
+        if (!res) return false;
 
         if (src == _remote_address) {
             return res;
         }
-        return Packet();
+        return false;
     }
 
-    Packet UDP::read(uint32_t max_len, NetworkAddress& address) {
-        uint8_t* recv_buf = new uint8_t(max_len);
+    bool UDP::read(Utils::BlobView& data, NetworkAddress& address, uint32_t max_len) {
+        data.resize(max_len);
 
         int size = address.size();
-        int iResult = recvfrom(_socket.get(), (char*)recv_buf, max_len, 0, address.get(), &size);
+        int iResult = recvfrom(_socket.get(), (char*)data.getw(), data.size(), 0, address.get(), &size);
         if (iResult == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeReciveData, WSAGetLastError());
             _socket.close();
+            return false;
         }
 
-        // make the buffer zero terminated
-        return Packet::consume_from(iResult, recv_buf);
+        data.resize(iResult);
+        return true;
     }
 
     UDP::~UDP() {

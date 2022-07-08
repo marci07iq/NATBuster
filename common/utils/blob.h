@@ -16,37 +16,69 @@ namespace NATBuster::Common::Utils {
     class BlobSliceView;
     class ConstBlobSliceView;
 
-    class _ConstBlobView {
-    public:
+    class _ConstBlobView : Utils::NonCopyable {
+    protected:
         _ConstBlobView();
-
+    public:
+        //Get read only buffer. Index 0 is at the start of the view
         virtual const uint8_t* getr() const = 0;
 
+        //Get size of the buffer that can be safely read/written
         virtual const uint32_t size() const = 0;
 
+        //Create a new cosnt slice view, looking at the segment of this
+        //New view must me inside the active region of this view
         const ConstBlobSliceView cslice(uint32_t start, uint32_t len) const;
 
-        //Part of this BlobView before the split
+        //Part of this BlobView before the split point
+        //Non incusive
         const ConstBlobSliceView cslice_left(uint32_t split) const;
-        //Part of this BlobView after the split
+        //Part of this BlobView after the split point
+        //Inclusive
         const ConstBlobSliceView cslice_right(uint32_t split) const;
     };
 
-    class BlobView : public ConstBlobView {
-    public:
-        BlobView();
+    bool operator==(const ConstBlobView& lhs, const ConstBlobView& rhs) {
+        if (lhs.size() != rhs.size()) return false;
+        return 0 == memcmp(lhs.getr(), rhs.getr(), lhs.size());
+    }
 
+    bool operator!=(const ConstBlobView& lhs, const ConstBlobView& rhs) {
+        if (lhs.size() == rhs.size()) return true;
+        return 0 != memcmp(lhs.getr(), rhs.getr(), lhs.size());
+    }
+
+    class BlobView : public ConstBlobView {
+    protected:
+        BlobView();
+    public:
+        //Resize the active region of this view.
+        //Resizes underlying structure to make it larger if needed,
+        //doesn't shrink underlying structure
         virtual void resize(uint32_t new_len) = 0;
 
+        //Set the minimum size of this view. Increases the size of the underlying view if needed
+        //Doesnt shrink this or the underyling view
         virtual void resize_min(uint32_t min_len) = 0;
 
+        //Set the minimum capacity of this view
+        //Increases the capacity of the underyling view if needed
+        //Capacity is the size to which the view can be resized without needin to do any new memory alloc/copy
+        virtual void capacity_min(uint32_t min_cap) = 0;
+
+        //get writeable buffer
         virtual uint8_t* getw() = 0;
 
+        virtual void copy_from(const ConstBlobView& src, uint32_t dst_offset = 0) = 0;
+
+        //Create a slice, realative to this view.
+        //Can be outside of the current active area.
+        //Will resizte this view, so that the returned view is always inside
         BlobSliceView slice(uint32_t start, uint32_t len);
 
-        //Part of this BlobView before the split
+        //Part of this BlobView before the split point
         BlobSliceView slice_left(uint32_t split);
-        //Part of this BlobView after the split
+        //Part of this BlobView after the split point
         BlobSliceView slice_right(uint32_t split);
     };
 
@@ -59,6 +91,7 @@ namespace NATBuster::Common::Utils {
 
         friend class BlobView;
 
+    public:
         //Allocate and zero out a buffer
         static uint8_t* alloc(uint32_t size) {
             uint8_t* res = new uint8_t[size];
@@ -76,6 +109,7 @@ namespace NATBuster::Common::Utils {
             memcpy(dst + dst_offset, src + src_offset, data_size);
         }
 
+    private:
         inline void dbg_self_test() const {
 #ifndef NDEBUG
             assert(_buffer != nullptr || (_capacity == 0 && _size == 0));
@@ -96,20 +130,28 @@ namespace NATBuster::Common::Utils {
         Blob(uint8_t* buffer_consume, uint32_t buffer_size);
 
     public:
+        //Blank, and move ctor
+        //No copy.
+
         Blob();
         Blob(const Blob& other) = delete;
-        Blob(Blob&& other);
-        Blob& operator=(Blob&& other);
         Blob& operator=(const Blob&) = delete;
+        Blob(Blob&& other) noexcept;
+        Blob& operator=(Blob&& other) noexcept;
 
+        //Factory to consume an existing buffer
+        static Blob factory_empty(uint32_t size, uint32_t pre_gap = 0, uint32_t end_gap = 0);
         //Factory to consume an existing buffer
         static Blob factory_consume(uint8_t* data_consume, uint32_t len);
         //Factory to copy a buffer, and optionally add a gap before/after
-        static Blob factory_copy(uint8_t* buffer_copy, uint32_t buffer_size, uint32_t pre_gap = 0, uint32_t end_gap = 0);
+        static Blob factory_copy(const uint8_t* buffer_copy, uint32_t buffer_size, uint32_t pre_gap = 0, uint32_t end_gap = 0);
+        //Factory to copy a buffer, and optionally add a gap before/after
+        static Blob factory_copy(const ConstBlobView& view, uint32_t pre_gap = 0, uint32_t end_gap = 0);
         //Factory from std::string. Doesn't stop at null, termination, stops at str.size()
         static Blob factory_string(const std::string& str);
 
-        static Blob concat(std::initializer_list<ConstBlobView*> list, uint32_t pre_gap = 0, uint32_t end_gap = 0);
+        //Concat views into one. Optionally add a pre and post gap in capacity.
+        static Blob factory_concat(std::initializer_list<ConstBlobView*> list, uint32_t pre_gap = 0, uint32_t end_gap = 0);
 
         //Pre-allocate space before and after the current active area
         void grow_gap(uint32_t min_pre_gap, uint32_t min_end_gap, bool smart = true);
@@ -120,12 +162,16 @@ namespace NATBuster::Common::Utils {
             grow_gap(min_pre_gap, 0, smart);
         }
 
-        //Start and end coordinates wrt old buffer indices
+        //Change the active area of the buffer
+        //Start and end wrt the current indices
         void resize(int32_t new_start, uint32_t new_end);
+        //Change the end of the active area of the buffer
         //End coordinates wrt old buffer indices
         inline void resize(uint32_t new_end) {
             resize(0, new_end);
         }
+        //Change the end of the active area of the buffer
+        //Can only increase buffer.
         //End coordinates wrt old buffer indices
         inline void resize_min(uint32_t min_len) {
             if (_size < min_len) {
@@ -134,9 +180,24 @@ namespace NATBuster::Common::Utils {
             }
         }
 
+        //Set the minimum capacity of the buffer
+        inline void capacity_min(uint32_t min_cap) {
+            if (_capacity < min_cap) {
+                grow_end_gap(min_cap - _size);
+            }
+        }
+
         void add_blob_after(const ConstBlobView& other);
         void add_blob_before(const ConstBlobView& other);
         void sandwich(const ConstBlobView& left, const BlobView& right);
+
+        void copy_from(const ConstBlobView& src, uint32_t dst_offset = 0) {
+            assert(dst_offset + src.size() < _size);
+
+            Blob::bufcpy(
+                _buffer, _capacity, dst_offset + _pre_gap,
+                src.getr(), src.size(), 0, src.size());
+        }
 
         inline uint8_t* getw() {
             dbg_self_test();
@@ -195,8 +256,18 @@ namespace NATBuster::Common::Utils {
             }
         }
 
+        void capacity_min(uint32_t min_cap) {
+            uint32_t new_cap_end = _start + min_cap;
+
+            _blob->capacity_min(new_cap_end);
+        }
+
         uint8_t* getw() {
             return _blob->getw() + _start;
+        }
+
+        virtual void copy_from(const ConstBlobView& src, uint32_t dst_offset = 0) {
+            _blob->copy_from(src, _start + dst_offset);
         }
 
         const uint8_t* getr() const {

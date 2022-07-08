@@ -29,9 +29,9 @@ namespace NATBuster::Common::Crypto {
 
         }
 
-        PKey(PKey&& other);
+        PKey(PKey&& other) noexcept;
 
-        PKey& operator=(PKey&& other);
+        PKey& operator=(PKey&& other) noexcept;
 
         bool loaded();
 

@@ -89,11 +89,15 @@ namespace NATBuster::Common::Utils {
         return *this;
     }
 
-    //Factory to consume an existing buffer
+    Blob Blob::factory_empty(uint32_t size, uint32_t pre_gap, uint32_t end_gap) {
+        uint32_t capacity = size + pre_gap + end_gap;
+        uint8_t* data = Blob::alloc(capacity);
+        return Blob(data, capacity, size, pre_gap);
+    }
     Blob Blob::factory_consume(uint8_t* data_consume, uint32_t len) {
         return Blob(data_consume, len);
     }
-    Blob Blob::factory_copy(uint8_t* buffer_copy, uint32_t buffer_size, uint32_t pre_gap, uint32_t end_gap) {
+    Blob Blob::factory_copy(const uint8_t* buffer_copy, uint32_t buffer_size, uint32_t pre_gap, uint32_t end_gap) {
         uint32_t capacity = pre_gap + buffer_size + end_gap;
         uint8_t* buffer = Blob::alloc(capacity);
 
@@ -101,11 +105,14 @@ namespace NATBuster::Common::Utils {
 
         return Blob(buffer, capacity, buffer_size, pre_gap);
     }
+    Blob Blob::factory_copy(const ConstBlobView& view, uint32_t pre_gap = 0, uint32_t end_gap = 0) {
+        return Blob::factory_copy(view.getr(), view.size(), pre_gap, end_gap);
+    }
     Blob Blob::factory_string(const std::string& str) {
         return factory_copy((uint8_t*)(str.c_str()), str.size(), 0, 0);
     }
 
-    Blob Blob::concat(std::initializer_list<ConstBlobView*> list, uint32_t pre_gap, uint32_t end_gap) {
+    Blob Blob::factory_concat(std::initializer_list<ConstBlobView*> list, uint32_t pre_gap, uint32_t end_gap) {
         uint32_t new_len = 0;
         for (auto it : list) {
             new_len += it->size();
@@ -119,7 +126,7 @@ namespace NATBuster::Common::Utils {
         uint32_t progress = pre_gap;
 
         for (auto it : list) {
-            Blob::bufcpy(buffer, new_len, progress, it->getr(), it->size(), 0, it->size());
+            Blob::bufcpy(buffer, new_cap, progress, it->getr(), it->size(), 0, it->size());
             progress += it->size();
         }
 

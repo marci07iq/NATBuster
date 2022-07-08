@@ -14,11 +14,11 @@ namespace NATBuster::Common::Transport {
         OPTErrorCallback error_callback,
         OPTClosedCallback closed_callback,
         Network::UDPHandle socket,
-        Network::Packet magic,
+        Utils::Blob&& magic,
         OPTUDPSettings settings
     ) : OPTBase(packet_callback, raw_callback, error_callback, closed_callback),
         _socket(socket),
-        _magic(magic),
+        _magic(std::move(magic)),
         _settings(settings) {
 
     }
@@ -112,20 +112,21 @@ namespace NATBuster::Common::Transport {
                 emitter->_error_callback();
             }
             if (result.ok()) {
-                Network::Packet packet = emitter->_socket->readFilter(emitter->_settings._max_mtu * 2);
+                Utils::Blob packet;
+                bool res = emitter->_socket->readFilter(packet, emitter->_settings._max_mtu * 2);
 
                 now = Time::now();
 
-                if (packet.size()) {
+                if (res) {
                     packet_decoder* pkt = packet_decoder::view(packet);
 
-                    switch ((PacketType)(pkt->type)) {
+                    switch ((pkt->type)) {
                         //Shouldnt get hello once connection up, but a few may still be in pipe
                         //Ignore
-                    case PacketType::MGMT_HELLO:
+                    case packet_decoder::PacketType::MGMT_HELLO:
                         break;
                         //Ping: reply with pong
-                    case PacketType::MGMT_PING:
+                    case packet_decoder::PacketType::MGMT_PING:
                         if (packet.size() == 65) {
                             emitter->send_pong(packet);
                         }
@@ -134,11 +135,11 @@ namespace NATBuster::Common::Transport {
                         }
                         break;
                         //Pong: update pong timer
-                    case PacketType::MGMT_PONG:
+                    case packet_decoder::PacketType::MGMT_PONG:
                         last_pong_in = now;
                         break;
                         //ACK: remove from re-transmit queue, update ping time estiamte
-                    case PacketType::PKT_ACK:
+                    case packet_decoder::PacketType::PKT_ACK:
                     {
                         std::lock_guard _lg(emitter->_tx_lock);
                         uint32_t seq = pkt->content.packet.seq;
@@ -165,21 +166,21 @@ namespace NATBuster::Common::Transport {
                         }
                     }
                     //Data packet
-                    case PacketType::PKT_MID:
-                    case PacketType::PKT_START:
-                    case PacketType::PKT_END:
-                    case PacketType::PKT_SINGLE:
+                    case packet_decoder::PacketType::PKT_MID:
+                    case packet_decoder::PacketType::PKT_START:
+                    case packet_decoder::PacketType::PKT_END:
+                    case packet_decoder::PacketType::PKT_SINGLE:
                         //Safe even at roll-around
                     {
                         int32_t advance = pkt->content.packet.seq - emitter->_rx_seq;
                         if (advance >= 0) {
-                            emitter->_receive_map.insert({ pkt->content.packet.seq , packet });
+                            emitter->_receive_map.insert({ pkt->content.packet.seq, std::move(packet) });
                             emitter->try_reassemble();
                         }
                     }
                     break;
 
-                    case PacketType::UDP_PIPE:
+                    case packet_decoder::PacketType::UDP_PIPE:
                         emitter->_raw_callback(packet);
                         break;
                     }
@@ -202,10 +203,10 @@ namespace NATBuster::Common::Transport {
     }*/
 
     void OPTUDP::send_ping() {
-        Network::Packet ping = Network::Packet::create_empty(65);
+        Utils::Blob ping = Utils::Blob::factory_empty(65);
 
         packet_decoder* pkt = packet_decoder::view(ping);
-        pkt->type = (uint8_t)PacketType::MGMT_PING;
+        pkt->type = packet_decoder::PacketType::MGMT_PING;
         for (int i = 0; i < 64; i++) {
             Random::fast_fill(pkt->content.ping.bytes, 64);
         }
@@ -213,11 +214,11 @@ namespace NATBuster::Common::Transport {
         _socket->send(ping);
     }
 
-    void OPTUDP::send_pong(Network::Packet ping) {
-        Network::Packet pong = Network::Packet::copy_from(ping);
+    void OPTUDP::send_pong(const Utils::ConstBlobView& ping_packet) {
+        Utils::Blob pong = Utils::Blob::factory_copy(ping_packet, 0, 0);
 
         packet_decoder* pkt = packet_decoder::view(pong);
-        pkt->type = (uint8_t)PacketType::MGMT_PONG;
+        pkt->type = packet_decoder::PacketType::MGMT_PONG;
 
         _socket->send(pong);
     }
@@ -229,28 +230,34 @@ namespace NATBuster::Common::Transport {
             if (it == _receive_map.end()) break;
 
             //Got it, move to reassembly queue
-            Network::Packet packet = it->second;
+            Utils::Blob packet = std::move(it->second);
             _receive_map.erase(it);
 
-            _reassamble_list.push_back(packet);
+            _reassemble_list.push_back(packet);
 
             packet_decoder* pkt = packet_decoder::view(packet);
             //End of frame
-            if (pkt->type == (uint8_t)PacketType::PKT_END || pkt->type == (uint8_t)PacketType::PKT_SINGLE) {
-                //Merge entries in the list
-                uint32_t size = 0;
-                for (auto&& it : _reassamble_list) {
-                    size += (it.size() - 5); //1 type + 4 seq
+            if (pkt->type == packet_decoder::PacketType::PKT_END || pkt->type == packet_decoder::PacketType::PKT_SINGLE) {
+                
+                uint32_t new_len = 0;
+                for (auto& it : _reassemble_list) {
+                    new_len += it.size();
                 }
-                Network::Packet assembled = Network::Packet::create_empty(size);
-                size = 0;
-                //Copy together
-                for (auto&& it : _reassamble_list) {
-                    memcpy(assembled.get() + size, it.get() + 5, it.size() - 5);
-                    size += (it.size() - 5); //1 type + 4 seq
+
+                uint8_t* buffer = Utils::Blob::alloc(new_len);
+
+                //Write progress
+                uint32_t progress = 0;
+
+                for (auto& it : _reassemble_list) {
+                    Utils::Blob::bufcpy(buffer, new_len, progress, it.getr(), it.size(), 0, it.size());
+                    progress += it.size();
                 }
+
+                Utils::Blob assembled = Utils::Blob::factory_consume(buffer, new_len);
+
                 _packet_callback(assembled);
-                _reassamble_list.clear();
+                _reassemble_list.clear();
             }
 
             _rx_seq += packet_decoder::seq_rt_cnt;
@@ -274,7 +281,7 @@ namespace NATBuster::Common::Transport {
         _socket->close();
     }
 
-    void OPTUDP::send(Network::Packet data) {
+    void OPTUDP::send(const Utils::ConstBlobView& data) {
         //Type and seq
         uint32_t max_packet_length = _settings._max_mtu - 5;
 
@@ -288,25 +295,24 @@ namespace NATBuster::Common::Transport {
             uint32_t data_left = data.size() - progress;
             uint32_t packet_data = (data_left - 1) / (packets_left)+1;
 
-            Network::Packet packet;
+            Utils::Blob packet = Utils::Blob::factory_empty(5 + packet_data);
 
-            //1 byte header
-            packet.create_empty(packet_data + 5);
+            packet.copy_from(data.cslice(progress, packet_data), 5);
 
             packet_decoder* pview = packet_decoder::view(packet);
 
-            pview->type = (uint8_t)((progress == 0) ?
-                ((packet_data == data_left) ? PacketType::PKT_SINGLE : PacketType::PKT_START) :
-                ((packet_data == data_left) ? PacketType::PKT_END : PacketType::PKT_MID));
+            pview->type = ((progress == 0) ?
+                ((packet_data == data_left) ? packet_decoder::PacketType::PKT_SINGLE : packet_decoder::PacketType::PKT_START) :
+                ((packet_data == data_left) ? packet_decoder::PacketType::PKT_END : packet_decoder::PacketType::PKT_MID));
 
-            memcpy(pview->content.packet.data, &data.get()[progress], packet_data);
-
+            pview->content.packet.seq = seq;
+            ++seq;
             packets_left--;
             progress += packet_data;
 
             struct transmit_packet tx_packet = {
                 .transmits = std::vector<Time::time_type_us>({ Time::now() }),
-                .packet = packet,
+                .packet = std::move(packet),
             };
 
             //Can't have ACK arrive before the packet was added to the queue
@@ -318,17 +324,15 @@ namespace NATBuster::Common::Transport {
         }
 
     }
-    void OPTUDP::sendRaw(Network::Packet data) {
-        Network::Packet packet;
-
+    void OPTUDP::sendRaw(const Utils::ConstBlobView& data) {
         //1 byte header
-        packet.create_empty(data.size() + 1);
+        Utils::Blob packet = Utils::Blob::factory_empty(data.size() + 1);
 
         packet_decoder* pview = packet_decoder::view(packet);
 
-        pview->type = (uint8_t)PacketType::UDP_PIPE;
+        pview->type = packet_decoder::PacketType::UDP_PIPE;
 
-        memcpy(pview->content.raw.data, data.get(), data.size());
+        packet.copy_from(data, 1);
 
         _socket->send(packet);
     }

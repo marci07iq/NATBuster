@@ -47,19 +47,53 @@ namespace NATBuster::Common::Crypto {
         }
     }*/
 
-    CipherAES256GCMPacket::CipherAES256GCMPacket() {
-        _ctx = EVP_CIPHER_CTX_new();
+    CipherPacketStream::CipherPacketStream(EVP_CIPHER_CTX* ctx, EVP_CIPHER* algo) :
+        _ctx(ctx),
+        _algo(algo) {
 
-        _algo = EVP_CIPHER_fetch(nullptr, "AES-256-GCM", nullptr);
     }
 
-    CipherAES256GCMPacket::CipherAES256GCMPacket(CipherAES256GCMPacket&& other) {
+    CipherPacketStream::CipherPacketStream(CipherPacketStream&& other) {
         _ctx = other._ctx;
         other._ctx = nullptr;
 
         _algo = other._algo;
         other._algo = nullptr;
 
+    }
+    CipherPacketStream& CipherPacketStream::operator=(CipherPacketStream&& other) {
+        if (_ctx != nullptr) EVP_CIPHER_CTX_free(_ctx);
+        _ctx = other._ctx;
+        other._ctx = nullptr;
+
+        if (_algo != nullptr) EVP_CIPHER_free(_algo);
+        _algo = other._algo;
+        other._algo = nullptr;
+
+        return *this;
+    }
+
+    CipherPacketStream::~CipherPacketStream() {
+        if (_algo != nullptr) {
+            EVP_CIPHER_free(_algo);
+        }
+
+        if (_ctx != nullptr) {
+            EVP_CIPHER_CTX_free(_ctx);
+        }
+    }
+
+    //AES-GCM
+
+    CipherAES256GCMPacketStream::CipherAES256GCMPacketStream() : CipherPacketStream(
+        EVP_CIPHER_CTX_new(),
+        EVP_CIPHER_fetch(nullptr, "AES-256-GCM", nullptr)
+    ) {
+    }
+
+    CipherAES256GCMPacketStream::CipherAES256GCMPacketStream(CipherAES256GCMPacketStream&& other) :
+        CipherPacketStream(std::move(other)) {
+        
         for (int i = 0; i < 32; i++) {
             _key[i] = other._key[i];
             other._key[i] = 0;
@@ -72,14 +106,9 @@ namespace NATBuster::Common::Crypto {
         other._iv.parts.packet = 0;
     }
 
-    CipherAES256GCMPacket& CipherAES256GCMPacket::operator=(CipherAES256GCMPacket&& other) {
-        if (_ctx != nullptr) EVP_CIPHER_CTX_free(_ctx);
-        _ctx = other._ctx;
-        other._ctx = nullptr;
+    CipherAES256GCMPacketStream& CipherAES256GCMPacketStream::operator=(CipherAES256GCMPacketStream&& other) {
+        CipherPacketStream::operator=(std::move(other));
 
-        if (_algo != nullptr) EVP_CIPHER_free(_algo);
-        _algo = other._algo;
-        other._algo = nullptr;
 
         for (int i = 0; i < 32; i++) {
             _key[i] = other._key[i];
@@ -95,33 +124,36 @@ namespace NATBuster::Common::Crypto {
         return *this;
     }
 
-    uint8_t CipherAES256GCMPacket::iv_size() {
-        return 4;
+    uint32_t CipherAES256GCMPacketStream::iv_size() {
+        return 32;
     }
-    void CipherAES256GCMPacket::set_iv_common(uint32_t common) {
+    void CipherAES256GCMPacketStream::set_iv_common(uint32_t common) {
         _iv.parts.common = common;
     }
-    void CipherAES256GCMPacket::set_iv_packet(uint64_t packet) {
+    void CipherAES256GCMPacketStream::set_iv_packet(uint64_t packet) {
         _iv.parts.packet = packet;
     }
 
-    uint8_t CipherAES256GCMPacket::key_size() {
+    uint32_t CipherAES256GCMPacketStream::key_size() {
         return 32;
     }
-    void CipherAES256GCMPacket::set_key(uint8_t key[32]) {
+    void CipherAES256GCMPacketStream::set_key(const uint8_t* key, uint32_t size) {
+        if (size == 32) {
+            throw 1;
+        }
         for (int i = 0; i < 32; i++) {
             _key[i] = key[i];
         }
     }
 
-    uint32_t CipherAES256GCMPacket::enc_size(uint32_t raw_size) {
+    uint32_t CipherAES256GCMPacketStream::enc_size(uint32_t raw_size) {
         return raw_size + 16;
     }
-    uint32_t CipherAES256GCMPacket::dec_size(uint32_t enc_size) {
+    uint32_t CipherAES256GCMPacketStream::dec_size(uint32_t enc_size) {
         return enc_size - 16;
     }
 
-    bool CipherAES256GCMPacket::encrypt(
+    bool CipherAES256GCMPacketStream::encrypt(
         const Utils::ConstBlobView& in,
         Utils::BlobView& out,
         const Utils::ConstBlobView& aad
@@ -177,8 +209,8 @@ namespace NATBuster::Common::Crypto {
 
         return true;
     }
-    
-    bool CipherAES256GCMPacket::decrypt(
+
+    bool CipherAES256GCMPacketStream::decrypt(
         const Utils::ConstBlobView& in,
         Utils::BlobView& out,
         const Utils::ConstBlobView& aad
@@ -232,16 +264,10 @@ namespace NATBuster::Common::Crypto {
         }
         return false;
     }
-    
 
-    CipherAES256GCMPacket::~CipherAES256GCMPacket() {
-        if (_algo != nullptr) {
-            EVP_CIPHER_free(_algo);
-        }
 
-        if (_ctx != nullptr) {
-            EVP_CIPHER_CTX_free(_ctx);
-        }
+    CipherAES256GCMPacketStream::~CipherAES256GCMPacketStream() {
+        
     }
 
 }

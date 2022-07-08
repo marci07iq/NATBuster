@@ -2,12 +2,12 @@
 
 #include <functional>
 
-#include "../network/network.h"
+#include "../utils/blob.h"
 #include "../utils/copy_protection.h"
 
 namespace NATBuster::Common::Transport {
-    typedef std::function<void(Network::Packet)> OPTPacketCallback;
-    typedef std::function<void(Network::Packet)> OPTRawCallback;
+    typedef std::function<void(const Utils::ConstBlobView&)> OPTPacketCallback;
+    typedef std::function<void(const Utils::ConstBlobView&)> OPTRawCallback;
     typedef std::function<void()> OPTErrorCallback;
     typedef std::function<void()> OPTClosedCallback;
 
@@ -26,8 +26,8 @@ namespace NATBuster::Common::Transport {
 
     public:
         //Send ordered packet
-        virtual void send(Network::Packet packet) = 0;
+        virtual void send(const Utils::ConstBlobView& packet) = 0;
         //Send UDP-like packet (no order / arrival guarantee, likely faster)
-        virtual void sendRaw(Network::Packet packet) = 0;
+        virtual void sendRaw(const Utils::ConstBlobView& packet) = 0;
     };
 };

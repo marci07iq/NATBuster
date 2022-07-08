@@ -9,6 +9,7 @@
 
 #include "network.h"
 #include "../utils/copy_protection.h"
+#include "../utils/blob.h"
 
 namespace NATBuster::Common::Network {
 
@@ -21,6 +22,17 @@ namespace NATBuster::Common::Network {
     public:
         SocketWrapper(SOCKET socket = INVALID_SOCKET) : _socket(socket) {
 
+        }
+
+        SocketWrapper(SocketWrapper&& other) noexcept {
+            _socket = other._socket;
+            other._socket = INVALID_SOCKET;
+        }
+
+        SocketWrapper& operator=(SocketWrapper&& other) noexcept {
+            close();
+            _socket = other._socket;
+            other._socket = INVALID_SOCKET;
         }
 
         inline bool valid() const {
@@ -61,7 +73,7 @@ namespace NATBuster::Common::Network {
     public:
         NetworkAddress();
 
-        NetworkAddress(std::string name, uint16_t port);
+        NetworkAddress(const std::string& name, uint16_t port);
 
         inline sockaddr* get() {
             return (sockaddr*)&_address;
@@ -99,7 +111,7 @@ namespace NATBuster::Common::Network {
     };
 
     template <typename MY_HWND>
-    class SocketBase : public Utils::AbstractBase {
+    class SocketBase {
     protected:
         SocketWrapper _socket;
 
@@ -128,7 +140,7 @@ namespace NATBuster::Common::Network {
 
     class TCPS : public SocketBase<TCPSHandle> {
     public:
-        TCPS(std::string name, uint16_t port);
+        TCPS(const std::string& name, uint16_t port);
 
         TCPCHandle accept();
 
@@ -144,10 +156,10 @@ namespace NATBuster::Common::Network {
         TCPC(SOCKET client);
         friend class TCPS;
     public:
-        TCPC(std::string name, uint16_t port);
+        TCPC(const std::string& name, uint16_t port);
 
-        bool send(Packet data);
-        Packet read(uint32_t min_len, uint32_t max_len);
+        bool send(const Utils::ConstBlobView& data);
+        bool read(Utils::BlobView& data, uint32_t min_len, uint32_t max_len);
 
         ~TCPC();
     };
@@ -160,12 +172,12 @@ namespace NATBuster::Common::Network {
         NetworkAddress _remote_address;
         NetworkAddress _local_address;
     public:
-        UDP(std::string remote_name, uint16_t remote_port, uint16_t local_port = 0);
+        UDP(const std::string& remote_name, uint16_t remote_port, uint16_t local_port = 0);
         UDP(NetworkAddress remote_address, NetworkAddress local_address);
 
-        bool send(Packet data);
-        Packet readFilter(uint32_t max_len);
-        Packet read(uint32_t max_len, NetworkAddress& address);
+        bool send(const Utils::ConstBlobView& data);
+        bool readFilter(Utils::BlobView& data, uint32_t max_len = 3000);
+        bool read(Utils::BlobView& data, NetworkAddress& address, uint32_t max_len = 3000);
 
         ~UDP();
     };

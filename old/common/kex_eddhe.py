@@ -19,8 +19,8 @@
 # Curve pre-shared
 
 # A->B: M1: Version
-# A<-B: M2: Version and capabilities (respond with a Vb <= Va)
-# A->B: M3: Selected system
+# A<-B: M2: Version and capabilities
+# Selected version is min(Va, Vb)
 
 # A->B: g^Xa, Na
 # B: K=g^Xa^Xb, H=hash(K, g^Xa, g^Xb, Na, Nb)

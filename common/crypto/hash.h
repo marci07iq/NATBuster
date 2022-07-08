@@ -23,9 +23,9 @@ namespace NATBuster::Common::Crypto {
     public:
         Hash(HashAlgo algo);
 
-        Hash(Hash&& other);
+        Hash(Hash&& other) noexcept;
 
-        Hash& operator=(Hash&& other);
+        Hash& operator=(Hash&& other) noexcept;
 
         uint32_t out_size();
 

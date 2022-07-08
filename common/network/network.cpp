@@ -3,7 +3,7 @@
 
 namespace NATBuster::Common::Network {
 
-    Packet::Packet() : _length(0), _data() {
+    /*Packet::Packet() : _length(0), _data() {
     }
 
     //Data is copied. Caller must destroy data after.
@@ -31,7 +31,7 @@ namespace NATBuster::Common::Network {
         uint8_t* mem = new uint8_t[length];
         memset(mem, 0, length);
         return Packet::consume_from(length, mem);
-    }
+    }*/
 
     /*Packet::Packet(const Packet& other) : _length(other.size()) {
         uint8_t* new_data = new uint8_t(other.size());

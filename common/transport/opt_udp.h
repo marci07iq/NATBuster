@@ -5,54 +5,13 @@
 
 #include "opt_base.h"
 #include "../utils/event.h"
+#include "../utils/blob.h"
+
+//Terminology used in this part of the project
+//Packet: Logical blocks of data
+//Frame: Induvidual 
 
 namespace NATBuster::Common::Transport {
-    enum class PacketType : uint8_t {
-        MGMT_HELLO = 1, //Followed by 64 byte pre-shared magic
-
-        MGMT_PING = 2, //Followed by a 64 byte random nonce
-        MGMT_PONG = 3, //Followed by the 64 byte reply
-
-        //Packet header, 4 byte SEQ, followed by content
-        PKT_MID = 16, //Middle of split packet
-        PKT_START = 17, //Start of split packet
-        PKT_END = 18, //End of split packet
-        PKT_SINGLE = 19, //Start and end of unsplit packet
-
-        //Packet management
-        PKT_ACK = 32, //Acknowledgement, followed by 4 byte SEQ
-        //PKT_FEC = 33, //???
-
-        //For raw UDP passthrough
-        UDP_PIPE = 48, //Deliver as - is
-    };
-
-#pragma pack(push, 1)
-    struct packet_decoder : Utils::NonStack {
-        static const uint32_t seq_rt_mask = 0x3f;
-        static const uint32_t seq_rt_cnt = 64;
-        static const uint32_t seq_num_mask = ~seq_rt_mask;
-
-        uint8_t type;
-        union {
-            struct ping_data { uint8_t bytes[64]; } ping;
-            struct packet_data { uint32_t seq; uint8_t data[1]; } packet;
-            struct raw_data { uint8_t data[1]; } raw;
-        } content;
-
-        //Need as non const ref, so caller must maintain ownership of Packet
-        static inline packet_decoder* view(Network::Packet& packet) {
-            return (packet_decoder*)(packet.get());
-        }
-    };
-
-    static_assert(offsetof(packet_decoder, type) == 0);
-    static_assert(offsetof(packet_decoder, content.ping.bytes) == 1);
-    static_assert(offsetof(packet_decoder, content.packet.seq) == 1);
-    static_assert(offsetof(packet_decoder, content.packet.data) == 5);
-    static_assert(offsetof(packet_decoder, content.raw.data) == 1);
-#pragma pack(pop)
-
     struct OPTUDPSettings {
         uint16_t _max_mtu = 1500; //Max MTU of the UDP packet to send
         bool _fec_on = false; //Enable forward error correction
@@ -69,13 +28,62 @@ namespace NATBuster::Common::Transport {
     typedef std::shared_ptr<OPTUDP> OPTUDPHandle;
 
     class OPTUDP : public OPTBase {
+#pragma pack(push, 1)
+        struct packet_decoder : Utils::NonStack {
+            static const uint32_t seq_rt_mask = 0x3f;
+            static const uint32_t seq_rt_cnt = 64;
+            static const uint32_t seq_num_mask = ~seq_rt_mask;
+
+            enum PacketType : uint8_t {
+                MGMT_HELLO = 1, //Followed by 64 byte pre-shared magic
+
+                MGMT_PING = 2, //Followed by a 64 byte random nonce
+                MGMT_PONG = 3, //Followed by the 64 byte reply
+
+                //Packet header, 4 byte SEQ, followed by content
+                PKT_MID = 16, //Middle of split packet
+                PKT_START = 17, //Start of split packet
+                PKT_END = 18, //End of split packet
+                PKT_SINGLE = 19, //Start and end of unsplit packet
+
+                //Packet management
+                PKT_ACK = 32, //Acknowledgement, followed by 4 byte SEQ
+                //PKT_FEC = 33, //???
+
+                //For raw UDP passthrough
+                UDP_PIPE = 48, //Deliver as - is
+            } type;
+            union {
+                struct ping_data { uint8_t bytes[64]; } ping;
+                struct packet_data { uint32_t seq; uint8_t data[1]; } packet;
+                struct raw_data { uint8_t data[1]; } raw;
+            } content;
+
+            //Need as non const ref, so caller must maintain ownership of Packet
+            static inline packet_decoder* view(Utils::BlobView& packet) {
+                return (packet_decoder*)(packet.getw());
+            }
+
+            static inline const packet_decoder* cview(const Utils::ConstBlobView& packet) {
+                return (const packet_decoder*)(packet.getr());
+            }
+        };
+
+        static_assert(offsetof(packet_decoder, type) == 0);
+        static_assert(offsetof(packet_decoder, content.ping.bytes) == 1);
+        static_assert(offsetof(packet_decoder, content.packet.seq) == 1);
+        static_assert(offsetof(packet_decoder, content.packet.data) == 5);
+        static_assert(offsetof(packet_decoder, content.raw.data) == 1);
+#pragma pack(pop)
+
+
         //To store packets that have arrived, but are not being reassambled
-        std::map<uint32_t, Network::Packet> _receive_map;
-        std::list<Network::Packet> _reassamble_list;
+        std::map<uint32_t, Utils::Blob> _receive_map;
+        std::list<Utils::Blob> _reassemble_list;
 
         struct transmit_packet {
             std::vector<Time::time_type_us> transmits;
-            Network::Packet packet;
+            Utils::Blob packet;
         };
         std::list<transmit_packet> _transmit_queue;
         std::mutex _tx_lock;
@@ -99,7 +107,7 @@ namespace NATBuster::Common::Transport {
 
 
         OPTUDPSettings _settings;
-        Network::Packet _magic;
+        const Utils::Blob _magic;
 
         Network::UDPHandle _socket;
 
@@ -116,7 +124,7 @@ namespace NATBuster::Common::Transport {
             OPTErrorCallback error_callback,
             OPTClosedCallback closed_callback,
             Network::UDPHandle socket,
-            Network::Packet magic,
+            Utils::Blob&& magic,
             OPTUDPSettings settings
         );
 
@@ -125,7 +133,7 @@ namespace NATBuster::Common::Transport {
         //void send_hello();
 
         void send_ping();
-        void send_pong(Network::Packet ping);
+        void send_pong(const Utils::ConstBlobView& ping);
 
         void try_reassemble();
 
@@ -137,12 +145,12 @@ namespace NATBuster::Common::Transport {
             OPTErrorCallback error_callback,
             OPTClosedCallback closed_callback,
             Network::UDPHandle socket,
-            Network::Packet magic,
+            Utils::Blob&& magic,
             OPTUDPSettings settings);
 
         void stop();
 
-        void send(Network::Packet data);
-        void sendRaw(Network::Packet data);
+        void send(const Utils::ConstBlobView& data);
+        void sendRaw(const Utils::ConstBlobView& data);
     };
 }

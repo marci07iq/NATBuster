@@ -50,7 +50,7 @@ namespace NATBuster::Common::Network {
 
     };
 
-    class Packet {
+    /*class Packet {
         std::shared_ptr<uint8_t[]> _data;
         uint32_t _length;
 
@@ -101,7 +101,7 @@ namespace NATBuster::Common::Network {
     bool operator!=(const PacketView& lhs, const PacketView& rhs) {
         if (lhs.size() != rhs.size()) return true;
         return 0 != memcmp(lhs.get(), rhs.get(), lhs.size());
-    }
+    }*/
 };
 
 #include "network_win.h"

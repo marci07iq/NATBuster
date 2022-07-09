@@ -244,9 +244,13 @@ namespace NATBuster::Common::Proto {
         //<-KEXC_IDENTITY
         //S5_CIdentity
         //SF_Done
+    public:
+        KEXV1_B(
+            Crypto::PKey&& my_private, Crypto::PKey&& other_public,
+            Utils::Blob&& m1, Utils::Blob&& m2);
 
-        virtual KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out) = 0;
+        KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out);
 
-        virtual KEX_Event init_kex(Transport::EncryptOPT* out) = 0;
+        KEX_Event init_kex(Transport::EncryptOPT* out);
     };
 }

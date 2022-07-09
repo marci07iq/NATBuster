@@ -52,10 +52,6 @@ namespace NATBuster::Common::Crypto {
         return *this;
     }
 
-    bool PKey::loaded() {
-        return _key != nullptr;
-    }
-
     bool PKey::generate(PKeyAlgo nid) {
         //Override protection
         if (_key != nullptr) return false;
@@ -123,7 +119,7 @@ namespace NATBuster::Common::Crypto {
         return (_key != nullptr);
     }
 
-    bool PKey::save_file_private(std::string filename) {
+    bool PKey::save_file_private(std::string filename) const {
         //Need to have a key
         if (_key == nullptr) return false;
 
@@ -141,7 +137,7 @@ namespace NATBuster::Common::Crypto {
         return res == 1;
     }
 
-    bool PKey::save_file_public(std::string filename) {
+    bool PKey::save_file_public(std::string filename) const {
         //Need to have a key
         if (_key == nullptr) return false;
 
@@ -158,7 +154,7 @@ namespace NATBuster::Common::Crypto {
         return res == 1;
     }
 
-    bool PKey::export_public(Utils::BlobView& out) {
+    bool PKey::export_public(Utils::BlobView& out) const {
         //Need to have a key
         if (_key == nullptr) return false;
 
@@ -181,7 +177,7 @@ namespace NATBuster::Common::Crypto {
         return res == 1;
     }
 
-    bool PKey::sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out) {
+    bool PKey::sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out) const {
         //TODO: Error check;
         EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
 
@@ -211,7 +207,7 @@ namespace NATBuster::Common::Crypto {
         return true;
     }
 
-    bool PKey::verify(const Utils::ConstBlobView& data_in, const Utils::ConstBlobView& sig_in) {
+    bool PKey::verify(const Utils::ConstBlobView& data_in, const Utils::ConstBlobView& sig_in) const {
         //TODO: Error check;
         EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
 
@@ -227,7 +223,7 @@ namespace NATBuster::Common::Crypto {
         return res == 1;
     }
 
-    bool PKey::ecdhe(PKey& key_other, Utils::BlobView& secret_out) {
+    bool PKey::ecdhe(PKey& key_other, Utils::BlobView& secret_out) const {
         EVP_PKEY_CTX* ctx;
         if (nullptr == (ctx = EVP_PKEY_CTX_new(_key, nullptr))) return false;
 

@@ -33,31 +33,40 @@ namespace NATBuster::Common::Crypto {
 
         PKey& operator=(PKey&& other) noexcept;
 
-        bool loaded();
+        inline bool has_key() const {
+            return _key != nullptr;
+        }
+        inline void erase() {
+            if (_key != nullptr) {
+                EVP_PKEY_free(_key);
+                _key = nullptr;
+            }
+
+        }
 
         bool generate(PKeyAlgo nid);
-
         bool generate_ec25519();
-
         bool generate_ed25519();
 
         bool load_file_private(std::string filename);
-
         bool load_public(const Utils::ConstBlobView& in);
 
-        bool save_file_private(std::string filename);
-
-        bool save_file_public(std::string filename);
-
-        bool export_public(Utils::BlobView& out);
+        bool save_file_private(std::string filename) const;
+        bool save_file_public(std::string filename) const;
+        bool export_public(Utils::BlobView& out) const;
 
         //Ed25519 key only
-        bool sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out);
-
+        bool sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out) const;
         //Ed25519 key only
-        bool verify(const Utils::ConstBlobView& data_in, const Utils::ConstBlobView& sig_in);
+        bool verify(const Utils::ConstBlobView& data_in, const Utils::ConstBlobView& sig_in) const;
 
         //Ec25519 key only
-        bool ecdhe(PKey& key_other, Utils::BlobView& secret_out);
+        bool ecdhe(PKey& key_other, Utils::BlobView& secret_out) const;
+
+        bool is_same(PKey& rhs) const {
+            if (!has_key()) return false;
+            if (!rhs.has_key()) return false;
+            return 1 == EVP_PKEY_eq(_key, rhs._key);
+        }
     };
 };

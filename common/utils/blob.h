@@ -28,14 +28,14 @@ namespace NATBuster::Common::Utils {
 
         //Create a new cosnt slice view, looking at the segment of this
         //New view must me inside the active region of this view
-        const ConstBlobSliceView cslice(uint32_t start, uint32_t len) const;
+        ConstBlobSliceView cslice(uint32_t start, uint32_t len) const;
 
         //Part of this BlobView before the split point
         //Non incusive
-        const ConstBlobSliceView cslice_left(uint32_t split) const;
+        ConstBlobSliceView cslice_left(uint32_t split) const;
         //Part of this BlobView after the split point
         //Inclusive
-        const ConstBlobSliceView cslice_right(uint32_t split) const;
+        ConstBlobSliceView cslice_right(uint32_t split) const;
     };
 
     bool operator==(const ConstBlobView& lhs, const ConstBlobView& rhs) {
@@ -118,7 +118,7 @@ namespace NATBuster::Common::Utils {
             assert(_pre_gap + _size <= _capacity);
 #endif
         }
-        
+
         inline uint32_t get_end_gap() const {
             return _capacity - _pre_gap - _size;
         }
@@ -199,6 +199,12 @@ namespace NATBuster::Common::Utils {
                 src.getr(), src.size(), 0, src.size());
         }
 
+        //Keep allocated memory area, but wipe it.
+        inline void erase() {
+            if (_buffer == nullptr) return;
+            memset(_buffer, _capacity, 0);
+        }
+
         inline uint8_t* getw() {
             dbg_self_test();
             if (_buffer == nullptr) return nullptr;
@@ -240,6 +246,13 @@ namespace NATBuster::Common::Utils {
         //Full
         BlobSliceView(BlobView* blob) : BlobSliceView(blob, 0, blob->size()) {
 
+        }
+
+        //Replace with a copy
+        BlobSliceView& operator=(const BlobSliceView& src) {
+            _blob = src._blob;
+            _start = src._start;
+            _len = src._len;
         }
 
         void resize(uint32_t new_len) {
@@ -288,10 +301,18 @@ namespace NATBuster::Common::Utils {
         uint32_t _len;
 
     public:
+
         //Sub section
         ConstBlobSliceView(const ConstBlobView* blob, uint32_t start, uint32_t len) : _blob(blob), _start(start), _len(len) {
-            //Check 
-            assert(_start + _len <= blob->size());
+            //Check
+            if (_blob != nullptr) {
+                assert(_start + _len <= _blob->size());
+            }
+
+        }
+
+        //Empty
+        ConstBlobSliceView() : ConstBlobSliceView(nullptr, 0, 0) {
 
         }
 
@@ -300,12 +321,87 @@ namespace NATBuster::Common::Utils {
 
         }
 
+        //Replace with a copy
+        ConstBlobSliceView& operator=(const ConstBlobSliceView& src) {
+            _blob = src._blob;
+            _start = src._start;
+            _len = src._len;
+        }
+
         const uint8_t* getr() const {
-            return _blob->getr() + _start;
+            const uint8_t* base = _blob->getr();
+            if (base == nullptr) return nullptr;
+            return base + _start;
         }
 
         const uint32_t size() const {
             return _len;
+        }
+    };
+
+    class PackedBlobWriter : Utils::NonCopyable {
+        uint32_t _write_cursor;
+        BlobView& _dst;
+    public:
+        //Appends a packed data record at the end of dst
+        PackedBlobWriter(BlobView& dst) : _dst(dst) {
+            _write_cursor = dst.size();
+        }
+
+        void add_record(const ConstBlobView& data) {
+            //Create space
+            _dst.resize(_write_cursor + 4 + data.size());
+
+            //Copy data
+            _dst.copy_from(data, _write_cursor + 4);
+
+            //Set size field
+            *((uint32_t*)(_dst.getw() + _write_cursor)) = data.size();
+            _write_cursor = _write_cursor + 4 + data.size();
+        }
+
+        BlobSliceView prepare_writeable_record() {
+            //Create an empty slice starting after the lenth field
+            return _dst.slice(_write_cursor + 4, 0);
+        }
+
+        void finish_writeable_record(const BlobSliceView& record) {
+            //Set size field
+            *((uint32_t*)(_dst.getw() + _write_cursor)) = record.size();
+            _write_cursor = _write_cursor + 4 + record.size();
+        }
+    };
+
+    class PackedBlobReader : Utils::NonCopyable {
+        uint32_t _read_cursor;
+        const ConstBlobView& _src;
+    public:
+        //Starts reading at the beginning, till the end of src.
+        PackedBlobReader(const ConstBlobView& src) : _src(src), _read_cursor(0) {
+
+        }
+
+        bool next_record(ConstBlobSliceView& new_slice) {
+            //Check to make sure record size is in source
+            if (_src.size() < _read_cursor + 4) return false;
+
+            uint32_t record_size = *((uint32_t*)(_src.getr() + _read_cursor));
+
+            //Check to make sure record is in source
+            //Check ordered to prevent from overflow if attacker controlled record_size is too big.
+            if (_src.size() - (4 + _read_cursor) < record_size) return false;
+
+            //Create a slice
+            new_slice = _src.cslice(_read_cursor + 4, record_size);
+
+            _read_cursor = _read_cursor + 4 + record_size;
+
+            return true;
+        }
+
+        bool eof() {
+            assert(_read_cursor <= _src.size);
+            return _read_cursor >= _src.size();
         }
     };
 }

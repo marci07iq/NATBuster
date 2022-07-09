@@ -12,45 +12,52 @@
 #include "../utils/blob.h"
 #include "../utils/time.h"
 
+namespace NATBuster::Common::Transport {
+    class EncryptOPT;
+};
+
 namespace NATBuster::Common::Proto {
-    enum class KEX_Event {
-        //KEX error. terminate connection
-
-        //Unknown error
-        ErrorGeneric = 0,
-        //Malformed packet received
-        ErrorMalformed = 1,
-        //Remote public key is not as expected
-        ErrorNotrust = 2,
-        //Failed: Crypto error occured
-        ErrorFailed = 3,
-
-        //Valid KEX message received
-        OK = 16,
-        //New keys are ready to use. All subsequent receive should be decoded with the new key
-        OK_Newkey = 17,
-        //KEX and auth are ready. The tunnle is open for business
-        OK_Ready = 18,
-    };
-
     class KEX : Utils::NonCopyable {
+    public:
+        enum class KEX_Event {
+            //KEX error. terminate connection
+
+            //Unknown error
+            ErrorGeneric = 0,
+            //Malformed packet received
+            ErrorMalformed = 1,
+            //No trust in remote identity
+            ErrorNotrust = 2,
+            //Crypto error occured
+            ErrorCrypto = 3,
+            //Outbound packet couldnt be sent
+            ErrorSend = 4,
+            //State error
+            ErrorState = 5,
+
+            //Valid KEX message received
+            OK = 16,
+            //KEX and auth are ready. The tunnle is open for business
+            OK_Done = 18,
+        };
+
+
     protected:
         KEX() {
 
         }
 
         Time::time_type_us _last_kex;
+
+
     public:
         inline Time::time_type_us last_kex() {
             return _last_kex;
         }
 
-        virtual KEX_Event recv(const Utils::ConstBlobView& packet) = 0;
+        virtual KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out) = 0;
 
-        //To be called after an OK_Newkey event
-        virtual void set_key(Crypto::CipherPacketStream& stream) = 0;
-
-
+        virtual KEX_Event init_kex(Transport::EncryptOPT* out) = 0;
     };
 
 };

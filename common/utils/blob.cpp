@@ -6,16 +6,16 @@ namespace NATBuster::Common::Utils {
 
     }
 
-    const ConstBlobSliceView _ConstBlobView::cslice(uint32_t start, uint32_t len) const {
+    ConstBlobSliceView _ConstBlobView::cslice(uint32_t start, uint32_t len) const {
         return ConstBlobSliceView(this, start, len);
     }
 
-    const ConstBlobSliceView _ConstBlobView::cslice_left(uint32_t split) const {
+    ConstBlobSliceView _ConstBlobView::cslice_left(uint32_t split) const {
         assert(split <= size());
         return ConstBlobSliceView(this, 0, split);
     }
 
-    const ConstBlobSliceView _ConstBlobView::cslice_right(uint32_t split) const {
+    ConstBlobSliceView _ConstBlobView::cslice_right(uint32_t split) const {
         assert(split <= size());
         return ConstBlobSliceView(this, split, size() - split);
     }

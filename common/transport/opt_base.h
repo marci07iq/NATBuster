@@ -30,4 +30,6 @@ namespace NATBuster::Common::Transport {
         //Send UDP-like packet (no order / arrival guarantee, likely faster)
         virtual void sendRaw(const Utils::ConstBlobView& packet) = 0;
     };
+
+    typedef std::shared_ptr<OPTBase> OPTBaseHandle;
 };

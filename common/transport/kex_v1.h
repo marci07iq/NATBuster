@@ -33,6 +33,11 @@ namespace NATBuster::Common::Proto {
         enum State : uint8_t {
             //KEX object created, no messages sent/received yet
             S0_New = 0,
+            //M1 (client version) message sent/received
+            SA_M1 = 6,
+            //M2 (server version) message sent/received
+            SA_M2 = 7,
+
             //Previous key exchange complete, return to idle
             SF_Done = 16,
 
@@ -52,6 +57,12 @@ namespace NATBuster::Common::Proto {
         } _state;
 
         enum PacketType : uint8_t {
+            //Client version
+            //4 byte int
+            KEXC_VERSION = 5,
+            //Server version
+            //4 byte int
+            KEXS_VERSION = 6,
             //Client hello (C->S)
             //Client DH-public key, client nonce
             //Allowed in state 
@@ -98,12 +109,9 @@ namespace NATBuster::Common::Proto {
         Crypto::PKey _lt_key_b;
 
         KEXV1(
-            Crypto::PKey&& lt_key_a, Crypto::PKey&& lt_key_b,
-            Utils::Blob&& m1, Utils::Blob&& m2) :
+            Crypto::PKey&& lt_key_a, Crypto::PKey&& lt_key_b) :
             _lt_key_a(std::move(lt_key_a)),
-            _lt_key_b(std::move(lt_key_b)),
-            _m1(std::move(m1)),
-            _m2(std::move(m2)) {
+            _lt_key_b(std::move(lt_key_b)) {
 
         }
 
@@ -194,6 +202,10 @@ namespace NATBuster::Common::Proto {
             }
             return true;
         }
+
+        virtual ~KEXV1() {
+
+        }
     };
 
     //KEX for the initiator side
@@ -215,13 +227,16 @@ namespace NATBuster::Common::Proto {
         //SF_Done
     public:
         KEXV1_A(
-            Crypto::PKey&& my_private, Crypto::PKey&& other_public,
-            Utils::Blob&& m1, Utils::Blob&& m2);
+            Crypto::PKey&& my_private, Crypto::PKey&& other_public);
 
 
-        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out);
+        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::Session* out);
 
-        KEX::KEX_Event init_kex(Transport::EncryptOPT* out);
+        KEX::KEX_Event init_kex(Transport::Session* out);
+
+        virtual ~KEXV1_A() {
+
+        }
     };
 
     //KEX for the target side
@@ -244,11 +259,14 @@ namespace NATBuster::Common::Proto {
         //SF_Done
     public:
         KEXV1_B(
-            Crypto::PKey&& my_private, Crypto::PKey&& other_public,
-            Utils::Blob&& m1, Utils::Blob&& m2);
+            Crypto::PKey&& my_private, Crypto::PKey&& other_public);
 
-        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out);
+        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::Session* out);
 
-        KEX::KEX_Event init_kex(Transport::EncryptOPT* out);
+        KEX::KEX_Event init_kex(Transport::Session* out);
+
+        virtual ~KEXV1_B() {
+
+        }
     };
 }

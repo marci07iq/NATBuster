@@ -3,17 +3,15 @@
 
 namespace NATBuster::Common::Proto {
     KEXV1_A::KEXV1_A(
-        Crypto::PKey&& my_private, Crypto::PKey&& other_public,
-        Utils::Blob&& m1, Utils::Blob&& m2) :
+        Crypto::PKey&& my_private, Crypto::PKey&& other_public) :
         KEXV1(
-            std::move(my_private), std::move(other_public),
-            std::move(m1), std::move(m2)
+            std::move(my_private), std::move(other_public)
         ) {
         _state = State::S0_New;
     }
 
 
-    KEX::KEX_Event KEXV1_A::recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out) {
+    KEX::KEX_Event KEXV1_A::recv(const Utils::ConstBlobView& packet, Transport::Session* out) {
         if (packet.size() == 0) return fail(KEX_Event::ErrorMalformed);
 
         PacketType packet_type = (PacketType)(*((uint8_t*)packet.getr()));
@@ -22,7 +20,51 @@ namespace NATBuster::Common::Proto {
 
         switch (_state)
         {
-            //Client Hello sent, expecting server hello as response
+            //Send M1 (client version)
+            //Should receive M2 (server version) next
+
+        case NATBuster::Common::Proto::KEXV1::SA_M1:
+        {
+            if (packet_type != PacketType::KEXS_HELLO) return fail(KEX_Event::ErrorState);
+            if (packet_data.size() != 4) return fail(KEX_Event::ErrorMalformed);
+            uint32_t version = *(uint32_t*)packet_data.getr();
+            if(version != 0x01000000) return fail(KEX_Event::ErrorMalformed);
+
+            _m2.copy_from(packet_data, 0);
+
+            _state = KEXV1::SA_M2;
+
+            //Clean memory garbage
+            kex_reset();
+            //Create new DH key
+            if (!_dh_key_a.generate_ec25519()) return fail(KEX_Event::ErrorCrypto);
+            //Create new nonce
+            if (!Crypto::random(_nonce_a, 64)) return fail(KEX_Event::ErrorCrypto);
+
+            //Blob for storing the data
+            Utils::Blob c_hello = Utils::Blob::factory_empty(1, 0, 200);
+
+            //Set packet type
+            *((uint8_t*)c_hello.getw()) = (uint8_t)PacketType::KEXC_HELLO;
+
+            //Writer for packing the data
+            Utils::PackedBlobWriter c_hello_w(c_hello);
+
+            //Write dh public key
+            Utils::BlobSliceView pkey = c_hello_w.prepare_writeable_record();
+            if (!_dh_key_a.export_public(pkey)) return fail(KEX_Event::ErrorCrypto);
+            c_hello_w.finish_writeable_record(pkey);
+
+            //Write nonce
+            c_hello_w.add_record(_nonce_a);
+
+            out->send(c_hello);
+            _state = S1_CHello;
+            return KEX_Event::OK;
+        }
+        break;
+
+        //Client Hello sent, expecting server hello as response
         case NATBuster::Common::Proto::KEXV1::S1_CHello:
         {
             if (packet_type != PacketType::KEXS_HELLO) return fail(KEX_Event::ErrorState);
@@ -161,35 +203,18 @@ namespace NATBuster::Common::Proto {
         }
     }
 
-    KEX::KEX_Event KEXV1_A::init_kex(Transport::EncryptOPT* out) {
+    KEX::KEX_Event KEXV1_A::init_kex(Transport::Session* out) {
         //KEX can only be be called when a previos kex is done
         if (_state == S0_New || _state == SF_Done) {
-            //Clean memory garbage
-            kex_reset();
-            //Create new DH key
-            if (!_dh_key_a.generate_ec25519()) return fail(KEX_Event::ErrorCrypto);
-            //Create new nonce
-            if (!Crypto::random(_nonce_a, 64)) return fail(KEX_Event::ErrorCrypto);
-
-            //Blob for storing the data
-            Utils::Blob c_hello = Utils::Blob::factory_empty(1, 0, 200);
+            _m1 = Utils::Blob::factory_empty(5, 0, 0);
 
             //Set packet type
-            *((uint8_t*)c_hello.getw()) = (uint8_t)PacketType::KEXC_HELLO;
+            *((uint8_t*)_m1.getw()) = (uint8_t)PacketType::KEXS_VERSION;
 
-            //Writer for packing the data
-            Utils::PackedBlobWriter c_hello_w(c_hello);
+            *((uint32_t*)(_m1.getw() + 1)) = 0x10000000;
 
-            //Write dh public key
-            Utils::BlobSliceView pkey = c_hello_w.prepare_writeable_record();
-            if(!_dh_key_a.export_public(pkey)) return fail(KEX_Event::ErrorCrypto);
-            c_hello_w.finish_writeable_record(pkey);
-
-            //Write nonce
-            c_hello_w.add_record(_nonce_a);
-
-            out->send(c_hello);
-            _state = S1_CHello;
+            out->send(_m1);
+            _state = KEXV1::SA_M1;
             return KEX_Event::OK;
         }
         _state = SF_Err;
@@ -198,17 +223,15 @@ namespace NATBuster::Common::Proto {
 
 
     KEXV1_B::KEXV1_B(
-        Crypto::PKey&& my_private, Crypto::PKey&& other_public,
-        Utils::Blob&& m1, Utils::Blob&& m2) :
+        Crypto::PKey&& my_private, Crypto::PKey&& other_public) :
         KEXV1(
-            std::move(my_private), std::move(other_public),
-            std::move(m1), std::move(m2)
+            std::move(my_private), std::move(other_public)
         ) {
         _state = State::S0_New;
     }
 
 
-    KEX::KEX_Event KEXV1_B::recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out) {
+    KEX::KEX_Event KEXV1_B::recv(const Utils::ConstBlobView& packet, Transport::Session* out) {
         if (packet.size() == 0) return fail(KEX_Event::ErrorMalformed);
 
         PacketType packet_type = (PacketType)(*((uint8_t*)packet.getr()));
@@ -217,8 +240,30 @@ namespace NATBuster::Common::Proto {
 
         switch (_state)
         {
-        //Not curretnyl in a kex. Should start with a client hello
+
         case NATBuster::Common::Proto::KEXV1::S0_New:
+        {
+            if (packet_type != PacketType::KEXC_HELLO) return fail(KEX_Event::ErrorState);
+            if (packet_data.size() != 4) return fail(KEX_Event::ErrorMalformed);
+            uint32_t version = *(uint32_t*)packet_data.getr();
+            if (version != 0x01000000) return fail(KEX_Event::ErrorMalformed);
+
+            _m1.copy_from(packet, 0);
+
+            _m2 = Utils::Blob::factory_empty(5, 0, 0);
+
+            //Set packet type
+            *((uint8_t*)_m2.getw()) = (uint8_t)PacketType::KEXS_VERSION;
+
+            *((uint32_t*)(_m2.getw() + 1)) = 0x10000000;
+
+            out->send(_m2);
+            _state = SA_M2;
+            return KEX_Event::OK;
+        }
+        break;
+            //Not curretnyl in a kex. Should start with a client hello
+        case NATBuster::Common::Proto::KEXV1::SA_M2:
         case NATBuster::Common::Proto::KEXV1::SF_Done:
         {
             if (packet_type != PacketType::KEXC_HELLO) return fail(KEX_Event::ErrorState);
@@ -263,7 +308,7 @@ namespace NATBuster::Common::Proto {
 
             //Write dh public key
             Utils::BlobSliceView ekey = s_hello_w.prepare_writeable_record();
-            if(!_dh_key_b.export_public(ekey)) return fail(KEX_Event::ErrorCrypto);
+            if (!_dh_key_b.export_public(ekey)) return fail(KEX_Event::ErrorCrypto);
             s_hello_w.finish_writeable_record(ekey);
 
             //Write nonce
@@ -382,7 +427,7 @@ namespace NATBuster::Common::Proto {
         }
     }
 
-    KEX::KEX_Event KEXV1_B::init_kex(Transport::EncryptOPT* out) {
+    KEX::KEX_Event KEXV1_B::init_kex(Transport::Session* out) {
         /*if (_state == S0_New || _state == SF_Done) {
             //Clean memory garbage
             kex_reset();

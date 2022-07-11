@@ -11,7 +11,7 @@
 #include "../crypto/cipher.h"
 
 namespace NATBuster::Common::Transport {
-    class EncryptOPT;
+    class Session;
 };
 
 namespace NATBuster::Common::Proto {
@@ -53,9 +53,13 @@ namespace NATBuster::Common::Proto {
             return _last_kex;
         }
 
-        virtual KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out) = 0;
+        virtual KEX_Event recv(const Utils::ConstBlobView& packet, Transport::Session* out) = 0;
 
-        virtual KEX_Event init_kex(Transport::EncryptOPT* out) = 0;
+        virtual KEX_Event init_kex(Transport::Session* out) = 0;
+
+        virtual ~KEX() {
+
+        }
     };
 
 };

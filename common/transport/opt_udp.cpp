@@ -219,9 +219,10 @@ namespace NATBuster::Common::Transport {
     }
 
     OPTUDP::OPTUDP(
+        bool is_client,
         Network::UDPHandle socket,
         OPTUDPSettings settings
-    ) : OPTBase(),
+    ) : OPTBase(is_client),
         _socket(socket),
         _source(std::make_shared< Utils::PollEventEmitter<Network::UDPHandle, Utils::Void>>(socket)),
         _settings(settings) {

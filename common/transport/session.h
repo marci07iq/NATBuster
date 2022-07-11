@@ -47,7 +47,7 @@ namespace NATBuster::Common::Transport {
             CLOSE = 3
         };
         //The underlying transport (likely a multiplexed pipe, or OPTUDP
-        std::shared_ptr<OPTBase> _underyling;
+        std::shared_ptr<OPTBase> _underlying;
         //Encryption system
         Crypto::CipherAES256GCMPacketStream _inbound;
         Crypto::CipherAES256GCMPacketStream _outbound;
@@ -83,10 +83,11 @@ namespace NATBuster::Common::Transport {
 
     public:
         Session(
+            bool is_client,
             std::shared_ptr<OPTBase> underlying,
             Crypto::PKey&& my_private,
-            Crypto::PKey&& remote_public,
-            bool is_client);
+            Crypto::PKey&& remote_public
+        );
 
         void start();
 

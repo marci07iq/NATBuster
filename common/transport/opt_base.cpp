@@ -2,7 +2,7 @@
 
 
 namespace NATBuster::Common::Transport {
-    OPTBase::OPTBase() {
+    OPTBase::OPTBase(bool is_client) : _is_client(is_client) {
 
     }
 }

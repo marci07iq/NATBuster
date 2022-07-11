@@ -34,51 +34,51 @@ namespace NATBuster::Common::Proto {
             //KEX object created, no messages sent/received yet
             S0_New = 0,
             //M1 (client version) message sent/received
-            SA_M1 = 6,
+            S1_M1 = 1,
             //M2 (server version) message sent/received
-            SA_M2 = 7,
+            S2_M2 = 2,
 
             //Previous key exchange complete, return to idle
-            SF_Done = 16,
+            KF_Done = 32,
 
             //Protocol error has occured. Irrecoverable state.
-            SF_Err = 17,
+            KF_Err = 33,
 
             //Client hello sent/received A->B
-            S1_CHello = 1,
+            K1_CHello = 17,
             //Server hello sent/received B->A
-            S2_SHello = 2,
+            K2_SHello = 18,
             //Server encryption newkeys sent/received B->A
-            S3_SEnc = 3,
+            K3_SEnc = 19,
             //Client encryption newkeys sent/received B->A
-            S4_CEnc = 4,
+            K4_CEnc = 20,
             //Client identity sent/received B->A
-            S5_CIdentity = 5,
+            K5_CIdentity = 21,
         } _state;
 
         enum PacketType : uint8_t {
             //Client version
             //4 byte int
-            KEXC_VERSION = 5,
+            KEXC_VERSION = 1,
             //Server version
             //4 byte int
-            KEXS_VERSION = 6,
+            KEXS_VERSION = 2,
             //Client hello (C->S)
             //Client DH-public key, client nonce
             //Allowed in state 
-            KEXC_HELLO = 0,
+            KEXC_HELLO = 3,
             //Server hello (S->C)
             //Server DH-public key, server LT-public key, 
-            KEXS_HELLO = 1,
+            KEXS_HELLO = 4,
             //Server new keys (S->C)
             //Server is ready to switch to new keys
             //Will send all subsequent messages with new keys
-            KEXS_NEWKEYS = 2,
+            KEXS_NEWKEYS = 5,
             //Client accepts KEXS_HELLO 
             //Client begins sending with new keys after this message
-            KEXC_NEWKEYS = 3,
+            KEXC_NEWKEYS = 6,
             //Client sends identity
-            KEXC_IDENTITY = 4
+            KEXC_IDENTITY = 7
 
         } type;
 
@@ -117,7 +117,7 @@ namespace NATBuster::Common::Proto {
 
         //Wipe the internal state
         inline KEX::KEX_Event fail(KEX::KEX_Event reason) {
-            _state = SF_Err;
+            _state = KF_Err;
             return reason;
         }
 
@@ -211,20 +211,20 @@ namespace NATBuster::Common::Proto {
     //KEX for the initiator side
     class KEXV1_A : public KEXV1 {
         //Client side states:
-        //S0_New / SF_Done
+        //S0_New / KF_Done
         //->KEXC_HELLO
-        //S1_CHello
+        //K1_CHello
         // 
         //<-KEXS_HELLO
-        //S2_SHello
+        //K2_SHello
         // 
         //<-KEXS_NEWKEYS
-        //S3_SEnc
+        //K3_SEnc
         //->KEXC_NEWKEYS
-        //S4_CEnc
+        //K4_CEnc
         //->KEXC_IDENTITY
-        //S5_CIdentity
-        //SF_Done
+        //K5_CIdentity
+        //KF_Done
     public:
         KEXV1_A(
             Crypto::PKey&& my_private, Crypto::PKey&& other_public);
@@ -242,21 +242,21 @@ namespace NATBuster::Common::Proto {
     //KEX for the target side
     class KEXV1_B : public KEXV1 {
         //Server side states:
-        //S0_New / SF_Done
+        //S0_New / KF_Done
         // 
         //<-KEXC_HELLO
-        //S1_CHello
+        //K1_CHello
         //->KEXS_HELLO
-        //S2_SHello
+        //K2_SHello
         //->KEXS_NEWKEYS
-        //S3_SEnc
+        //K3_SEnc
         // 
         //<-KEXC_NEWKEYS
-        //S4_CEnc
+        //K4_CEnc
         // 
         //<-KEXC_IDENTITY
-        //S5_CIdentity
-        //SF_Done
+        //K5_CIdentity
+        //KF_Done
     public:
         KEXV1_B(
             Crypto::PKey&& my_private, Crypto::PKey&& other_public);

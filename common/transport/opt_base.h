@@ -23,7 +23,9 @@ namespace NATBuster::Common::Transport {
         //ErrorCallback _error_callback = nullptr;
         //CloseCallback _close_callback = nullptr;
 
-        OPTBase();
+        bool _is_client;
+
+        OPTBase(bool is_client);
     private:
         using Utils::EventEmitter<const Utils::ConstBlobView&>::set_result_callback;
     public:

@@ -83,14 +83,14 @@ namespace NATBuster::Common::Transport {
     }
 
     Session::Session(
+        bool is_client,
         std::shared_ptr<OPTBase> underlying,
         Crypto::PKey&& my_private,
-        Crypto::PKey&& remote_public,
-        bool is_client
+        Crypto::PKey&& remote_public
     ) :
-        OPTBase()
+        OPTBase(is_client)
     {
-        if (is_client) {
+        if (_is_client) {
             _kex = std::make_unique<Proto::KEXV1_A>(std::move(my_private), std::move(remote_public));
         }
         else {
@@ -99,12 +99,12 @@ namespace NATBuster::Common::Transport {
     }
 
     void Session::start() {
-        _underyling->set_packet_callback(new Utils::MemberCallback<Session, void, const Utils::ConstBlobView&>(weak_from_this(), &Session::on_packet));
-        _underyling->set_raw_callback(new Utils::MemberCallback<Session, void, const Utils::ConstBlobView&>(weak_from_this(), &Session::on_raw));
-        _underyling->set_error_callback(new Utils::MemberCallback<Session, void>(weak_from_this(), &Session::on_error));
-        _underyling->set_close_callback(new Utils::MemberCallback<Session, void>(weak_from_this(), &Session::on_close));
+        _underlying->set_packet_callback(new Utils::MemberCallback<Session, void, const Utils::ConstBlobView&>(weak_from_this(), &Session::on_packet));
+        _underlying->set_raw_callback(new Utils::MemberCallback<Session, void, const Utils::ConstBlobView&>(weak_from_this(), &Session::on_raw));
+        _underlying->set_error_callback(new Utils::MemberCallback<Session, void>(weak_from_this(), &Session::on_error));
+        _underlying->set_close_callback(new Utils::MemberCallback<Session, void>(weak_from_this(), &Session::on_close));
 
-        _underyling->start();
+        _underlying->start();
     }
 
     //Send ordered packet
@@ -115,10 +115,10 @@ namespace NATBuster::Common::Transport {
 
     //Send raw fasttrack packet, passed stright to the underlying inderface
     void Session::sendRaw(const Utils::ConstBlobView& packet) {
-        _underyling->sendRaw(packet);
+        _underlying->sendRaw(packet);
     }
 
     void Session::close() {
-        _underyling->close();
+        _underlying->close();
     }
 }

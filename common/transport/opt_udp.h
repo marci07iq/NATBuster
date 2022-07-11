@@ -205,6 +205,7 @@ namespace NATBuster::Common::Transport {
         void on_housekeeping();
 
         OPTUDP(
+            bool is_client,
             Network::UDPHandle socket,
             OPTUDPSettings settings
         );

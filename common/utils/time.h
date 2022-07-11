@@ -1,3 +1,5 @@
+#pragma once
+
 #include <chrono>
 #include <stdint.h>
 
@@ -7,15 +9,10 @@ namespace NATBuster::Common::Time
 {
     typedef uint64_t time_type_us;
     typedef int64_t time_delta_type_us;
-    static const time_delta_type_us TIME_DELTA_INFINTE = -1;
-    static const time_delta_type_us TIME_DELTA_ZERO = 0;
+    extern const time_delta_type_us TIME_DELTA_INFINTE;
+    extern const time_delta_type_us TIME_DELTA_ZERO;
 
-    time_type_us now() {
-        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-
-        return start.time_since_epoch() /
-            std::chrono::microseconds(1);
-    }
+    time_type_us now();
 
 #ifdef WIN32
     struct Timeout {

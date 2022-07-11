@@ -18,7 +18,7 @@ int main() {
     auto space = test.slice(4, 1);
     auto end = punctuation.cslice(2, 1);
 
-    Blob result = Blob::concat({ &hello, &space, &world, &end}, 0, 1);
+    Blob result = Blob::factory_concat({ &hello, &space, &world, &end}, 0, 1);
 
     result.resize(result.size() + 1);
 

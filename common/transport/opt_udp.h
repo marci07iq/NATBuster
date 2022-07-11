@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "opt_base.h"
+#include "../network/network.h"
 #include "../utils/event.h"
 #include "../utils/blob.h"
 
@@ -15,11 +16,13 @@ namespace NATBuster::Common::Transport {
     struct OPTUDPSettings {
         uint16_t _max_mtu = 1500; //Max MTU of the UDP packet to send
         bool _fec_on = false; //Enable forward error correction
-        Time::time_type_us ping_interval = 2000000; //2sec
-        Time::time_type_us max_pong = 30000000; //30sec
+        Time::time_delta_type_us ping_interval = 2000000; //2sec
+        Time::time_delta_type_us max_pong = 30000000; //30sec
+        Time::time_delta_type_us min_retransmit = 3000; //3ms
+        //Re-transmits occur after ping*ping_rt_mul + jitter*jitter_rt_mul
         float ping_rt_mul = 1.5f;
         float jitter_rt_mul = 1.5f;
-        //Re-transmits occur after ping*ping_rt_mul + jitter*jitter_rt_mul
+        //Exponential running average weight of new data point
         float ping_average_weight = 0.01;
     };
 
@@ -27,7 +30,7 @@ namespace NATBuster::Common::Transport {
 
     typedef std::shared_ptr<OPTUDP> OPTUDPHandle;
 
-    class OPTUDP : public OPTBase {
+    class OPTUDP : public OPTBase, public std::enable_shared_from_this<OPTUDP> {
 #pragma pack(push, 1)
         struct packet_decoder : Utils::NonStack {
             static const uint32_t seq_rt_mask = 0x3f;
@@ -76,28 +79,47 @@ namespace NATBuster::Common::Transport {
         static_assert(offsetof(packet_decoder, content.raw.data) == 1);
 #pragma pack(pop)
 
+        //These variable are only touched from the callbacks
 
         //To store packets that have arrived, but are not being reassambled
         std::map<uint32_t, Utils::Blob> _receive_map;
         std::list<Utils::Blob> _reassemble_list;
+        //Next packet we are expecting in
+        uint32_t _rx_seq = 0;
+        //Last pong received
+        Time::time_type_us _last_pong_in = 0;
 
+        //These variables are locked by the tx mutex
+
+        //The following are locked by tx_lock
         struct transmit_packet {
+            transmit_packet() {
+
+            }
+
+            transmit_packet(transmit_packet&& other) noexcept {
+                transmits = std::move(other.transmits);
+                packet = std::move(other.packet);
+            }
+
+            transmit_packet& operator=(transmit_packet&& other) noexcept {
+                transmits = std::move(other.transmits);
+                packet = std::move(other.packet);
+            }
+
             std::vector<Time::time_type_us> transmits;
             Utils::Blob packet;
         };
         std::list<transmit_packet> _transmit_queue;
+        //Next packet to send out
+        //Use the low 6 bits for a re-transmit counter
+        uint32_t _tx_seq = 0;
         std::mutex _tx_lock;
 
-        bool _got_hello = false;
-        bool _run = false;
-        std::mutex _system_lock;
-
-        //Use the low 6 bits for a re-transmit counter
-
-        //Next packet to send out
-        uint32_t _tx_seq = 0;
-        //Next packet we are expecting in
-        uint32_t _rx_seq = 0;
+        //Socket
+        Network::UDPHandle _socket;
+        //PollEventEmitter wrapping the socket
+        std::shared_ptr<Utils::PollEventEmitter<Network::UDPHandle, Utils::Void>> _source;
 
         //Running average of ACK pings
         float _ping = 0.1;
@@ -105,52 +127,105 @@ namespace NATBuster::Common::Transport {
         float _ping2 = 0.01;
         //Jitter = sqrt(ping2 - ping**2)
 
-
+        //Settings objects
         OPTUDPSettings _settings;
-        const Utils::Blob _magic;
 
-        Network::UDPHandle _socket;
+        //Internal utility functions
 
-        uint32_t next_seq(int n = 1) {
+        //Get outbound sequential numbers for the next n frames.
+        //Returns the first number. Usable range is [retval, retval+n)
+        //Once requested, an seq Must be sent, to be correctly reassambled
+        inline uint32_t next_seq(int n = 1) {
             std::lock_guard lg(_tx_lock);
             uint32_t ret = _tx_seq;
             _tx_seq += packet_decoder::seq_rt_cnt * n;
             return ret;
         }
 
+        //Calculate the delay between subsequent retransmits, based on the current ping
+        inline Time::time_delta_type_us next_retransmit_delta() {
+            Time::time_delta_type_us res = 1000000 * (
+                _settings.ping_rt_mul * _ping +
+                _settings.jitter_rt_mul * sqrt(_ping2 - _ping * _ping)
+                );
+            //Sum 3ms re-transmit is just spamming
+            return (res < _settings.min_retransmit) ? _settings.min_retransmit : res;
+        }
+
+        inline Time::time_type_us next_floating_time() {
+            {
+                //Time the pong must be received by, or else the connection is declared dead
+                Time::time_type_us next_pong_treshold = _last_pong_in + _settings.max_pong;
+
+                //Time for the next scheduled re-transmit
+                std::lock_guard _lg(_tx_lock);
+                if (_transmit_queue.size()) {
+                    packet_decoder* pkt = packet_decoder::view(_transmit_queue.front().packet);
+                    uint32_t old_rt = (pkt->content.packet.seq & packet_decoder::seq_rt_mask);
+                    Time::time_type_us next_transmit = _transmit_queue.front().transmits[old_rt] + next_retransmit_delta();
+
+                    _internal_floating = (next_transmit < next_pong_treshold) ? next_transmit : next_pong_treshold;
+                }
+                else {
+                    _internal_floating = next_pong_treshold;
+                }
+            }
+
+            if (_external_floating.cb.has_function() && _external_floating.dst < _internal_floating) {
+                return _external_floating.dst;
+            }
+
+            return _internal_floating;
+        }
+
+        //Send a ping packet
+        void send_ping();
+        //Send a pong packet, in response to a ping
+        void send_pong(const Utils::ConstBlobView& ping);
+
+        //Helper function to try to reassamble and emit as many functions as possible right now
+        void try_reassemble();
+
+        //Functions to receive events from the underlying emitter
+
+        //Called when a packet can be read
+        void on_receive(Utils::Void data);
+        //Called when a socket error occurs
+        void on_error();
+        //Called for the ping timer
+        void on_ping_timer();
+        //The variable timer, used for checking the pong dying, and the retransmit
+        void on_floating_timer();
+        Time::time_type_us _internal_floating;
+        Utils::Timers::timer _external_floating;
+        //Socket was closed
+        void on_close();
+
+        //Housekeeping function, to be called after all timer and packet functions
+        void on_housekeeping();
+
         OPTUDP(
-            OPTPacketCallback packet_callback,
-            OPTRawCallback raw_callback,
-            OPTErrorCallback error_callback,
-            OPTClosedCallback closed_callback,
             Network::UDPHandle socket,
-            Utils::Blob&& magic,
             OPTUDPSettings settings
         );
 
-        Time::time_delta_type_us next_retransmit_delta();
-
-        //void send_hello();
-
-        void send_ping();
-        void send_pong(const Utils::ConstBlobView& ping);
-
-        void try_reassemble();
-
-        static void loop(std::weak_ptr<OPTUDP> emitter_w);
     public:
         OPTUDPHandle create(
-            OPTPacketCallback packet_callback,
-            OPTRawCallback raw_callback,
-            OPTErrorCallback error_callback,
-            OPTClosedCallback closed_callback,
             Network::UDPHandle socket,
-            Utils::Blob&& magic,
             OPTUDPSettings settings);
 
-        void stop();
+        void start();
+
+        virtual void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override {
+            _external_floating.cb = cb;
+            _external_floating.dst = end;
+
+            _source->updateFloatingNext(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_floating_timer), next_floating_time());
+        }
 
         void send(const Utils::ConstBlobView& data);
         void sendRaw(const Utils::ConstBlobView& data);
+
+        void close();
     };
 }

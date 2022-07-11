@@ -4,13 +4,11 @@
 #include <cstdint>
 #include <array>
 
-#include <openssl/evp.h>
-
-#include "../crypto/cipher.h"
-
 #include "../utils/copy_protection.h"
 #include "../utils/blob.h"
 #include "../utils/time.h"
+
+#include "../crypto/cipher.h"
 
 namespace NATBuster::Common::Transport {
     class EncryptOPT;
@@ -38,7 +36,7 @@ namespace NATBuster::Common::Proto {
             //Valid KEX message received
             OK = 16,
             //KEX and auth are ready. The tunnle is open for business
-            OK_Done = 18,
+            OK_Done = 20,
         };
 
 

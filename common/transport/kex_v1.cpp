@@ -1,5 +1,5 @@
 #include "kex_v1.h"
-#include "encrypt.h"
+#include "session.h"
 
 namespace NATBuster::Common::Proto {
     KEXV1_A::KEXV1_A(
@@ -414,5 +414,6 @@ namespace NATBuster::Common::Proto {
         }
         _state = SF_Err;
         return KEX_Event::ErrorState;*/
+        return KEX_Event::OK;
     }
 }

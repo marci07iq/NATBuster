@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <array>
 
-#include <openssl/evp.h>
-
 #include "../utils/copy_protection.h"
 #include "../utils/blob.h"
 
@@ -110,7 +108,7 @@ namespace NATBuster::Common::Proto {
         }
 
         //Wipe the internal state
-        inline KEX_Event fail(KEX_Event reason) {
+        inline KEX::KEX_Event fail(KEX::KEX_Event reason) {
             _state = SF_Err;
             return reason;
         }
@@ -221,9 +219,9 @@ namespace NATBuster::Common::Proto {
             Utils::Blob&& m1, Utils::Blob&& m2);
 
 
-        KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out);
+        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out);
 
-        KEX_Event init_kex(Transport::EncryptOPT* out);
+        KEX::KEX_Event init_kex(Transport::EncryptOPT* out);
     };
 
     //KEX for the target side
@@ -249,8 +247,8 @@ namespace NATBuster::Common::Proto {
             Crypto::PKey&& my_private, Crypto::PKey&& other_public,
             Utils::Blob&& m1, Utils::Blob&& m2);
 
-        KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out);
+        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::EncryptOPT* out);
 
-        KEX_Event init_kex(Transport::EncryptOPT* out);
+        KEX::KEX_Event init_kex(Transport::EncryptOPT* out);
     };
 }

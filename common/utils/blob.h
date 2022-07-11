@@ -38,15 +38,9 @@ namespace NATBuster::Common::Utils {
         ConstBlobSliceView cslice_right(uint32_t split) const;
     };
 
-    bool operator==(const ConstBlobView& lhs, const ConstBlobView& rhs) {
-        if (lhs.size() != rhs.size()) return false;
-        return 0 == memcmp(lhs.getr(), rhs.getr(), lhs.size());
-    }
+    bool operator==(const ConstBlobView& lhs, const ConstBlobView& rhs);
 
-    bool operator!=(const ConstBlobView& lhs, const ConstBlobView& rhs) {
-        if (lhs.size() == rhs.size()) return true;
-        return 0 != memcmp(lhs.getr(), rhs.getr(), lhs.size());
-    }
+    bool operator!=(const ConstBlobView& lhs, const ConstBlobView& rhs);
 
     class BlobView : public ConstBlobView {
     protected:
@@ -326,6 +320,8 @@ namespace NATBuster::Common::Utils {
             _blob = src._blob;
             _start = src._start;
             _len = src._len;
+
+            return *this;
         }
 
         const uint8_t* getr() const {
@@ -400,7 +396,7 @@ namespace NATBuster::Common::Utils {
         }
 
         bool eof() {
-            assert(_read_cursor <= _src.size);
+            assert(_read_cursor <= _src.size());
             return _read_cursor >= _src.size();
         }
     };

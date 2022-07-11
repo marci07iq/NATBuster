@@ -122,6 +122,8 @@ namespace NATBuster::Common::Network {
 
         }
 
+        template<typename HWND>
+        friend class SocketBase;
     public:
         inline bool valid() {
             return _socket.valid();
@@ -130,8 +132,8 @@ namespace NATBuster::Common::Network {
             return _socket.close();
         }
 
-        Utils::EventResponse<Utils::Void> check(Time::Timeout timeout);
-        static Utils::EventResponse<MY_HWND> find(const std::list<MY_HWND>& sockets, Time::Timeout timeout);
+        Utils::PollResponse<Utils::Void> check(Time::Timeout timeout);
+        static Utils::PollResponse<MY_HWND> find(const std::list<MY_HWND>& sockets, Time::Timeout timeout);
     };
 
     //

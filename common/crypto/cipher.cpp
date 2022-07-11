@@ -53,7 +53,7 @@ namespace NATBuster::Common::Crypto {
 
     }
 
-    CipherPacketStream::CipherPacketStream(CipherPacketStream&& other) {
+    CipherPacketStream::CipherPacketStream(CipherPacketStream&& other) noexcept {
         _ctx = other._ctx;
         other._ctx = nullptr;
 
@@ -61,7 +61,7 @@ namespace NATBuster::Common::Crypto {
         other._algo = nullptr;
 
     }
-    CipherPacketStream& CipherPacketStream::operator=(CipherPacketStream&& other) {
+    CipherPacketStream& CipherPacketStream::operator=(CipherPacketStream&& other) noexcept {
         if (_ctx != nullptr) EVP_CIPHER_CTX_free(_ctx);
         _ctx = other._ctx;
         other._ctx = nullptr;
@@ -91,7 +91,7 @@ namespace NATBuster::Common::Crypto {
     ) {
     }
 
-    CipherAES256GCMPacketStream::CipherAES256GCMPacketStream(CipherAES256GCMPacketStream&& other) :
+    CipherAES256GCMPacketStream::CipherAES256GCMPacketStream(CipherAES256GCMPacketStream&& other) noexcept :
         CipherPacketStream(std::move(other)) {
         
         for (int i = 0; i < 32; i++) {
@@ -106,7 +106,7 @@ namespace NATBuster::Common::Crypto {
         other._iv.parts.packet = 0;
     }
 
-    CipherAES256GCMPacketStream& CipherAES256GCMPacketStream::operator=(CipherAES256GCMPacketStream&& other) {
+    CipherAES256GCMPacketStream& CipherAES256GCMPacketStream::operator=(CipherAES256GCMPacketStream&& other) noexcept {
         CipherPacketStream::operator=(std::move(other));
 
 
@@ -125,7 +125,13 @@ namespace NATBuster::Common::Crypto {
     }
 
     uint32_t CipherAES256GCMPacketStream::iv_size() {
-        return 32;
+        return 12;
+    }
+    void CipherAES256GCMPacketStream::set_iv(const uint8_t* bytes, uint32_t size) {
+        assert(size == 12);
+        for (int i = 0; i < 12 && i < size; i++) {
+            _iv.bytes[i] = bytes[i];
+        }
     }
     void CipherAES256GCMPacketStream::set_iv_common(uint32_t common) {
         _iv.parts.common = common;

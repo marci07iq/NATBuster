@@ -1,3 +1,6 @@
+#pragma once
+
+/*
 #include <condition_variable>
 #include <functional>
 #include <mutex>
@@ -42,4 +45,4 @@ namespace NATBuster::Common::Utils {
             return data.size();
         }
     };
-};
+};*/

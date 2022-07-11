@@ -20,6 +20,16 @@ namespace NATBuster::Common::Utils {
         return ConstBlobSliceView(this, split, size() - split);
     }
 
+    bool operator==(const ConstBlobView& lhs, const ConstBlobView& rhs) {
+        if (lhs.size() != rhs.size()) return false;
+        return 0 == memcmp(lhs.getr(), rhs.getr(), lhs.size());
+    }
+
+    bool operator!=(const ConstBlobView& lhs, const ConstBlobView& rhs) {
+        if (lhs.size() == rhs.size()) return true;
+        return 0 != memcmp(lhs.getr(), rhs.getr(), lhs.size());
+    }
+
 
 
     BlobView::BlobView() {
@@ -61,7 +71,7 @@ namespace NATBuster::Common::Utils {
     Blob::Blob() : Blob(nullptr, 0) {
 
     }
-    Blob::Blob(Blob&& other) {
+    Blob::Blob(Blob&& other) noexcept {
         _buffer = other._buffer;
         _pre_gap = other._pre_gap;
         _capacity = other._capacity;
@@ -72,7 +82,7 @@ namespace NATBuster::Common::Utils {
         other._capacity = 0;
         other._size = 0;
     }
-    Blob& Blob::operator=(Blob&& other) {
+    Blob& Blob::operator=(Blob&& other) noexcept {
         //Wipe self content
         clear();
 
@@ -105,7 +115,7 @@ namespace NATBuster::Common::Utils {
 
         return Blob(buffer, capacity, buffer_size, pre_gap);
     }
-    Blob Blob::factory_copy(const ConstBlobView& view, uint32_t pre_gap = 0, uint32_t end_gap = 0) {
+    Blob Blob::factory_copy(const ConstBlobView& view, uint32_t pre_gap, uint32_t end_gap) {
         return Blob::factory_copy(view.getr(), view.size(), pre_gap, end_gap);
     }
     Blob Blob::factory_string(const std::string& str) {

@@ -39,12 +39,12 @@ namespace NATBuster::Common::Crypto {
         return len;
     }
 
-    PKey::PKey(PKey&& other) {
+    PKey::PKey(PKey&& other) noexcept {
         _key = other._key;
         other._key = nullptr;
     }
 
-    PKey& PKey::operator=(PKey&& other) {
+    PKey& PKey::operator=(PKey&& other) noexcept {
         if(_key != nullptr) EVP_PKEY_free(_key);
         _key = other._key;
         other._key = nullptr;

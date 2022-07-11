@@ -15,8 +15,8 @@ int main() {
 
         if (!NATBuster::Common::Crypto::random_u64(iv_packet_0)) goto error;
 
-        NATBuster::Common::Crypto::CipherAES256GCMPacket encrypt;
-        NATBuster::Common::Crypto::CipherAES256GCMPacket decrypt;
+        NATBuster::Common::Crypto::CipherAES256GCMPacketStream encrypt;
+        NATBuster::Common::Crypto::CipherAES256GCMPacketStream decrypt;
 
         encrypt.set_iv_common(iv_common_0);
         decrypt.set_iv_common(iv_common_0);

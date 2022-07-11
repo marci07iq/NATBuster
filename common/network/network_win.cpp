@@ -76,7 +76,7 @@ namespace NATBuster::Common::Network {
     }
 
     template <typename MY_HWND>
-    Utils::EventResponse<Utils::Void> SocketBase<MY_HWND>::check(Time::Timeout timeout) {
+    Utils::PollResponse<Utils::Void> SocketBase<MY_HWND>::check(Time::Timeout timeout) {
         FD_SET collection;
 
         FD_ZERO(&collection);
@@ -84,52 +84,59 @@ namespace NATBuster::Common::Network {
         if (_socket.valid()) {
             FD_SET(_socket.get(), &collection);
         }
+        else {
+            return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::ClosedError);
+        }
 
         int count = select(0, &collection, nullptr, nullptr, timeout.to_native());
 
         if (count == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
-            return Utils::EventResponse<void>(Utils::EventResponseType::SystemError);
+            return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::UnknownError);
         }
 
         if (count == 0) {
-            return Utils::EventResponse<void>(Utils::EventResponseType::Timeout);
+            return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::Timeout);
         }
 
         if (_socket.valid()) {
             if (FD_ISSET(_socket.get(), &collection)) {
-                return Utils::EventResponse<void>(Utils::EventResponseType::OK);
+                return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::OK);
             }
         }
 
-        return Utils::EventResponse<void>(Utils::EventResponseType::UnexpectedError);
+        return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::UnknownError);
     }
 
     template <typename MY_HWND>
-    Utils::EventResponse<MY_HWND> SocketBase<MY_HWND>::find(const std::list<MY_HWND>& sockets, Time::Timeout timeout) {
+    Utils::PollResponse<MY_HWND> SocketBase<MY_HWND>::find(const std::list<MY_HWND>& sockets, Time::Timeout timeout) {
         FD_SET collection;
 
         FD_ZERO(&collection);
 
+        int entries = 0;
         for (auto&& socket : sockets) {
             SocketWrapper& sw = socket->_socket;
 
             if (sw.valid()) {
                 FD_SET(sw.get(), &collection);
+                ++entries;
             }
         }
+        //No sockets
+        if (entries == 0) {
+            return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::ClosedError);
+        }
 
-        timeval to = timeout.to_native();
-
-        int count = select(0, &collection, nullptr, nullptr, (timeout.infinite()) ? nullptr : (&to));
+        int count = select(0, &collection, nullptr, nullptr, timeout.to_native());
 
         if (count == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
-            return Utils::EventResponse<void>(Utils::EventResponseType::SystemError);
+            return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::UnknownError);
         }
 
         if (count == 0) {
-            return Utils::EventResponse<void>(Utils::EventResponseType::Timeout);
+            return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::Timeout);
         }
 
         for (auto&& socket : sockets) {
@@ -137,12 +144,12 @@ namespace NATBuster::Common::Network {
 
             if (sw.valid()) {
                 if (FD_ISSET(socket->_socket.get(), &collection)) {
-                    return Utils::EventResponse<void>(Utils::EventResponseType::OK, socket);
+                    return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::OK);
                 }
             }
         }
 
-        return Utils::EventResponse<void>(Utils::EventResponseType::UnexpectedError);
+        return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::UnknownError);
     }
 
 

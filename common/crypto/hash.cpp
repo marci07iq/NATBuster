@@ -23,7 +23,7 @@ namespace NATBuster::Common::Crypto {
         _algo = EVP_MD_fetch(nullptr, HashAlgoNames[(uint8_t)algo].openssl_name, nullptr);
     }
 
-    Hash::Hash(Hash&& other) {
+    Hash::Hash(Hash&& other) noexcept {
         _ctx = other._ctx;
         other._ctx = nullptr;
 
@@ -31,7 +31,7 @@ namespace NATBuster::Common::Crypto {
         other._algo = nullptr;
     }
 
-    Hash& Hash::operator=(Hash&& other) {
+    Hash& Hash::operator=(Hash&& other) noexcept {
         if (_ctx != nullptr) EVP_MD_CTX_free(_ctx);
         _ctx = other._ctx;
         other._ctx = nullptr;

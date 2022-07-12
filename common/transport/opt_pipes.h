@@ -2,7 +2,7 @@
 
 #include <map>
 #include <memory>
-
+#include <shared_mutex>
 
 #include "opt_base.h"
 
@@ -13,55 +13,58 @@ namespace NATBuster::Common::Transport {
         std::shared_ptr<OPTPipes> _underlying;
         uint32_t _id;
 
+        Utils::Timers::timer _floating;
+
         friend class OPTPipes;
 
+        enum OpenState {
+            None,
+            OpenRequsted,
+            Opened,
+            CloseRequrested,
+            Closed
+        } _open_state;
+
+    private:
         OPTPipe(
             bool is_client,
-            uint32_t id) : OPTBase(is_client), _id(id) {
+            std::shared_ptr<OPTPipes> underlying,
+            uint32_t id);
 
-        }
+        static std::shared_ptr<OPTPipe> create(
+            bool is_client,
+            std::shared_ptr<OPTPipes> underlying,
+            uint32_t id);
     public:
-        void start() {
-            Utils::Blob req_packet = Utils::Blob::factory_empty(5);
-
-            OPTPipes::packet_decoder* req_header = OPTPipes::packet_decoder::view(req_packet);
-            req_header->type = OPTPipes::packet_decoder::MGMT_OPEN_REQ;
-            req_header->id = _id;
-
-            _underlying->_underlying->send(req_packet);
-        }
+        void start();
 
         //Send ordered packet
-        void send(const Utils::ConstBlobView& packet) {
-            Utils::Blob full_packet = Utils::Blob::factory_empty(5 + packet.size());
-
-            OPTPipes::packet_decoder* header = OPTPipes::packet_decoder::view(full_packet);
-            header->type = OPTPipes::packet_decoder::DATA;
-            header->id = _id;
-
-            full_packet.copy_from(packet, 5);
-
-            _underlying->_underlying->send(full_packet);
-        }
+        void send(const Utils::ConstBlobView& packet);
         //Send UDP-like packet (no order / arrival guarantee, likely faster)
-        void sendRaw(const Utils::ConstBlobView& packet) {
-            Utils::Blob full_packet = Utils::Blob::factory_empty(5 + packet.size());
+        void sendRaw(const Utils::ConstBlobView& packet);
 
-            OPTPipes::packet_decoder* header = OPTPipes::packet_decoder::view(full_packet);
-            header->type = OPTPipes::packet_decoder::DATA;
-            header->id = _id;
+        //Add a callback that will be called in `delta` time, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta);
 
-            full_packet.copy_from(packet, 5);
+        //Add a callback that will be called at time `end`, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
 
-            _underlying->_underlying->sendRaw(full_packet);
-        }
+        //Overwrite the next time the floating timer is fired
+        //There is only one floating timer
+        //Only call from callbacks, or before start
+        void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
+
         //Close connection (gracefully) if possible
-        void close() {
-            _underlying->closePipe(_id);
-        }
+        void close();
     };
 
-    class OPTPipes : public std::enable_shared_from_this<OPTPipes> {
+    class OPTPipes : public Utils::EventEmitter<std::shared_ptr<OPTPipe>>, public std::enable_shared_from_this<OPTPipes> {
+    private:
+
 #pragma pack(push, 1)
         struct packet_decoder : Utils::NonStack {
             static const uint32_t seq_rt_mask = 0x3f;
@@ -85,13 +88,9 @@ namespace NATBuster::Common::Transport {
             } content;
 
             //Need as non const ref, so caller must maintain ownership of Packet
-            static inline packet_decoder* view(Utils::BlobView& packet) {
-                return (packet_decoder*)(packet.getw());
-            }
+            static inline packet_decoder* view(Utils::BlobView& packet);
 
-            static inline const packet_decoder* cview(const Utils::ConstBlobView& packet) {
-                return (const packet_decoder*)(packet.getr());
-            }
+            static inline const packet_decoder* cview(const Utils::ConstBlobView& packet);
         };
 
         static_assert(offsetof(packet_decoder, type) == 0);
@@ -103,160 +102,113 @@ namespace NATBuster::Common::Transport {
         std::shared_ptr<OPTBase> _underlying;
 
         std::map<uint32_t, std::shared_ptr<OPTPipe>> _pipes;
+        //Opened pipes are odd if true
+        //Client is the side that initiated the connection
         bool _is_client;
         uint32_t _next_pipe_id;
-        std::mutex _pipe_lock;
+        //Unique lock when changing the map contents
+        //Shared lock when only changing the elements
+        std::shared_mutex _pipe_lock;
+
+        Utils::Timers::timer _floating;
 
         friend class OPTPipe;
 
         //Called when a packet can be read
-        void on_packet(const Utils::ConstBlobView& data) {
-            const OPTPipes::packet_decoder* header = OPTPipes::packet_decoder::cview(data);
-
-            switch (header->type)
-            {
-            case packet_decoder::MGMT_OPEN_REQ:
-            {
-                std::unique_lock _lg(_pipe_lock);
-                auto it = _pipes.find(header->id);
-                if (it == _pipes.end()) {
-                    Utils::Blob resp_packet = Utils::Blob::factory_copy(data);
-
-                    OPTPipes::packet_decoder* resp_header = OPTPipes::packet_decoder::view(resp_packet);
-                    resp_header->type = packet_decoder::MGMT_OPEN_RESP;
-
-                    _underlying->send(resp_packet);
-                }
-            }
-            break;
-            case packet_decoder::MGMT_OPEN_RESP:
-            {
-                std::unique_lock _lg(_pipe_lock);
-                auto it = _pipes.find(header->id);
-                if (it != _pipes.end()) {
-                    //TODO:
-                }
-            }
-            break;
-            case packet_decoder::MGMT_CLOSE:
-            {
-                std::unique_lock _lg(_pipe_lock);
-                auto it = _pipes.find(header->id);
-                if (it != _pipes.end()) {
-                    std::shared_ptr<OPTPipe> pipe = it->second;
-                    _lg.unlock();
-                    pipe->close();
-                }
-            }
-            break;
-            case packet_decoder::DATA:
-            {
-                std::unique_lock _lg(_pipe_lock);
-                auto it = _pipes.find(header->id);
-                if (it != _pipes.end()) {
-                    std::shared_ptr<OPTPipe> pipe = it->second;
-                    _lg.unlock();
-                    const Utils::ConstBlobSliceView data = data.cslice_right(5);
-                    pipe->_result_callback(data);
-                }
-            }
-            break;
-            default:
-                _underlying->close();
-                break;
-            }
-        }
+        void on_open();
         //Called when a packet can be read
-        void on_raw(const Utils::ConstBlobView& data) {
-            const OPTPipes::packet_decoder* header = OPTPipes::packet_decoder::cview(data);
+        void on_packet(const Utils::ConstBlobView& data);
+        //Called when a packet can be read
+        void on_raw(const Utils::ConstBlobView& data);
+        //Called when a socket error occurs
+        void on_error();
+        //Timer
+        void on_floating() {
+            std::shared_lock _lg(_pipe_lock);
 
-            switch (header->type)
-            {
-            case packet_decoder::DATA:
-            {
-                std::unique_lock _lg(_pipe_lock);
-                auto it = _pipes.find(header->id);
-                if (it != _pipes.end()) {
-                    std::shared_ptr<OPTPipe> pipe = it->second;
-                    _lg.unlock();
-                    const Utils::ConstBlobSliceView data = data.cslice_right(5);
-                    pipe->_raw_callback(data);
+            //Find earliest
+            for (auto&& it : _pipes) {
+                if (it.second->_floating.dst < Time::now()) {
+                    it.second->_floating.cb.call_and_clear();
                 }
             }
-            break;
-            case packet_decoder::MGMT_OPEN_REQ:
-            case packet_decoder::MGMT_OPEN_RESP:
-            case packet_decoder::MGMT_CLOSE:
-            default:
-                _underlying->close();
-                break;
-            }
-        }
-        //Called when a socket error occurs
-        void on_error() {
-            std::lock_guard _lg(_pipe_lock);
 
-            for (auto& it : _pipes) {
-                it.second->_error_callback();
+            if (_floating.dst < Time::now()) {
+                _floating.cb.call_and_clear();
             }
+           
+
+            updateFloatingNext();
         }
         //Socket was closed
-        void on_close() {
-            std::lock_guard _lg(_pipe_lock);
+        void on_close();
 
-            for (auto& it : _pipes) {
-                it.second->_close_callback();
+        void updateFloatingNext() {
+            std::shared_lock _lg(_pipe_lock);
+
+            int cnt = 0;
+            Time::time_type_us earliest = 0;
+
+            //Find earliest amound pipes
+            for (auto&& it : _pipes) {
+                if (it.second->_floating.cb.has_function()) {
+                    if (cnt == 0) {
+                        earliest = it.second->_floating.dst;
+                    }
+                    else {
+                        earliest = Time::earlier(earliest, it.second->_floating.dst);
+                    }
+                    ++cnt;
+                }
             }
-        }
 
+            //Add own
+            if (_floating.cb.has_function()) {
+                if (cnt == 0) {
+                    earliest = _floating.dst;
+                }
+                else {
+                    earliest = Time::earlier(earliest, _floating.dst);
+                }
+                ++cnt;
+            }
+
+            //Set underlying callback
+            if (cnt > 0) {
+                _underlying->updateFloatingNext(
+                    new Utils::MemberCallback<OPTPipes, void>(
+                        weak_from_this(),
+                        &OPTPipes::on_floating
+                        ), earliest);
+            }
+        };
+
+        void closePipe(uint32_t id);
     public:
-        OPTPipes(bool is_client) : _is_client(is_client), _next_pipe_id(_is_client ? 1 : 0) {
+        OPTPipes(bool is_client);
 
-        }
+        void start();
 
-        void start() {
-            _underlying->set_packet_callback(new Utils::MemberCallback<OPTPipes, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTPipes::on_packet));
-            _underlying->set_raw_callback(new Utils::MemberCallback<OPTPipes, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTPipes::on_raw));
-            _underlying->set_error_callback(new Utils::MemberCallback<OPTPipes, void>(weak_from_this(), &OPTPipes::on_error));
-            _underlying->set_close_callback(new Utils::MemberCallback<OPTPipes, void>(weak_from_this(), &OPTPipes::on_close));
+        //Opened pipe mist be started to actually initiate the connection
+        std::shared_ptr<OPTPipe> openPipe();
 
-            _underlying->start();
-        }
+        //Add a callback that will be called in `delta` time, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta);
 
-        void closePipe(uint32_t id) {
-            std::unique_lock _lg(_pipe_lock);
+        //Add a callback that will be called at time `end`, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
 
-            auto it = _pipes.find(id);
-            if (it != _pipes.end()) {
-                _pipes.erase(it);
+        //Overwrite the next time the floating timer is fired
+        //There is only one floating timer
+        //Only call from callbacks, or before start
+        void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
 
-                _lg.unlock();
-
-                Utils::Blob close_packet = Utils::Blob::factory_empty(5);
-
-                OPTPipes::packet_decoder* close_header = OPTPipes::packet_decoder::view(close_packet);
-                close_header->type = OPTPipes::packet_decoder::MGMT_CLOSE;
-                close_header->id = id;
-
-                _underlying->send(close_packet);
-            }
-        }
-
-        void closePipe(std::shared_ptr<OPTPipe> pipe) {
-            closePipe(pipe->_id);
-        }
-
-        std::shared_ptr<OPTPipe> openPipe() {
-            std::lock_guard _lg(_pipe_lock);
-
-            uint32_t new_id = _next_pipe_id;
-            _next_pipe_id += 2;
-
-            std::shared_ptr<OPTPipe> pipe = std::make_shared<OPTPipe>(true, new_id);
-
-            _pipes.insert({ new_id, pipe });
-
-            return pipe;
-        }
+        //Close the event emitter
+        //Will issue a close callback unless one has already been issued
+        void close();
     };
 };

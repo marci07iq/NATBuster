@@ -332,7 +332,7 @@ namespace NATBuster::Common::Utils
         //Thread startup
         {
             //Retrieve the shared ptr
-            std::shared_ptr<PollEventEmitter<POLL_SRC, RESULT_TYPE>> emitter = emitter_u.get();
+            std::shared_ptr<PollEventEmitter<POLL_SRC, RESULT_TYPE>> emitter = *emitter_u;
             //Destroy the unique ptr
             emitter_u.reset();
 

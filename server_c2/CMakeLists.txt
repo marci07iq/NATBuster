@@ -9,6 +9,6 @@ file(GLOB_RECURSE SERVER_HDRS CONFIGURE_DEPENDS *.h)
 #set(SRCS "test.cpp")
 #set(HDRS "")
 
-ADD_EXECUTABLE(Server ${SERVER_SRCS} ${SERVER_HDRS})
+ADD_EXECUTABLE(ServerC2 ${SERVER_SRCS} ${SERVER_HDRS})
 
-include_directories(Server ${ROOT_INCLUDE_DIRS})
+target_link_libraries(ServerC2 OpenSSL::SSL OpenSSL::Crypto Common)

@@ -7,11 +7,13 @@
 
 #include "../os.h"
 
-#include "network.h"
+#include "network_common.h"
 #include "../utils/copy_protection.h"
 #include "../utils/blob.h"
 
 namespace NATBuster::Common::Network {
+
+    void NetworkError(NetworkErrorCodes internal_id, int os_id);
 
     //
     // Wrap OS sockets into a non-copyable object
@@ -144,7 +146,7 @@ namespace NATBuster::Common::Network {
     public:
         TCPS(const std::string& name, uint16_t port);
 
-        TCPCHandle accept();
+        TCPCHandle accept(NetworkAddress& src);
 
         ~TCPS();
     };
@@ -183,6 +185,85 @@ namespace NATBuster::Common::Network {
 
         ~UDP();
     };
+
+
+    template <typename MY_HWND>
+    Utils::PollResponse<Utils::Void> SocketBase<MY_HWND>::check(Time::Timeout timeout) {
+        FD_SET collection;
+
+        FD_ZERO(&collection);
+
+        if (_socket.valid()) {
+            FD_SET(_socket.get(), &collection);
+        }
+        else {
+            return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::ClosedError);
+        }
+
+        int count = select(0, &collection, nullptr, nullptr, timeout.to_native());
+
+        if (count == SOCKET_ERROR) {
+            NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
+            return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::UnknownError);
+        }
+
+        if (count == 0) {
+            return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::Timeout);
+        }
+
+        if (_socket.valid()) {
+            if (FD_ISSET(_socket.get(), &collection)) {
+                return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::OK);
+            }
+        }
+
+        return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::UnknownError);
+    }
+
+    template <typename MY_HWND>
+    Utils::PollResponse<MY_HWND> SocketBase<MY_HWND>::find(const std::list<MY_HWND>& sockets, Time::Timeout timeout) {
+        FD_SET collection;
+
+        FD_ZERO(&collection);
+
+        int entries = 0;
+        for (auto&& socket : sockets) {
+            SocketWrapper& sw = socket->_socket;
+
+            if (sw.valid()) {
+                FD_SET(sw.get(), &collection);
+                ++entries;
+            }
+        }
+        //No sockets
+        if (entries == 0) {
+            return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::ClosedError);
+        }
+
+        int count = select(0, &collection, nullptr, nullptr, timeout.to_native());
+
+        if (count == SOCKET_ERROR) {
+            NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
+            return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::UnknownError);
+        }
+
+        if (count == 0) {
+            return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::Timeout);
+        }
+
+        for (auto&& socket : sockets) {
+            SocketWrapper& sw = socket->_socket;
+
+            if (sw.valid()) {
+                if (FD_ISSET(socket->_socket.get(), &collection)) {
+                    return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::OK);
+                }
+            }
+        }
+
+        return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::UnknownError);
+    }
+
 }
 
 #endif

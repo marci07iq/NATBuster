@@ -75,84 +75,6 @@ namespace NATBuster::Common::Network {
         _address.sin_port = htons(port);
     }
 
-    template <typename MY_HWND>
-    Utils::PollResponse<Utils::Void> SocketBase<MY_HWND>::check(Time::Timeout timeout) {
-        FD_SET collection;
-
-        FD_ZERO(&collection);
-
-        if (_socket.valid()) {
-            FD_SET(_socket.get(), &collection);
-        }
-        else {
-            return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::ClosedError);
-        }
-
-        int count = select(0, &collection, nullptr, nullptr, timeout.to_native());
-
-        if (count == SOCKET_ERROR) {
-            NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
-            return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::UnknownError);
-        }
-
-        if (count == 0) {
-            return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::Timeout);
-        }
-
-        if (_socket.valid()) {
-            if (FD_ISSET(_socket.get(), &collection)) {
-                return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::OK);
-            }
-        }
-
-        return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::UnknownError);
-    }
-
-    template <typename MY_HWND>
-    Utils::PollResponse<MY_HWND> SocketBase<MY_HWND>::find(const std::list<MY_HWND>& sockets, Time::Timeout timeout) {
-        FD_SET collection;
-
-        FD_ZERO(&collection);
-
-        int entries = 0;
-        for (auto&& socket : sockets) {
-            SocketWrapper& sw = socket->_socket;
-
-            if (sw.valid()) {
-                FD_SET(sw.get(), &collection);
-                ++entries;
-            }
-        }
-        //No sockets
-        if (entries == 0) {
-            return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::ClosedError);
-        }
-
-        int count = select(0, &collection, nullptr, nullptr, timeout.to_native());
-
-        if (count == SOCKET_ERROR) {
-            NetworkError(NetworkErrorCodeSelectRead, WSAGetLastError());
-            return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::UnknownError);
-        }
-
-        if (count == 0) {
-            return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::Timeout);
-        }
-
-        for (auto&& socket : sockets) {
-            SocketWrapper& sw = socket->_socket;
-
-            if (sw.valid()) {
-                if (FD_ISSET(socket->_socket.get(), &collection)) {
-                    return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::OK);
-                }
-            }
-        }
-
-        return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::UnknownError);
-    }
-
-
     //
     // TCP Server OS implementation
     // 
@@ -205,12 +127,13 @@ namespace NATBuster::Common::Network {
         }
     }
 
-    TCPCHandle TCPS::accept() {
+    TCPCHandle TCPS::accept(NetworkAddress& src) {
         int iResult;
         SOCKET clientSocket;
 
         // Accept a client socket
-        clientSocket = ::accept(_socket.get(), nullptr, nullptr);
+        int sz = src.size();
+        clientSocket = ::accept(_socket.get(), src.get(), &sz);
         if (clientSocket == INVALID_SOCKET) {
             int error = WSAGetLastError();
             NetworkError(NetworkErrorCodeAccept, error);
@@ -341,6 +264,10 @@ namespace NATBuster::Common::Network {
         data.resize(progress);
 
         return true;
+    }
+
+    TCPC::~TCPC() {
+        _socket.close();
     }
 
     //

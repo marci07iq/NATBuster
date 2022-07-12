@@ -10,4 +10,8 @@ namespace NATBuster::Common::Time {
         return start.time_since_epoch() /
             std::chrono::microseconds(1);
     }
+
+    time_type_us earlier(time_type_us a, time_type_us b) {
+        return (a < b) ? a : b;
+    }
 }

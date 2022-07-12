@@ -14,9 +14,7 @@ namespace NATBuster::Common::Time
 
     time_type_us now();
 
-    time_type_us earlier(time_type_us a, time_type_us b) {
-        return (a < b) ? a : b;
-    }
+    time_type_us earlier(time_type_us a, time_type_us b);
 
 #ifdef WIN32
     struct Timeout {

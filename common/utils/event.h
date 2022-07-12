@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <functional>
 #include <list>
 #include <mutex>
@@ -74,6 +75,7 @@ namespace NATBuster::Common::Utils
     template <typename SRC, typename VAL>
     concept Pollable = requires(SRC t, Time::Timeout to)
     {
+        //{ (int)5 } -> std::same_as<int>;
         //Validity check. If false, the event emitter shuts down
         { t->valid() } -> std::same_as<bool>;
         //Close function, for when the event emitter needs to exit

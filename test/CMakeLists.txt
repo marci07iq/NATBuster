@@ -14,5 +14,3 @@ foreach (testsourcefile ${tests})
     target_link_libraries("${filename}" OpenSSL::SSL OpenSSL::Crypto Common)
     
 endforeach (testsourcefile ${srcs})
-
-include_directories(Client ${ROOT_INCLUDE_DIRS})

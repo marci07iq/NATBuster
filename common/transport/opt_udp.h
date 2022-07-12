@@ -188,6 +188,8 @@ namespace NATBuster::Common::Transport {
 
         //Functions to receive events from the underlying emitter
 
+        //Called when the emitter starts
+        void on_open();
         //Called when a packet can be read
         void on_receive(Utils::Void data);
         //Called when a socket error occurs

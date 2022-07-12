@@ -31,12 +31,6 @@ namespace NATBuster::Common::Transport {
             _underlying->_underlying->send(req_packet);
         }
 
-        //void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) = 0;
-
-        //void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) = 0;
-
-        //void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) = 0;
-
         //Send ordered packet
         void send(const Utils::ConstBlobView& packet) {
             Utils::Blob full_packet = Utils::Blob::factory_empty(5 + packet.size());

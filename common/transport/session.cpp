@@ -2,6 +2,11 @@
 #include "kex_v1.h"
 
 namespace NATBuster::Common::Transport {
+    //Called when the emitter starts
+    void Session::on_open() {
+        //Start the key exchange
+        _kex->init_kex(this);
+    }
     //Called when a packet can be read
     void Session::on_packet(const Utils::ConstBlobView& data) {
         //Decrypt data if there is encyption
@@ -39,6 +44,10 @@ namespace NATBuster::Common::Transport {
             case NATBuster::Common::Proto::KEX::KEX_Event::OK:
                 break;
             case NATBuster::Common::Proto::KEX::KEX_Event::OK_Done:
+                if (!_flags._first_kex_ok) {
+                    //Let upper levels know that the tunnle is ready
+                    _open_callback();
+                }
                 _flags._first_kex_ok = true;
                 break;
             case NATBuster::Common::Proto::KEX::KEX_Event::ErrorGeneric:
@@ -82,6 +91,29 @@ namespace NATBuster::Common::Transport {
         _close_callback();
     }
 
+    void Session::send_internal(PacketType type, const Utils::ConstBlobView& packet) {
+        Utils::Blob packet_full = Utils::Blob::factory_empty(1 + packet.size());
+
+        (*((uint8_t*)packet_full.getw())) = type;
+        packet_full.copy_from(packet, 1);
+
+        //Decrypt data if there is encyption
+        Utils::Blob packet_encryped;
+        Utils::Blob no_aad;
+
+        //TODO: Thread protection!!
+        if (_flags._enc_on_ob) {
+            _outbound.encrypt(packet_full, packet_encryped, no_aad);
+        }
+
+        Utils::BlobView& to_send = (_flags._enc_on_ob) ? packet_encryped : packet_full;
+
+        _underlying->send(to_send);
+    }
+    void Session::send_kex(const Utils::ConstBlobView& packet) {
+        send_internal(PacketType::KEX, packet);
+    }
+
     Session::Session(
         bool is_client,
         std::shared_ptr<OPTBase> underlying,
@@ -109,8 +141,7 @@ namespace NATBuster::Common::Transport {
 
     //Send ordered packet
     void Session::send(const Utils::ConstBlobView& packet) {
-        Utils::Blob packet_content;
-
+        send_internal(PacketType::DATA, packet);
     }
 
     //Send raw fasttrack packet, passed stright to the underlying inderface

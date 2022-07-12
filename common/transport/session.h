@@ -72,6 +72,8 @@ namespace NATBuster::Common::Transport {
         friend class Proto::KEXV1_A;
         friend class Proto::KEXV1_B;
 
+        //Called when the emitter starts
+        void on_open();
         //Called when a packet can be read
         void on_packet(const Utils::ConstBlobView& data);
         //Called when a packet can be read
@@ -80,6 +82,9 @@ namespace NATBuster::Common::Transport {
         void on_error();
         //Socket was closed
         void on_close();
+
+        void send_internal(PacketType type, const Utils::ConstBlobView& packet);
+        void send_kex(const Utils::ConstBlobView& packet);
 
     public:
         Session(

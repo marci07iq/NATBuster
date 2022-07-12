@@ -11,30 +11,28 @@ namespace NATBuster::Common::Transport {
     //Ordered packet transport
     class OPTBase : public Utils::EventEmitter<const Utils::ConstBlobView&> {
     public:
-        //using PacketCallback = Utils::Callback<const Utils::ConstBlobView&>;
-        //using RawCallback = Utils::Callback<const Utils::ConstBlobView&>;
-        //using ErrorCallback = Utils::Callback<>;
-        //using CloseCallback = Utils::Callback<>;
-
+        
     protected:
         ResultCallback _raw_callback;
-        //PacketCallback _packet_callback = nullptr;
-        //RawCallback _raw_callback = nullptr;
-        //ErrorCallback _error_callback = nullptr;
-        //CloseCallback _close_callback = nullptr;
-
+        
         bool _is_client;
 
         OPTBase(bool is_client);
     private:
         using Utils::EventEmitter<const Utils::ConstBlobView&>::set_result_callback;
     public:
+        //Called when a TCP type packet is available
+        //All callbacks are issued from the same thread
+        //Safe to call from any thread, even during a callback
         inline void set_packet_callback(
             ResultCallback::raw_type packet_callback) {
             set_result_callback(packet_callback);
         }
 
-        void set_raw_callback(
+        //Called when a UDP type packet is available
+        //All callbacks are issued from the same thread
+        //Safe to call from any thread, even during a callback
+        inline void set_raw_callback(
             ResultCallback::raw_type raw_callback) {
             _raw_callback = raw_callback;
         }

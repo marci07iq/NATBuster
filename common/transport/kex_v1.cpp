@@ -58,7 +58,7 @@ namespace NATBuster::Common::Proto {
             //Write nonce
             c_hello_w.add_record(_nonce_a);
 
-            out->send(c_hello);
+            out->send_kex(c_hello);
             _state = K1_CHello;
             return KEX_Event::OK;
         }
@@ -145,7 +145,7 @@ namespace NATBuster::Common::Proto {
 
                 *((uint8_t*)c_newkey_packet.getw()) = (uint8_t)PacketType::KEXC_NEWKEYS;
 
-                out->send(c_newkey_packet);
+                out->send_kex(c_newkey_packet);
             }
 
             //Set outbound keys
@@ -213,7 +213,7 @@ namespace NATBuster::Common::Proto {
 
             *((uint32_t*)(_m1.getw() + 1)) = 0x10000000;
 
-            out->send(_m1);
+            out->send_kex(_m1);
             _state = KEXV1::S1_M1;
             return KEX_Event::OK;
         }
@@ -257,7 +257,7 @@ namespace NATBuster::Common::Proto {
 
             *((uint32_t*)(_m2.getw() + 1)) = 0x10000000;
 
-            out->send(_m2);
+            out->send_kex(_m2);
             _state = S2_M2;
             return KEX_Event::OK;
         }
@@ -324,7 +324,7 @@ namespace NATBuster::Common::Proto {
             if (!_lt_key_b.sign(_h, h_sign)) return fail(KEX_Event::ErrorCrypto);
             s_hello_w.finish_writeable_record(h_sign);
 
-            out->send(s_hello);
+            out->send_kex(s_hello);
             _state = State::K2_SHello;
 
             //Send server new key packet
@@ -333,7 +333,7 @@ namespace NATBuster::Common::Proto {
 
                 *((uint8_t*)s_newkey_packet.getw()) = (uint8_t)PacketType::KEXS_NEWKEYS;
 
-                out->send(s_newkey_packet);
+                out->send_kex(s_newkey_packet);
             }
 
             //Set outbound keys

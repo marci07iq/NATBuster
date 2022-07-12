@@ -110,6 +110,20 @@ namespace NATBuster::Common::Utils {
         //It is only to make sure things are fast
         static_assert(decltype(_new_cb)::is_always_lock_free);
 
+        inline void update_cb_from_new() {
+            //Check out new cb
+            raw_type new_cb = _new_cb.exchange(nullptr);
+            //New callback has been set
+            if (new_cb != nullptr) {
+                //Remove old one
+                if (_cb != nullptr) {
+                    delete _cb;
+                }
+                //Set new one
+                _cb = new_cb;
+            }
+        }
+
     public:
         void replace(raw_type cb) {
             //Set new callback
@@ -146,20 +160,20 @@ namespace NATBuster::Common::Utils {
             return *this;
         }
 
+        //Create from other instance
+        //Only call if other is NOT currently executing a callback.
+        void move_from_safe_other(Callback& data)  {
+            //Update data to the latest state
+            data.update_cb_from_new();
+            //Move into self
+            replace(data._cb);
+            data._cb = nullptr;
+        }
+
         //For one time use timers
         void call_and_clear(ARGS... args) {
             if (this != nullptr) {
-                //Check out new cb
-                raw_type new_cb = _new_cb.exchange(nullptr);
-                //New callback has been set
-                if (new_cb != nullptr) {
-                    //Remove old one
-                    if (_cb != nullptr) {
-                        delete _cb;
-                    }
-                    //Set new one
-                    _cb = new_cb;
-                }
+                update_cb_from_new();
 
                 //Check out cb
                 raw_type cb = _cb;
@@ -173,17 +187,7 @@ namespace NATBuster::Common::Utils {
 
         void operator()(ARGS... args) {
             if (this != nullptr) {
-                //Check out new cb
-                raw_type new_cb = _new_cb.exchange(nullptr);
-                //New callback has been set
-                if (new_cb != nullptr) {
-                    //Remove old one
-                    if (_cb != nullptr) {
-                        delete _cb;
-                    }
-                    //Set new one
-                    _cb = new_cb;
-                }
+                update_cb_from_new();
 
                 //Call
                 if (_cb != nullptr) {

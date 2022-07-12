@@ -69,6 +69,10 @@ namespace NATBuster::Common::Transport {
         } while (true);
     }
 
+    void OPTUDP::on_open() {
+        _open_callback();
+    }
+
     void OPTUDP::on_receive(Utils::Void data) {
         Utils::Blob packet;
         //Packet not neccessarily really available
@@ -224,12 +228,14 @@ namespace NATBuster::Common::Transport {
         OPTUDPSettings settings
     ) : OPTBase(is_client),
         _socket(socket),
-        _source(std::make_shared< Utils::PollEventEmitter<Network::UDPHandle, Utils::Void>>(socket)),
+        _source(std::make_shared<Utils::PollEventEmitter<Network::UDPHandle, Utils::Void>>(socket)),
         _settings(settings) {
 
     }
 
     void OPTUDP::start() {
+        //Set callbacks
+        _source->set_open_callback(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_open));
         _source->set_result_callback(new Utils::MemberCallback<OPTUDP, void, Utils::Void>(weak_from_this(), &OPTUDP::on_receive));
         _source->set_error_callback(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_error));
         _source->set_close_callback(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_close));

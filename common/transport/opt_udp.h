@@ -214,17 +214,24 @@ namespace NATBuster::Common::Transport {
 
     public:
         OPTUDPHandle create(
+            bool is_client,
             Network::UDPHandle socket,
-            OPTUDPSettings settings);
+            OPTUDPSettings settings
+        );
 
         void start();
 
-        virtual void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override {
-            _external_floating.cb = cb;
-            _external_floating.dst = end;
+        //Add a callback that will be called in `delta` time, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta);
 
-            _source->updateFloatingNext(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_floating_timer), next_floating_time());
-        }
+        //Add a callback that will be called at time `end`, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
+
+        void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override;
 
         void send(const Utils::ConstBlobView& data);
         void sendRaw(const Utils::ConstBlobView& data);

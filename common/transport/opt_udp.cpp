@@ -233,6 +233,14 @@ namespace NATBuster::Common::Transport {
 
     }
 
+    OPTUDPHandle OPTUDP::create(
+        bool is_client,
+        Network::UDPHandle socket,
+        OPTUDPSettings settings
+    ) {
+        return std::shared_ptr<OPTUDP>(new OPTUDP(is_client, socket, settings));
+    }
+
     void OPTUDP::start() {
         //Set callbacks
         _source->set_open_callback(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_open));
@@ -244,6 +252,27 @@ namespace NATBuster::Common::Transport {
         _source->addDelay(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_ping_timer), _settings.ping_interval);
 
         _source->start();
+    }
+
+    //Add a callback that will be called in `delta` time, if the emitter is still running
+    //There is no way to cancel this call
+    //Only call from callbacks, or before start
+    inline void OPTUDP::addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
+        _source->addDelay(cb, delta);
+    }
+
+    //Add a callback that will be called at time `end`, if the emitter is still running
+    //There is no way to cancel this call
+    //Only call from callbacks, or before start
+    inline void OPTUDP::addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
+        _source->addTimer(cb, end);
+    }
+
+    void OPTUDP::updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
+        _external_floating.cb = cb;
+        _external_floating.dst = end;
+
+        _source->updateFloatingNext(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_floating_timer), next_floating_time());
     }
 
     void OPTUDP::send(const Utils::ConstBlobView& data) {

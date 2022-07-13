@@ -5,7 +5,19 @@
 namespace NATBuster::Common::Network {
     //Log errors
     void NetworkError(NetworkErrorCodes internal_id, int os_id) {
-        std::cerr << "Error code: " << internal_id << ", " << os_id << std::endl;
+
+        wchar_t* s = NULL;
+        FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL, os_id,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPWSTR)&s, 0, NULL);
+
+        std::cerr << "Error code: " << internal_id << ", " << os_id << ":";
+        std::wcerr << s;
+        std::cerr << std::endl;
+        
+        LocalFree(s);
+
     }
 
     namespace WSA {
@@ -24,6 +36,7 @@ namespace NATBuster::Common::Network {
             }
 
             ~WSAWrapper() {
+                std::cout << "WSA CLEAN" << std::endl;
                 WSACleanup();
             }
 

@@ -158,7 +158,7 @@ namespace NATBuster::Common::Transport {
         );
 
     public:
-        OPTTCPHandle create(
+        static OPTTCPHandle create(
             bool is_client,
             Network::TCPCHandle socket);
 

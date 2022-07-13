@@ -102,6 +102,18 @@ namespace NATBuster::Common::Transport {
         //Send raw fasttrack packet, passed stright to the underlying inderface
         void sendRaw(const Utils::ConstBlobView& packet);
 
+        //Add a callback that will be called in `delta` time, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) override;
+
+        //Add a callback that will be called at time `end`, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override;
+
+        void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override;
+
         void close();
     };
 }

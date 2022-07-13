@@ -9,8 +9,10 @@
 using namespace NATBuster::Common::Network;
 using NATBuster::Common::Utils::MemberCallback;
 using NATBuster::Common::Utils::Void;
+using NATBuster::Common::Utils::Blob;
 
 class IPServer : public std::enable_shared_from_this<IPServer> {
+public:
     TCPSHandle _hwnd;
     std::shared_ptr<TCPSEmitter> _emitter;
 
@@ -19,9 +21,11 @@ class IPServer : public std::enable_shared_from_this<IPServer> {
         NetworkAddress src;
         TCPCHandle client = _hwnd->accept(src);
         if (client) {
+            Blob resp = Blob::factory_string("ASD");
+            client->send(resp);
             std::cout << "ACCEPTED FROM " << src.get_ipv4() << ":" << src.get_port() << std::endl;
-            client->close();
-            std::cout << "CLOSED" << std::endl;
+            //client->close();
+            //std::cout << "CLOSED" << std::endl;
         }
 
     }
@@ -34,7 +38,6 @@ class IPServer : public std::enable_shared_from_this<IPServer> {
         std::cout << "CLOSE" << std::endl;
     }
 
-public:
     IPServer(uint16_t port) : _hwnd(std::make_shared<TCPS>("", port)), _emitter(std::make_shared<TCPSEmitter>(_hwnd)) {
 
     }
@@ -59,7 +62,13 @@ int main() {
     server->start();
 
     int x;
-    std::cin >> x;
+    do {
+        std::cin >> x;
+    } while (x != 0);
+
+    server->_emitter->close();
+
+    server->_emitter->join();
 
     return 0;
 }

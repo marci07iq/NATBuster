@@ -139,6 +139,24 @@ namespace NATBuster::Common::Transport {
         _underlying->start();
     }
 
+    //Add a callback that will be called in `delta` time, if the emitter is still running
+    //There is no way to cancel this call
+    //Only call from callbacks, or before start
+    inline void Session::addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
+        _underlying->addDelay(cb, delta);
+    }
+
+    //Add a callback that will be called at time `end`, if the emitter is still running
+    //There is no way to cancel this call
+    //Only call from callbacks, or before start
+    inline void Session::addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
+        _underlying->addTimer(cb, end);
+    }
+
+    void Session::updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
+        _underlying->updateFloatingNext(cb, end);
+    }
+
     //Send ordered packet
     void Session::send(const Utils::ConstBlobView& packet) {
         send_internal(PacketType::DATA, packet);

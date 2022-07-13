@@ -321,6 +321,14 @@ namespace NATBuster::Common::Utils
         //Close the event emitter
         //Will issue a close callback unless one has already been issued
         void close();
+
+        void detach() {
+            _thread.detach();
+        }
+
+        void join() {
+            _thread.join();
+        }
     };
 
     template<typename POLL_SRC, typename RESULT_TYPE>

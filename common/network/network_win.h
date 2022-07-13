@@ -47,6 +47,7 @@ namespace NATBuster::Common::Network {
 
         inline void close() {
             if (valid()) {
+                std::cout << "CLOSE SOCKET" << std::endl;
                 closesocket(_socket);
                 _socket = INVALID_SOCKET;
             }

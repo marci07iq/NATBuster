@@ -18,12 +18,11 @@ public:
 
     void connect_callback(Void data) {
         std::cout << "CONNECT AVAIL" << std::endl;
-        NetworkAddress src;
-        TCPCHandle client = _hwnd->accept(src);
+        TCPCHandle client = _hwnd->accept();
         if (client) {
+            std::cout << "ACCEPTED FROM " << client->get_remote_addr().get_addr() << ":" << client->get_remote_addr().get_port() << std::endl;
             Blob resp = Blob::factory_string("ASD");
             client->send(resp);
-            std::cout << "ACCEPTED FROM " << src.get_ipv4() << ":" << src.get_port() << std::endl;
             //client->close();
             //std::cout << "CLOSED" << std::endl;
         }

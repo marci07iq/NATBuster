@@ -9,7 +9,7 @@
 
 //#define FD_SETSIZE 512
 #include <winsock2.h>
-
+#include <mswsock.h>   // Need for SO_UPDATE_CONNECT_CONTEXT
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 

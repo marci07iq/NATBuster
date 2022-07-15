@@ -18,6 +18,7 @@ if (${CMAKE_BUILD_TYPE} STREQUAL "Release")
 endif()
 
 find_package(OpenSSL REQUIRED)
+find_package(jsoncpp CONFIG REQUIRED)
 
 # Client
 add_subdirectory ("client")

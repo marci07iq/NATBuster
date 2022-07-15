@@ -8,19 +8,22 @@ void keygen() {
     using NATBuster::Common::Utils::Blob;
 
     PKey key;
-    key.generate_ec25519();
+    key.generate_ed25519();
 
     std::cout << "Filename (no extension): " << std::endl;
     std::string filename;
     std::cin >> filename;
 
-    key.save_file_public(filename + "_public.txt");
-    key.save_file_private(filename + "_private.txt");
+    key.export_file_public(filename + "_public.txt");
+    key.export_file_private(filename + "_private.txt");
     
 }
 
 int main() {
-    
+    //Keys for testing the features
+    std::string client_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGJOEK8OBASAmL7LKy0L5r4Md18JzK5jO9x5rNBXJHa1\n-----END PRIVATE KEY-----";
+    std::string ipserver_public_key_s = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAvN41TKTecBATHqVhQzEmiT0ZDvXlEas9vFVR/aoztj0=\n-----END PUBLIC KEY-----";
+
 
     std::string command;
     while(true) {
@@ -33,7 +36,7 @@ int main() {
             std::cout << "Commands" << std::endl;
             std::cout << "exit: Exit" << std::endl;
             std::cout << "help, ?: Prints help" << std::endl;
-            std::cout << "keygen: Create EC25519 keypair" << std::endl;
+            std::cout << "keygen: Create ED25519 keypair" << std::endl;
         }
         else if (command == "exit") {
             break;

@@ -117,16 +117,16 @@ namespace NATBuster::Common::Transport {
     Session::Session(
         bool is_client,
         std::shared_ptr<OPTBase> underlying,
-        Crypto::PKey&& my_private,
-        Crypto::PKey&& remote_public
+        Crypto::PKey&& self,
+        std::shared_ptr<Identity::UserGroup> known_remotes
     ) :
         OPTBase(is_client)
     {
         if (_is_client) {
-            _kex = std::make_unique<Proto::KEXV1_A>(std::move(my_private), std::move(remote_public));
+            _kex = std::make_unique<Proto::KEXV1_A>(std::move(self), known_remotes);
         }
         else {
-            _kex = std::make_unique<Proto::KEXV1_B>(std::move(my_private), std::move(remote_public));
+            _kex = std::make_unique<Proto::KEXV1_B>(std::move(self), known_remotes);
         }
     }
 

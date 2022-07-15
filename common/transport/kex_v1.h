@@ -105,13 +105,17 @@ namespace NATBuster::Common::Proto {
         //Long term public key of other side
         //If empty, any remote is accepted
 
-        Crypto::PKey _lt_key_a;
-        Crypto::PKey _lt_key_b;
+        Crypto::PKey _lt_key_self;
+        Crypto::PKey _lt_key_remote;
+
+        std::shared_ptr<Identity::User> _user_remote;
+        std::shared_ptr<Identity::UserGroup> _users_remote;
 
         KEXV1(
-            Crypto::PKey&& lt_key_a, Crypto::PKey&& lt_key_b) :
-            _lt_key_a(std::move(lt_key_a)),
-            _lt_key_b(std::move(lt_key_b)) {
+            Crypto::PKey&& self,
+            std::shared_ptr<Identity::UserGroup> known_remotes) :
+            _lt_key_self(std::move(self)),
+            _users_remote(known_remotes) {
 
         }
 
@@ -169,7 +173,7 @@ namespace NATBuster::Common::Proto {
             hash_content_w.add_record(_m2);
 
             Utils::Blob lt_key_a;
-            if (!_lt_key_a.export_public(lt_key_a)) return false;
+            if (!_lt_key_self.export_public(lt_key_a)) return false;
             hash_content_w.add_record(lt_key_a);
 
             Crypto::Hash hasher(Crypto::HashAlgo::SHA512);
@@ -227,12 +231,18 @@ namespace NATBuster::Common::Proto {
         //KF_Done
     public:
         KEXV1_A(
-            Crypto::PKey&& my_private, Crypto::PKey&& other_public);
+            Crypto::PKey&& self,
+            std::shared_ptr<Identity::UserGroup> known_remotes
+        );
 
 
         KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::Session* out);
 
         KEX::KEX_Event init_kex(Transport::Session* out);
+
+        std::shared_ptr<Identity::User> get_user() {
+            return _user_remote;
+        }
 
         virtual ~KEXV1_A() {
 
@@ -259,11 +269,17 @@ namespace NATBuster::Common::Proto {
         //KF_Done
     public:
         KEXV1_B(
-            Crypto::PKey&& my_private, Crypto::PKey&& other_public);
+            Crypto::PKey&& self,
+            std::shared_ptr<Identity::UserGroup> known_remotes
+        );
 
         KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::Session* out);
 
         KEX::KEX_Event init_kex(Transport::Session* out);
+
+        std::shared_ptr<Identity::User> get_user() {
+            return _user_remote;
+        }
 
         virtual ~KEXV1_B() {
 

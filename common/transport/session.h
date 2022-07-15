@@ -85,13 +85,13 @@ namespace NATBuster::Common::Transport {
 
         void send_internal(PacketType type, const Utils::ConstBlobView& packet);
         void send_kex(const Utils::ConstBlobView& packet);
-
+        
     public:
         Session(
             bool is_client,
             std::shared_ptr<OPTBase> underlying,
-            Crypto::PKey&& my_private,
-            Crypto::PKey&& remote_public
+            Crypto::PKey&& self,
+            std::shared_ptr<Identity::UserGroup> known_remotes
         );
 
         void start();
@@ -115,5 +115,9 @@ namespace NATBuster::Common::Transport {
         void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override;
 
         void close();
+
+        std::shared_ptr<Identity::User> getUser() {
+            return _kex->get_user();
+        }
     };
 }

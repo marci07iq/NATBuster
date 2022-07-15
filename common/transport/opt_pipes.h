@@ -60,6 +60,8 @@ namespace NATBuster::Common::Transport {
 
         //Close connection (gracefully) if possible
         void close();
+
+        std::shared_ptr<Identity::User> getUser() override;
     };
 
     class OPTPipes : public Utils::EventEmitter<std::shared_ptr<OPTPipe>>, public std::enable_shared_from_this<OPTPipes> {

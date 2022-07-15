@@ -60,7 +60,7 @@ namespace NATBuster::Common::Network {
     }
 
     NetworkAddress::NetworkAddress(const std::string& name, uint16_t port) {
-        ZeroMemory(&_address, sizeof(sockaddr_in));
+        ZeroMemory(&_address, sizeof(SOCKADDR_STORAGE));
 
         if (name.length()) {
             //Resolve host name to IP
@@ -76,16 +76,17 @@ namespace NATBuster::Common::Network {
                 return;
             }
 
-            _address.sin_addr.s_addr = *(u_long*)server_ip->h_addr_list[0];
+            ((sockaddr_in*)&_address)->sin_addr.s_addr = *(u_long*)server_ip->h_addr_list[0];
         }
         else {
             //Any address
-            _address.sin_addr.s_addr = INADDR_ANY;
+            ((sockaddr_in*)&_address)->sin_addr.s_addr = INADDR_ANY;
         }
 
         //Address
-        _address.sin_family = AF_INET;
-        _address.sin_port = htons(port);
+        _address.ss_family = AF_INET;
+        ((sockaddr_in*)&_address)->sin_family = AF_INET;
+        ((sockaddr_in*)&_address)->sin_port = htons(port);
     }
 
     //
@@ -140,13 +141,15 @@ namespace NATBuster::Common::Network {
         }
     }
 
-    TCPCHandle TCPS::accept(NetworkAddress& src) {
+    TCPCHandle TCPS::accept() {
         int iResult;
+        NetworkAddress remote_address;
         SOCKET clientSocket;
 
         // Accept a client socket
-        int sz = src.size();
-        clientSocket = ::accept(_socket.get(), src.get(), &sz);
+        int len = *remote_address.sizew();
+        clientSocket = ::accept(_socket.get(), (sockaddr*)remote_address.getw(), &len);
+        *remote_address.sizew() = len;
         if (clientSocket == INVALID_SOCKET) {
             int error = WSAGetLastError();
             NetworkError(NetworkErrorCodeAccept, error);
@@ -158,7 +161,7 @@ namespace NATBuster::Common::Network {
             return std::shared_ptr<TCPC>();
         }
 
-        TCPC* newSocket = new TCPC(clientSocket);
+        TCPC* newSocket = new TCPC(clientSocket, remote_address);
 
         return TCPCHandle(newSocket);
     }
@@ -172,6 +175,50 @@ namespace NATBuster::Common::Network {
     //
 
     TCPC::TCPC(const std::string& name, uint16_t port) {
+        NetworkAddress local_addr;
+
+        _socket.set(::socket(AF_INET6, SOCK_STREAM, 0));
+        if (_socket.invalid()) {
+            NetworkError(NetworkErrorCodeCreateClientSocket, WSAGetLastError());
+            return;
+        }
+
+        int ipv6only = 0;
+        int iResult = setsockopt(_socket.get(), IPPROTO_IPV6,
+            IPV6_V6ONLY, (char*)&ipv6only, sizeof(ipv6only));
+        if (iResult == SOCKET_ERROR) {
+            NetworkError(NetworkErrorCodeCreateClientSocket, WSAGetLastError());
+            _socket.close();
+            return;
+        }
+
+        std::string port_s = std::to_string(port);
+        BOOL bSuccess = WSAConnectByName(
+            _socket.get(),
+            name.c_str(),
+            port_s.c_str(),
+            local_addr.sizew(),
+            (SOCKADDR*)local_addr.getw(),
+            _remote_addr.sizew(),
+            (SOCKADDR*)_remote_addr.getw(),
+            NULL,
+            NULL);
+        if (!bSuccess) {
+            NetworkError(NetworkErrorCodeConnect, WSAGetLastError());
+            _socket.close();
+            return;
+        }
+
+        iResult = setsockopt(_socket.get(), SOL_SOCKET,
+            SO_UPDATE_CONNECT_CONTEXT, NULL, 0);
+        if (iResult == SOCKET_ERROR) {
+            wprintf(L"setsockopt for SO_UPDATE_CONNECT_CONTEXT failed with error: %d\n",
+                WSAGetLastError());
+            _socket.close();
+            return;
+        }
+
+        /*
         int iResult;
 
         // Protocol
@@ -213,10 +260,10 @@ namespace NATBuster::Common::Network {
         if (_socket.invalid()) {
             NetworkError(NetworkErrorCodeConnect, 0);
             return;
-        }
+        }*/
     }
 
-    TCPC::TCPC(SOCKET client) : SocketBase<TCPCHandle>(client) {
+    TCPC::TCPC(SOCKET client, NetworkAddress remote_addr) : SocketBase<TCPCHandle>(client), _remote_addr(remote_addr) {
 
     }
 
@@ -279,6 +326,10 @@ namespace NATBuster::Common::Network {
         return true;
     }
 
+    const NetworkAddress& TCPC::get_remote_addr() {
+        return _remote_addr;
+    }
+
     TCPC::~TCPC() {
         _socket.close();
     }
@@ -302,7 +353,7 @@ namespace NATBuster::Common::Network {
         }
 
         // Receive on its own outbound address
-        iResult = ::bind(_socket.get(), _local_address.get(), _local_address.size());
+        iResult = ::bind(_socket.get(), (const sockaddr*)_local_address.get(), _local_address.size());
         if (iResult == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeBindListenSocket, WSAGetLastError());
             _socket.close();
@@ -313,7 +364,7 @@ namespace NATBuster::Common::Network {
     bool UDP::send(const Utils::ConstBlobView& data) {
         // Send a datagram to the receiver
         int iResult = ::sendto(_socket.get(),
-            (char*)data.getr(), data.size(), 0, _remote_address.get(), _remote_address.size());
+            (char*)data.getr(), data.size(), 0, (const sockaddr*)_remote_address.get(), _remote_address.size());
         if (iResult == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeSendData, WSAGetLastError());
             _socket.close();
@@ -337,8 +388,9 @@ namespace NATBuster::Common::Network {
     bool UDP::read(Utils::BlobView& data, NetworkAddress& address, uint32_t max_len) {
         data.resize(max_len);
 
-        int size = address.size();
-        int iResult = recvfrom(_socket.get(), (char*)data.getw(), data.size(), 0, address.get(), &size);
+        int size = *address.sizew();
+        int iResult = recvfrom(_socket.get(), (char*)data.getw(), data.size(), 0, (sockaddr*)address.getw(), &size);
+        *address.sizew() = size;
         if (iResult == SOCKET_ERROR) {
             NetworkError(NetworkErrorCodeReciveData, WSAGetLastError());
             _socket.close();

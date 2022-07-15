@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <stdio.h>
+#include <array>
 
 #include "../os.h"
 
@@ -68,48 +69,69 @@ namespace NATBuster::Common::Network {
     };
 
     class NetworkAddress {
-        sockaddr_in _address;
+        enum Type {
+            Unknown,
+            IPV4,
+            IPV6
+        } _type;
 
-        const int _address_length = sizeof(sockaddr_in);
+        SOCKADDR_STORAGE _address;
 
-        static_assert(sizeof(sockaddr_in) == sizeof(sockaddr));
+        DWORD _address_length = sizeof(_address);
     public:
         NetworkAddress();
 
         NetworkAddress(const std::string& name, uint16_t port);
 
-        inline sockaddr* get() {
-            return (sockaddr*)&_address;
+        inline const SOCKADDR_STORAGE* get() const {
+            return (SOCKADDR_STORAGE*)&_address;
         }
 
-        inline const sockaddr* get() const {
-            return (sockaddr*)&_address;
+        inline SOCKADDR_STORAGE* getw() {
+            return (SOCKADDR_STORAGE*)&_address;
         }
 
-        inline int size() const {
+        inline const DWORD size() const {
             return _address_length;
         }
 
-        inline uint32_t get_ipv4_int() const {
-            return _address.sin_addr.s_addr;
+        inline DWORD* sizew() {
+            return &_address_length;
         }
 
-        inline std::string get_ipv4() const {
-            char* res = inet_ntoa(_address.sin_addr);
-
-            return std::string(res);
+        inline std::string get_addr() const {
+            if (_address.ss_family == AF_INET) {
+                std::array<char, 16> res;
+                inet_ntop(AF_INET, &((sockaddr_in*)(&_address))->sin_addr, res.data(), res.size());
+                std::string res_str(res.data());
+                return res_str;
+            }
+            if (_address.ss_family == AF_INET6) {
+                std::array<char, 46> res;
+                inet_ntop(AF_INET6, &((sockaddr_in6*)(&_address))->sin6_addr, res.data(), res.size());
+                std::string res_str(res.data());
+                return res_str;
+            }
+            return std::string();
         }
 
         inline uint16_t get_port() const {
-            return _address.sin_port;
+            if (_address.ss_family == AF_INET) {
+                return ((sockaddr_in*)(&_address))->sin_port;
+            }
+            if (_address.ss_family == AF_INET6) {
+                return ((sockaddr_in6*)(&_address))->sin6_port;
+            }
+            return 0;
         }
 
         inline bool operator==(const NetworkAddress& rhs) const {
-            return memcmp(&_address, &rhs._address, sizeof(sockaddr_in)) == 0;
+            if (_address_length != rhs._address_length) return false;
+            return memcmp(&_address, &rhs._address, _address_length) == 0;
         }
 
         inline bool operator!=(const NetworkAddress& rhs) const {
-            return memcmp(&_address, &rhs._address, sizeof(sockaddr_in)) != 0;
+            return !(this->operator==(rhs));
         }
     };
 
@@ -147,7 +169,7 @@ namespace NATBuster::Common::Network {
     public:
         TCPS(const std::string& name, uint16_t port);
 
-        TCPCHandle accept(NetworkAddress& src);
+        TCPCHandle accept();
 
         ~TCPS();
     };
@@ -158,13 +180,18 @@ namespace NATBuster::Common::Network {
 
     class TCPC : public SocketBase<TCPCHandle> {
     private:
-        TCPC(SOCKET client);
+        NetworkAddress _remote_addr;
+
+        TCPC(SOCKET client, NetworkAddress addr);
         friend class TCPS;
     public:
         TCPC(const std::string& name, uint16_t port);
 
         bool send(const Utils::ConstBlobView& data);
         bool read(Utils::BlobView& data, uint32_t min_len, uint32_t max_len);
+
+        //const NetworkAddress& get_local_addr();
+        const NetworkAddress& get_remote_addr();
 
         ~TCPC();
     };
@@ -174,8 +201,8 @@ namespace NATBuster::Common::Network {
     //
 
     class UDP : public SocketBase<UDPHandle> {
-        NetworkAddress _remote_address;
         NetworkAddress _local_address;
+        NetworkAddress _remote_address;
     public:
         UDP(const std::string& remote_name, uint16_t remote_port, uint16_t local_port = 0);
         UDP(NetworkAddress remote_address, NetworkAddress local_address);

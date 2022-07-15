@@ -107,6 +107,10 @@ namespace NATBuster::Common::Transport {
         }
     }
 
+    std::shared_ptr<Identity::User> OPTPipe::getUser() {
+        return _underlying->_underlying->getUser();
+    }
+
     //Called when a packet can be read
     void OPTPipes::on_open() {
         _open_callback();

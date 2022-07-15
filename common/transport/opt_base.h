@@ -7,6 +7,8 @@
 #include "../utils/copy_protection.h"
 #include "../utils/event.h"
 
+#include "../identity/identity.h"
+
 namespace NATBuster::Common::Transport {
     //Ordered packet transport
     class OPTBase : public Utils::EventEmitter<const Utils::ConstBlobView&> {
@@ -43,5 +45,9 @@ namespace NATBuster::Common::Transport {
         virtual void sendRaw(const Utils::ConstBlobView& packet) = 0;
         //Close connection (gracefully) if possible
         virtual void close() = 0;
+
+        virtual std::shared_ptr<Identity::User> getUser() {
+            return Identity::User::Anonymous;
+        }
     };
 };

@@ -104,7 +104,38 @@ namespace NATBuster::Common::Crypto {
 
         return (_key != nullptr);
     }
+    bool PKey::load_file_public(std::string filename) {
+        //Dont overwrite
+        if (_key != nullptr) return false;
 
+        //Read file
+        FILE* fp = fopen(filename.c_str(), "r");
+        if (fp == nullptr) return false;
+
+        //Read key
+        _key = PEM_read_PUBKEY(fp, nullptr, key_password_cb, nullptr);
+
+        //Close file
+        fclose(fp);
+
+        return (_key != nullptr);
+    }
+    bool PKey::load_private(const Utils::ConstBlobView& in) {
+        //Dont overwrite
+        if (_key != nullptr) return false;
+
+        //Create BIO
+        BIO* mem = BIO_new(BIO_s_mem());
+        BIO_write(mem, in.getr(), in.size());
+
+        //Read key
+        _key = PEM_read_bio_PrivateKey(mem, nullptr, key_password_cb, nullptr);
+
+        //Free BIO
+        BIO_free(mem);
+
+        return (_key != nullptr);
+    }
     bool PKey::load_public(const Utils::ConstBlobView& in) {
         //Dont overwrite
         if (_key != nullptr) return false;
@@ -122,7 +153,7 @@ namespace NATBuster::Common::Crypto {
         return (_key != nullptr);
     }
 
-    bool PKey::save_file_private(std::string filename) const {
+    bool PKey::export_file_private(std::string filename) const {
         //Need to have a key
         if (_key == nullptr) return false;
 
@@ -139,8 +170,7 @@ namespace NATBuster::Common::Crypto {
 
         return res == 1;
     }
-
-    bool PKey::save_file_public(std::string filename) const {
+    bool PKey::export_file_public(std::string filename) const {
         //Need to have a key
         if (_key == nullptr) return false;
 
@@ -156,7 +186,28 @@ namespace NATBuster::Common::Crypto {
 
         return res == 1;
     }
+    bool PKey::export_private(Utils::BlobView& out) const {
+        //Need to have a key
+        if (_key == nullptr) return false;
 
+        //Create BIO buffer
+        BIO* mem = BIO_new(BIO_s_mem());
+
+        //Write key
+        int res = PEM_write_bio_PKCS8PrivateKey(mem, _key, nullptr, nullptr, 0, nullptr, nullptr);
+
+        //Create output space
+        out.resize(BIO_ctrl_pending(mem));
+
+        //Copy out
+        BIO_read(mem, out.getw(), out.size());
+        assert(BIO_eof(mem));
+
+        //Free mem
+        BIO_free(mem);
+
+        return res == 1;
+    }
     bool PKey::export_public(Utils::BlobView& out) const {
         //Need to have a key
         if (_key == nullptr) return false;
@@ -178,6 +229,21 @@ namespace NATBuster::Common::Crypto {
         BIO_free(mem);
 
         return res == 1;
+    }
+
+    PKey&& PKey::copy_public() const {
+        Utils::Blob content;
+        export_public(content);
+        PKey result;
+        result.load_public(content);
+        return std::move(result);
+    }
+    PKey&& PKey::copy_private() const {
+        Utils::Blob content;
+        export_private(content);
+        PKey result;
+        result.load_private(content);
+        return std::move(result);
     }
 
     bool PKey::sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out) const {
@@ -209,7 +275,6 @@ namespace NATBuster::Common::Crypto {
 
         return true;
     }
-
     bool PKey::verify(const Utils::ConstBlobView& data_in, const Utils::ConstBlobView& sig_in) const {
         //TODO: Error check;
         EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();

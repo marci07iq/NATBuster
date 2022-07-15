@@ -3,10 +3,10 @@
 
 namespace NATBuster::Common::Proto {
     KEXV1_A::KEXV1_A(
-        Crypto::PKey&& my_private, Crypto::PKey&& other_public) :
-        KEXV1(
-            std::move(my_private), std::move(other_public)
-        ) {
+        Crypto::PKey&& self,
+        std::shared_ptr<Identity::UserGroup> known_remotes
+    ) :
+        KEXV1(std::move(self), known_remotes) {
         _state = State::S0_New;
     }
 
@@ -91,20 +91,34 @@ namespace NATBuster::Common::Proto {
             if (!packet_reader.next_record(lt_key_b)) return fail(KEX_Event::ErrorMalformed);
             Crypto::PKey lt_key_b_obj;
             if (!lt_key_b_obj.load_public(lt_key_b)) return fail(KEX_Event::ErrorCrypto);
-            //Check if there is a trusted key, and compare
-            if (_lt_key_b.has_key()) {
-                if (!_lt_key_b.is_same(lt_key_b_obj)) return fail(KEX_Event::ErrorNotrust);
+            //Check if we already know the key
+            if (_lt_key_remote.has_key()) {
+                //The new key must match
+                if(!_lt_key_remote.is_same(lt_key_b_obj))return fail(KEX_Event::ErrorNotrust);
             }
+            //First time login
             else {
-                std::cout << "WARN: Implicit trusting remote key" << std::endl;
-                _lt_key_b = std::move(lt_key_b_obj);
+                //If a pool of allowed keys was set
+                if (_users_remote) {
+                    //New key must be member
+                    if (!_users_remote->isMember(lt_key_b_obj)) return fail(KEX_Event::ErrorNotrust);
+                    _lt_key_remote = std::move(lt_key_b_obj);
+                    _user_remote = _users_remote->findUser(_lt_key_remote);
+                }
+                //If no allowed keys were set, implicitly trust anyone
+                else {
+                    std::cout << "WARN: Implicit trusting remote key" << std::endl;
+                    _lt_key_remote = std::move(lt_key_b_obj);
+                    _user_remote = Identity::User::Anonymous;
+                }
+                
             }
 
             //Message integrity signature
             Utils::ConstBlobSliceView h_sign;
             if (!packet_reader.next_record(h_sign)) return fail(KEX_Event::ErrorMalformed);
 
-            if (!_lt_key_b.verify(_h, h_sign)) return fail(KEX_Event::ErrorNotrust);
+            if (!_lt_key_remote.verify(_h, h_sign)) return fail(KEX_Event::ErrorNotrust);
 
             //There should be nothing left in the inbound data
             if (!packet_reader.eof()) return fail(KEX_Event::ErrorMalformed);
@@ -223,10 +237,10 @@ namespace NATBuster::Common::Proto {
 
 
     KEXV1_B::KEXV1_B(
-        Crypto::PKey&& my_private, Crypto::PKey&& other_public) :
-        KEXV1(
-            std::move(my_private), std::move(other_public)
-        ) {
+        Crypto::PKey&& self,
+        std::shared_ptr<Identity::UserGroup> known_remotes
+    ) :
+        KEXV1(std::move(self), known_remotes) {
         _state = State::S0_New;
     }
 
@@ -316,12 +330,12 @@ namespace NATBuster::Common::Proto {
 
             //Write lt public key
             Utils::BlobSliceView lkey = s_hello_w.prepare_writeable_record();
-            if (!_lt_key_b.export_public(lkey)) return fail(KEX_Event::ErrorCrypto);
+            if (!_lt_key_self.export_public(lkey)) return fail(KEX_Event::ErrorCrypto);
             s_hello_w.finish_writeable_record(lkey);
 
             //Write h signature
             Utils::BlobSliceView h_sign = s_hello_w.prepare_writeable_record();
-            if (!_lt_key_b.sign(_h, h_sign)) return fail(KEX_Event::ErrorCrypto);
+            if (!_lt_key_self.sign(_h, h_sign)) return fail(KEX_Event::ErrorCrypto);
             s_hello_w.finish_writeable_record(h_sign);
 
             out->send_kex(s_hello);
@@ -389,12 +403,29 @@ namespace NATBuster::Common::Proto {
             if (!packet_reader.next_record(lt_key_a)) return fail(KEX_Event::ErrorMalformed);
             Crypto::PKey lt_key_a_obj;
             if (!lt_key_a_obj.load_public(lt_key_a)) return fail(KEX_Event::ErrorCrypto);
-            if (_lt_key_a.has_key()) {
-                if (!_lt_key_a.is_same(lt_key_a_obj)) return fail(KEX_Event::ErrorNotrust);
+            //Check if we already know the key
+            if (_lt_key_remote.has_key()) {
+                //The new key must match
+                if (!_lt_key_remote.is_same(lt_key_a_obj))return fail(KEX_Event::ErrorNotrust);
             }
+            //First time login
             else {
-                std::cout << "WARN: Implicit trusting remote key" << std::endl;
-                _lt_key_a = std::move(lt_key_a_obj);
+                //If a pool of allowed keys was set
+                if (_users_remote) {
+                    //New key must be member
+                    if (!_users_remote->isMember(lt_key_a_obj)) return fail(KEX_Event::ErrorNotrust);
+
+                    _lt_key_remote = std::move(lt_key_a_obj);
+                    _user_remote = _users_remote->findUser(_lt_key_remote);
+                }
+                //If no allowed keys were set, implicitly trust anyone
+                else {
+                    std::cout << "WARN: Implicit trusting remote key" << std::endl;
+
+                    _lt_key_remote = std::move(lt_key_a_obj);
+                    _user_remote = Identity::User::Anonymous;
+                }
+                
             }
 
             //Signature
@@ -409,7 +440,7 @@ namespace NATBuster::Common::Proto {
             if (!client_proof_hash(client_proof_data))  return fail(KEX_Event::ErrorCrypto);
 
             //Check signature
-            if (!_lt_key_a.verify(client_proof_data, client_proof_signature)) return fail(KEX_Event::ErrorNotrust);
+            if (!_lt_key_remote.verify(client_proof_data, client_proof_signature)) return fail(KEX_Event::ErrorNotrust);
 
             _state = KF_Done;
             return KEX_Event::OK_Done;

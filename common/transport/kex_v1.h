@@ -54,7 +54,7 @@ namespace NATBuster::Common::Proto {
             K4_CEnc = 20,
             //Client identity sent/received B->A
             K5_CIdentity = 21,
-        } _state;
+        } _state = S0_New;
 
         enum PacketType : uint8_t {
             //Client version
@@ -79,8 +79,7 @@ namespace NATBuster::Common::Proto {
             KEXC_NEWKEYS = 6,
             //Client sends identity
             KEXC_IDENTITY = 7
-
-        } type;
+        };
 
         //The initial client capabilities, and server capabilities message
         //To auth agains downgrade attacks
@@ -105,7 +104,7 @@ namespace NATBuster::Common::Proto {
         //Long term public key of other side
         //If empty, any remote is accepted
 
-        Crypto::PKey _lt_key_self;
+        const Crypto::PKey _lt_key_self;
         Crypto::PKey _lt_key_remote;
 
         std::shared_ptr<Identity::User> _user_remote;
@@ -116,7 +115,7 @@ namespace NATBuster::Common::Proto {
             std::shared_ptr<Identity::UserGroup> known_remotes) :
             _lt_key_self(std::move(self)),
             _users_remote(known_remotes) {
-
+            assert(_lt_key_self.has_key());
         }
 
         //Wipe the internal state
@@ -160,7 +159,7 @@ namespace NATBuster::Common::Proto {
             return true;
         }
 
-        bool client_proof_hash(Utils::BlobView& dst) const {
+        bool client_proof_hash(Utils::BlobView& dst, const Crypto::PKey& client_key) const {
             Utils::Blob hash_content;
             Utils::PackedBlobWriter hash_content_w(hash_content);
 
@@ -172,9 +171,9 @@ namespace NATBuster::Common::Proto {
 
             hash_content_w.add_record(_m2);
 
-            Utils::Blob lt_key_a;
-            if (!_lt_key_self.export_public(lt_key_a)) return false;
-            hash_content_w.add_record(lt_key_a);
+            Utils::Blob client_key_blob;
+            if (!client_key.export_public(client_key_blob)) return false;
+            hash_content_w.add_record(client_key_blob);
 
             Crypto::Hash hasher(Crypto::HashAlgo::SHA512);
             if (!hasher.calc(hash_content, dst)) return false;

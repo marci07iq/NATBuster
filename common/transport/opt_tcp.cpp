@@ -17,21 +17,28 @@ namespace NATBuster::Common::Transport {
         //Packet not neccessarily really available
         bool res = _socket->read(packet, 1, 8000);
 
-        if (res) {
-            _reassamble_list.push_back(std::move(packet));
-            _reassamble_total_len += packet.size();
+        if (!res) {
+            close();
+            return;
+        }
+        _reassamble_total_len += packet.size();
+        _reassamble_list.push_back(std::move(packet));
 
-            while (_reassamble_list.size() > 0) {
-                //Now try to reassamble
-                Utils::Blob next_header;
+        while (_reassamble_list.size() > 0) {
+            //Now try to reassamble
+            Utils::Blob next_header;
 
-                //Peek at next header
-                read_from_reassamble_list(next_header, 5, true);
+            //Peek at next header
+            if (!read_from_reassamble_list(next_header, 5, true)) {
+                goto exit_loop;
+            }
 
-                const packet_decoder* decode = packet_decoder::cview(next_header);
-                
-                Utils::Blob content;
+            const packet_decoder* decode = packet_decoder::cview(next_header);
 
+            Utils::Blob content;
+
+            //Prevent the rx buffer getting too full
+            if (decode->len < max_packet_size) {
                 switch (decode->type)
                 {
                 case packet_decoder::PKT_NORMAL:
@@ -40,6 +47,9 @@ namespace NATBuster::Common::Transport {
                         //Cut off the header, and send to user
                         _result_callback(content.cslice_right(5));
                     }
+                    else {
+                        goto exit_loop;
+                    }
                     break;
                 case packet_decoder::PKT_RAW:
                     //Read out 5 byte header and content
@@ -47,13 +57,25 @@ namespace NATBuster::Common::Transport {
                         //Cut off the header, and send to user
                         _raw_callback(content.cslice_right(5));
                     }
+                    else {
+                        goto exit_loop;
+                    }
                     break;
                 default:
                     close();
+                    goto exit_loop;
                     break;
                 }
             }
+            else {
+                close();
+                goto exit_loop;
+                break;
+            }
         }
+    exit_loop:
+        return;
+
     }
 
     void OPTTCP::on_error() {
@@ -70,7 +92,7 @@ namespace NATBuster::Common::Transport {
     ) : OPTBase(is_client),
         _socket(socket),
         _source(std::make_shared<Utils::PollEventEmitter<Network::TCPCHandle, Utils::Void>>(socket))
-        {
+    {
 
     }
 
@@ -89,7 +111,7 @@ namespace NATBuster::Common::Transport {
 
         _source->start();
     }
-    
+
     //Add a callback that will be called in `delta` time, if the emitter is still running
     //There is no way to cancel this call
     //Only call from callbacks, or before start

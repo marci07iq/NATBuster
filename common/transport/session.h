@@ -119,5 +119,9 @@ namespace NATBuster::Common::Transport {
         std::shared_ptr<Identity::User> getUser() {
             return _kex->get_user();
         }
+
+        virtual ~Session() {
+
+        }
     };
 }

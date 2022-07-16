@@ -29,7 +29,7 @@ namespace NATBuster::Common::Transport {
         {
         case NATBuster::Common::Transport::Session::DATA:
             if (_flags._first_kex_ok) {
-                _result_callback(data);
+                _result_callback(content);
             }
             else {
                 //Error;
@@ -71,8 +71,8 @@ namespace NATBuster::Common::Transport {
             }
             break;
         case NATBuster::Common::Transport::Session::CLOSE:
-            break;
         default:
+            close();
             break;
         }
     }
@@ -120,7 +120,8 @@ namespace NATBuster::Common::Transport {
         Crypto::PKey&& self,
         std::shared_ptr<Identity::UserGroup> known_remotes
     ) :
-        OPTBase(is_client)
+        OPTBase(is_client),
+        _underlying(underlying)
     {
         if (_is_client) {
             _kex = std::make_unique<Proto::KEXV1_A>(std::move(self), known_remotes);
@@ -131,6 +132,7 @@ namespace NATBuster::Common::Transport {
     }
 
     void Session::start() {
+        _underlying->set_open_callback(new Utils::MemberCallback<Session, void>(weak_from_this(), &Session::on_open));
         _underlying->set_packet_callback(new Utils::MemberCallback<Session, void, const Utils::ConstBlobView&>(weak_from_this(), &Session::on_packet));
         _underlying->set_raw_callback(new Utils::MemberCallback<Session, void, const Utils::ConstBlobView&>(weak_from_this(), &Session::on_raw));
         _underlying->set_error_callback(new Utils::MemberCallback<Session, void>(weak_from_this(), &Session::on_error));

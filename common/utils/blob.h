@@ -186,7 +186,9 @@ namespace NATBuster::Common::Utils {
         void sandwich(const ConstBlobView& left, const BlobView& right);
 
         void copy_from(const ConstBlobView& src, uint32_t dst_offset = 0) {
-            assert(dst_offset + src.size() < _size);
+            resize_min(dst_offset + src.size());
+
+            assert(src.size() <= (_size - dst_offset));
 
             Blob::bufcpy(
                 _buffer, _capacity, dst_offset + _pre_gap,

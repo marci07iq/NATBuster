@@ -43,7 +43,7 @@ namespace NATBuster::Common::Proto {
 
 
     protected:
-        KEX() {
+        KEX() : _last_kex(0) {
 
         }
 

@@ -25,17 +25,17 @@ namespace NATBuster::Common::Proto {
 
         case NATBuster::Common::Proto::KEXV1::S1_M1:
         {
-            if (packet_type != PacketType::KEXS_HELLO) return fail(KEX_Event::ErrorState);
+            if (packet_type != PacketType::KEXS_VERSION) return fail(KEX_Event::ErrorState);
             if (packet_data.size() != 4) return fail(KEX_Event::ErrorMalformed);
             uint32_t version = *(uint32_t*)packet_data.getr();
             if(version != 0x01000000) return fail(KEX_Event::ErrorMalformed);
+            //Clean memory garbage
+            kex_reset();
 
-            _m2.copy_from(packet_data, 0);
+            _m2.copy_from(packet, 0);
 
             _state = KEXV1::S2_M2;
 
-            //Clean memory garbage
-            kex_reset();
             //Create new DH key
             if (!_dh_key_a.generate_ec25519()) return fail(KEX_Event::ErrorCrypto);
             //Create new nonce
@@ -148,6 +148,8 @@ namespace NATBuster::Common::Proto {
             assert(crypto_size <= crypto_data.size());
             out->_inbound.set_iv(crypto_data.getr(), crypto_size);
 
+            out->_flags._enc_on_ib = true;
+
             _state = NATBuster::Common::Proto::KEXV1::K3_SEnc;
 
 
@@ -160,6 +162,8 @@ namespace NATBuster::Common::Proto {
                 *((uint8_t*)c_newkey_packet.getw()) = (uint8_t)PacketType::KEXC_NEWKEYS;
 
                 out->send_kex(c_newkey_packet);
+
+                out->_flags._enc_on_ob = true;
             }
 
             //Set outbound keys
@@ -181,20 +185,26 @@ namespace NATBuster::Common::Proto {
                 Utils::Blob c_id = Utils::Blob::factory_empty(1, 0, 200);
 
                 //Set packet type
-                *((uint8_t*)c_id.getw()) = (uint8_t)PacketType::KEXC_HELLO;
+                *((uint8_t*)c_id.getw()) = (uint8_t)PacketType::KEXC_IDENTITY;
 
                 //Writer for packing the data
                 Utils::PackedBlobWriter c_id_w(c_id);
 
                 //Write public key
-                Utils::BlobSliceView lt_key_b = c_id_w.prepare_writeable_record();
-                if (!_dh_key_a.export_public(lt_key_b)) return fail(KEX_Event::ErrorCrypto);
-                c_id_w.finish_writeable_record(lt_key_b);
+                Utils::BlobSliceView lt_key_self = c_id_w.prepare_writeable_record();
+                if (!_lt_key_self.export_public(lt_key_self)) return fail(KEX_Event::ErrorCrypto);
+                c_id_w.finish_writeable_record(lt_key_self);
+
+                //Calculate proof data
+                Utils::Blob client_proof_data = Utils::Blob::factory_empty(0, 0, 200);
+                if (!client_proof_hash(client_proof_data, _lt_key_self))  return fail(KEX_Event::ErrorCrypto);
 
                 //Write identity proof
                 Utils::BlobSliceView client_proof = c_id_w.prepare_writeable_record();
-                if (!client_proof_hash(client_proof))  return fail(KEX_Event::ErrorCrypto);
+                if (!_lt_key_self.sign(client_proof_data, client_proof)) return fail(KEX_Event::ErrorCrypto);
                 c_id_w.finish_writeable_record(client_proof);
+
+                out->send_kex(c_id);
             }
 
             _state = NATBuster::Common::Proto::KEXV1::K5_CIdentity;
@@ -223,9 +233,9 @@ namespace NATBuster::Common::Proto {
             _m1 = Utils::Blob::factory_empty(5, 0, 0);
 
             //Set packet type
-            *((uint8_t*)_m1.getw()) = (uint8_t)PacketType::KEXS_VERSION;
+            *((uint8_t*)_m1.getw()) = (uint8_t)PacketType::KEXC_VERSION;
 
-            *((uint32_t*)(_m1.getw() + 1)) = 0x10000000;
+            *((uint32_t*)(_m1.getw() + 1)) = 0x01000000;
 
             out->send_kex(_m1);
             _state = KEXV1::S1_M1;
@@ -257,7 +267,7 @@ namespace NATBuster::Common::Proto {
 
         case NATBuster::Common::Proto::KEXV1::S0_New:
         {
-            if (packet_type != PacketType::KEXC_HELLO) return fail(KEX_Event::ErrorState);
+            if (packet_type != PacketType::KEXC_VERSION) return fail(KEX_Event::ErrorState);
             if (packet_data.size() != 4) return fail(KEX_Event::ErrorMalformed);
             uint32_t version = *(uint32_t*)packet_data.getr();
             if (version != 0x01000000) return fail(KEX_Event::ErrorMalformed);
@@ -269,7 +279,7 @@ namespace NATBuster::Common::Proto {
             //Set packet type
             *((uint8_t*)_m2.getw()) = (uint8_t)PacketType::KEXS_VERSION;
 
-            *((uint32_t*)(_m2.getw() + 1)) = 0x10000000;
+            *((uint32_t*)(_m2.getw() + 1)) = 0x01000000;
 
             out->send_kex(_m2);
             _state = S2_M2;
@@ -312,7 +322,7 @@ namespace NATBuster::Common::Proto {
             _state = State::K1_CHello;
 
             //Prepare server hello
-            Utils::Blob s_hello = Utils::Blob::factory_empty(0, 0, 500);
+            Utils::Blob s_hello = Utils::Blob::factory_empty(1, 0, 500);
 
             //Set packet type
             *((uint8_t*)s_hello.getw()) = (uint8_t)PacketType::KEXS_HELLO;
@@ -348,6 +358,8 @@ namespace NATBuster::Common::Proto {
                 *((uint8_t*)s_newkey_packet.getw()) = (uint8_t)PacketType::KEXS_NEWKEYS;
 
                 out->send_kex(s_newkey_packet);
+
+                out->_flags._enc_on_ob = true;
             }
 
             //Set outbound keys
@@ -388,6 +400,8 @@ namespace NATBuster::Common::Proto {
             if (!secret_hash_derive_bits(crypto_data, 'D', crypto_size)) return fail(KEX_Event::ErrorCrypto);
             assert(crypto_size <= crypto_data.size());
             out->_inbound.set_iv(crypto_data.getr(), crypto_size);
+
+            out->_flags._enc_on_ib = true;
 
             _state = NATBuster::Common::Proto::KEXV1::K4_CEnc;
             return KEX_Event::OK;
@@ -437,7 +451,7 @@ namespace NATBuster::Common::Proto {
 
             //Calculate proof data
             Utils::Blob client_proof_data = Utils::Blob::factory_empty(0, 0, 200);
-            if (!client_proof_hash(client_proof_data))  return fail(KEX_Event::ErrorCrypto);
+            if (!client_proof_hash(client_proof_data, _lt_key_remote))  return fail(KEX_Event::ErrorCrypto);
 
             //Check signature
             if (!_lt_key_remote.verify(client_proof_data, client_proof_signature)) return fail(KEX_Event::ErrorNotrust);

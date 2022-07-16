@@ -21,8 +21,8 @@ namespace NATBuster::Common::Transport {
 #pragma pack(push, 1)
         struct packet_decoder : Utils::NonStack {
             enum PacketType : uint8_t {
-                PKT_NORMAL,
-                PKT_RAW
+                PKT_NORMAL = 1,
+                PKT_RAW = 2
             } type;
             uint32_t len;
             uint8_t data[1];
@@ -35,6 +35,8 @@ namespace NATBuster::Common::Transport {
             static inline const packet_decoder* cview(const Utils::ConstBlobView& packet) {
                 return (const packet_decoder*)(packet.getr());
             }
+
+            ~packet_decoder() = delete;
         };
 
         static_assert(offsetof(packet_decoder, type) == 0);
@@ -47,7 +49,9 @@ namespace NATBuster::Common::Transport {
         //PollEventEmitter wrapping the socket
         std::shared_ptr<Utils::PollEventEmitter<Network::TCPCHandle, Utils::Void>> _source;
 
-        uint32_t _reassamble_total_len;
+        static const uint32_t max_packet_size = 1 << 24;
+
+        uint32_t _reassamble_total_len = 0;
         std::list<Utils::Blob> _reassamble_list;
 
         bool skip_from_reassamble_list(uint32_t len) {
@@ -91,7 +95,7 @@ namespace NATBuster::Common::Transport {
             return false;
         }
         bool read_from_reassamble_list(Utils::Blob& dst, uint32_t len, bool peek) {
-            if (len <= _reassamble_total_len) {
+            if (len  <= _reassamble_total_len) {
                 uint32_t progress = 0;
                 dst.resize(len);
 
@@ -180,5 +184,9 @@ namespace NATBuster::Common::Transport {
         void sendRaw(const Utils::ConstBlobView& data);
 
         void close();
+
+        virtual ~OPTTCP() {
+
+        }
     };
 }

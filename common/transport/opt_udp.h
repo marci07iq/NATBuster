@@ -237,5 +237,9 @@ namespace NATBuster::Common::Transport {
         void sendRaw(const Utils::ConstBlobView& data);
 
         void close();
+
+        virtual ~OPTUDP() {
+
+        }
     };
 }

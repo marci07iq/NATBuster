@@ -72,8 +72,8 @@ namespace NATBuster::Common::Crypto {
         bool export_private(Utils::BlobView& out) const;
         bool export_public(Utils::BlobView& out) const;
 
-        PKey&& copy_public() const;
-        PKey&& copy_private() const;
+        bool copy_public_from(const PKey& src);
+        bool copy_private_from(const PKey& src);
 
         //Ed25519 key only
         bool sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out) const;
@@ -91,6 +91,10 @@ namespace NATBuster::Common::Crypto {
 
         bool fingerprint(Hash& hash_ctx, Utils::BlobView& out) {
 
+        }
+
+        ~PKey() {
+            erase();
         }
     };
 };

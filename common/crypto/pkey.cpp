@@ -48,7 +48,7 @@ namespace NATBuster::Common::Crypto {
     }
 
     PKey& PKey::operator=(PKey&& other) noexcept {
-        if(_key != nullptr) EVP_PKEY_free(_key);
+        if (_key != nullptr) EVP_PKEY_free(_key);
         _key = other._key;
         other._key = nullptr;
 
@@ -231,19 +231,15 @@ namespace NATBuster::Common::Crypto {
         return res == 1;
     }
 
-    PKey&& PKey::copy_public() const {
+    bool PKey::copy_public_from(const PKey& src) {
         Utils::Blob content;
-        export_public(content);
-        PKey result;
-        result.load_public(content);
-        return std::move(result);
+        if (!src.export_public(content)) return false;
+        if (!load_public(content)) return false;
     }
-    PKey&& PKey::copy_private() const {
+    bool PKey::copy_private_from(const PKey& src) {
         Utils::Blob content;
-        export_private(content);
-        PKey result;
-        result.load_private(content);
-        return std::move(result);
+        if (!src.export_private(content)) return false;
+        if (!load_private(content)) return false;
     }
 
     bool PKey::sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out) const {
@@ -312,7 +308,7 @@ namespace NATBuster::Common::Crypto {
         }
 
         secret_out.resize(secret_len_szt);
-        
+
         if (1 != (EVP_PKEY_derive(ctx, secret_out.getw(), &secret_len_szt))) {
             EVP_PKEY_CTX_free(ctx);
             return false;

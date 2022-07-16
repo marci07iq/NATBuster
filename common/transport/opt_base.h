@@ -49,5 +49,60 @@ namespace NATBuster::Common::Transport {
         virtual std::shared_ptr<Identity::User> getUser() {
             return Identity::User::Anonymous;
         }
+
+        virtual ~OPTBase() {
+
+        }
     };
+
+    /*//Stacked filter
+    class OPTBaseFilter : public OPTBase {
+    protected:
+        std::shared_ptr<OPTBase> _underlying;
+
+        OPTBaseFilter(bool is_client, std::shared_ptr<OPTBase> underlying) :
+            OPTBase(is_client) {
+
+        }
+    private:
+        using Utils::EventEmitter<const Utils::ConstBlobView&>::set_result_callback;
+    public:
+        //Add a callback that will be called in `delta` time, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        virtual void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
+            _underlying->addDelay(cb, delta);
+        }
+
+        //Add a callback that will be called at time `end`, if the emitter is still running
+        //There is no way to cancel this call
+        //Only call from callbacks, or before start
+        virtual void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
+            _underlying->addTimer(cb, end);
+        }
+
+        //Overwrite the next time the floating timer is fired
+        //There is only one floating timer
+        //Only call from callbacks, or before start
+        virtual void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
+            _underlying->updateFloatingNext(cb, end);
+        }
+
+        //Send ordered packet
+        virtual void send(const Utils::ConstBlobView& packet) override {
+            _underlying->send(packet);
+        };
+        //Send UDP-like packet (no order / arrival guarantee, likely faster)
+        virtual void sendRaw(const Utils::ConstBlobView& packet) override {
+            _underlying->send(packet);
+        };
+        //Close connection (gracefully) if possible
+        virtual void close() override {
+            _underlying->close();
+        }
+
+        virtual std::shared_ptr<Identity::User> getUser() override {
+            _underlying->getUser();
+        }
+    };*/
 };

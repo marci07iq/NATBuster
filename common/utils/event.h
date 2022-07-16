@@ -136,7 +136,7 @@ namespace NATBuster::Common::Utils
 
         Time::time_delta_type_us run() {
             //Call all one time timers
-            while ((_timers.size() > 0) && (_timers.top()->dst >= Time::now())) {
+            while ((_timers.size() > 0) && (_timers.top()->dst <= Time::now())) {
                 _timers.top()->cb();
                 delete _timers.top();
                 _timers.pop();
@@ -147,7 +147,7 @@ namespace NATBuster::Common::Utils
             }
             //Call floating timer
             //Multiple times (if the user keeps re-setting it)
-            while (_floating_timer.cb.has_function() && _floating_timer.dst < Time::now()) {
+            while (_floating_timer.cb.has_function() && _floating_timer.dst <= Time::now()) {
                 _floating_timer.cb.call_and_clear();
             }
 
@@ -258,6 +258,10 @@ namespace NATBuster::Common::Utils
         //Close the event emitter
         //Will issue a close callback unless one has already been issued
         virtual void close() = 0;
+
+        virtual ~EventEmitter() {
+
+        }
     };
 
 
@@ -328,6 +332,17 @@ namespace NATBuster::Common::Utils
 
         void join() {
             _thread.join();
+        }
+
+        virtual ~PollEventEmitter() {
+            if (_thread.get_id() == std::this_thread::get_id()) {
+                //The thread is cleaning itself up
+                //It should stop itself after the current callback is done
+                _thread.detach();
+            }
+            else {
+                _thread.join();
+            }
         }
     };
 

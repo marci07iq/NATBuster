@@ -62,6 +62,10 @@ namespace NATBuster::Common::Transport {
         void close();
 
         std::shared_ptr<Identity::User> getUser() override;
+
+        virtual ~OPTPipe() {
+
+        }
     };
 
     class OPTPipes : public Utils::EventEmitter<std::shared_ptr<OPTPipe>>, public std::enable_shared_from_this<OPTPipes> {
@@ -212,5 +216,9 @@ namespace NATBuster::Common::Transport {
         //Close the event emitter
         //Will issue a close callback unless one has already been issued
         void close();
+
+        virtual ~OPTPipes() {
+
+        }
     };
 };

@@ -128,7 +128,9 @@ namespace NATBuster::Common::Crypto {
         return 12;
     }
     void CipherAES256GCMPacketStream::set_iv(const uint8_t* bytes, uint32_t size) {
-        assert(size == 12);
+        if (size != 12) {
+            throw 1;
+        }
         for (int i = 0; i < 12 && i < size; i++) {
             _iv.bytes[i] = bytes[i];
         }
@@ -144,7 +146,7 @@ namespace NATBuster::Common::Crypto {
         return 32;
     }
     void CipherAES256GCMPacketStream::set_key(const uint8_t* key, uint32_t size) {
-        if (size == 32) {
+        if (size != 32) {
             throw 1;
         }
         for (int i = 0; i < 32; i++) {

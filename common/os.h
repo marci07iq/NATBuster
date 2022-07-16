@@ -1,6 +1,11 @@
 #pragma once
 
+
 #ifdef WIN32
+
+//Don't use the winapi min/max macros.
+#define NOMINMAX
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -14,4 +19,7 @@
 #include <iphlpapi.h>
 
 #pragma comment(lib, "Ws2_32.lib")
+
+#undef NOMINMAX
+
 #endif

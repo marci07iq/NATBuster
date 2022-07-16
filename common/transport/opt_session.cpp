@@ -1,14 +1,14 @@
-#include "session.h"
+#include "opt_session.h"
 #include "kex_v1.h"
 
 namespace NATBuster::Common::Transport {
     //Called when the emitter starts
-    void Session::on_open() {
+    void OPTSession::on_open() {
         //Start the key exchange
         _kex->init_kex(this);
     }
     //Called when a packet can be read
-    void Session::on_packet(const Utils::ConstBlobView& data) {
+    void OPTSession::on_packet(const Utils::ConstBlobView& data) {
         //Decrypt data if there is encyption
         Utils::Blob data_decrypted;
         Utils::Blob no_aad;
@@ -27,7 +27,7 @@ namespace NATBuster::Common::Transport {
 
         switch (type)
         {
-        case NATBuster::Common::Transport::Session::DATA:
+        case NATBuster::Common::Transport::OPTSession::DATA:
             if (_flags._first_kex_ok) {
                 _result_callback(content);
             }
@@ -36,7 +36,7 @@ namespace NATBuster::Common::Transport {
                 close();
             }
             break;
-        case NATBuster::Common::Transport::Session::KEX:
+        case NATBuster::Common::Transport::OPTSession::KEX:
         {
             Proto::KEX::KEX_Event res = _kex->recv(content, this);
             switch (res)
@@ -62,7 +62,7 @@ namespace NATBuster::Common::Transport {
             }
         }
         break;
-        case NATBuster::Common::Transport::Session::ENC_OFF:
+        case NATBuster::Common::Transport::OPTSession::ENC_OFF:
             if (_flags._enc_off_enable) {
                 _flags._enc_on_ib = false;
             }
@@ -70,28 +70,28 @@ namespace NATBuster::Common::Transport {
                 close();
             }
             break;
-        case NATBuster::Common::Transport::Session::CLOSE:
+        case NATBuster::Common::Transport::OPTSession::CLOSE:
         default:
             close();
             break;
         }
     }
     //Called when a packet can be read
-    void Session::on_raw(const Utils::ConstBlobView& data) {
+    void OPTSession::on_raw(const Utils::ConstBlobView& data) {
         if (_flags._first_kex_ok) {
             _raw_callback(data);
         }
     }
     //Called when a socket error occurs
-    void Session::on_error() {
+    void OPTSession::on_error() {
         _error_callback();
     }
     //Socket was closed
-    void Session::on_close() {
+    void OPTSession::on_close() {
         _close_callback();
     }
 
-    void Session::send_internal(PacketType type, const Utils::ConstBlobView& packet) {
+    void OPTSession::send_internal(PacketType type, const Utils::ConstBlobView& packet) {
         Utils::Blob packet_full = Utils::Blob::factory_empty(1 + packet.size());
 
         (*((uint8_t*)packet_full.getw())) = type;
@@ -110,11 +110,11 @@ namespace NATBuster::Common::Transport {
 
         _underlying->send(to_send);
     }
-    void Session::send_kex(const Utils::ConstBlobView& packet) {
+    void OPTSession::send_kex(const Utils::ConstBlobView& packet) {
         send_internal(PacketType::KEX, packet);
     }
 
-    Session::Session(
+    OPTSession::OPTSession(
         bool is_client,
         std::shared_ptr<OPTBase> underlying,
         Crypto::PKey&& self,
@@ -131,12 +131,12 @@ namespace NATBuster::Common::Transport {
         }
     }
 
-    void Session::start() {
-        _underlying->set_open_callback(new Utils::MemberCallback<Session, void>(weak_from_this(), &Session::on_open));
-        _underlying->set_packet_callback(new Utils::MemberCallback<Session, void, const Utils::ConstBlobView&>(weak_from_this(), &Session::on_packet));
-        _underlying->set_raw_callback(new Utils::MemberCallback<Session, void, const Utils::ConstBlobView&>(weak_from_this(), &Session::on_raw));
-        _underlying->set_error_callback(new Utils::MemberCallback<Session, void>(weak_from_this(), &Session::on_error));
-        _underlying->set_close_callback(new Utils::MemberCallback<Session, void>(weak_from_this(), &Session::on_close));
+    void OPTSession::start() {
+        _underlying->set_open_callback(new Utils::MemberCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_open));
+        _underlying->set_packet_callback(new Utils::MemberCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_packet));
+        _underlying->set_raw_callback(new Utils::MemberCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_raw));
+        _underlying->set_error_callback(new Utils::MemberCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_error));
+        _underlying->set_close_callback(new Utils::MemberCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_close));
 
         _underlying->start();
     }
@@ -144,32 +144,32 @@ namespace NATBuster::Common::Transport {
     //Add a callback that will be called in `delta` time, if the emitter is still running
     //There is no way to cancel this call
     //Only call from callbacks, or before start
-    inline void Session::addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
+    inline void OPTSession::addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
         _underlying->addDelay(cb, delta);
     }
 
     //Add a callback that will be called at time `end`, if the emitter is still running
     //There is no way to cancel this call
     //Only call from callbacks, or before start
-    inline void Session::addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
+    inline void OPTSession::addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
         _underlying->addTimer(cb, end);
     }
 
-    void Session::updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
+    void OPTSession::updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
         _underlying->updateFloatingNext(cb, end);
     }
 
     //Send ordered packet
-    void Session::send(const Utils::ConstBlobView& packet) {
+    void OPTSession::send(const Utils::ConstBlobView& packet) {
         send_internal(PacketType::DATA, packet);
     }
 
     //Send raw fasttrack packet, passed stright to the underlying inderface
-    void Session::sendRaw(const Utils::ConstBlobView& packet) {
+    void OPTSession::sendRaw(const Utils::ConstBlobView& packet) {
         _underlying->sendRaw(packet);
     }
 
-    void Session::close() {
+    void OPTSession::close() {
         _underlying->close();
     }
 }

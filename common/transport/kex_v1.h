@@ -235,9 +235,9 @@ namespace NATBuster::Common::Proto {
         );
 
 
-        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::Session* out);
+        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::OPTSession* out);
 
-        KEX::KEX_Event init_kex(Transport::Session* out);
+        KEX::KEX_Event init_kex(Transport::OPTSession* out);
 
         std::shared_ptr<Identity::User> get_user() {
             return _user_remote;
@@ -272,9 +272,9 @@ namespace NATBuster::Common::Proto {
             std::shared_ptr<Identity::UserGroup> known_remotes
         );
 
-        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::Session* out);
+        KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::OPTSession* out);
 
-        KEX::KEX_Event init_kex(Transport::Session* out);
+        KEX::KEX_Event init_kex(Transport::OPTSession* out);
 
         std::shared_ptr<Identity::User> get_user() {
             return _user_remote;

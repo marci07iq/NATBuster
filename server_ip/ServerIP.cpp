@@ -33,9 +33,18 @@ int main() {
     ipserver_private_key.load_private(ipserver_private_key_b);
     client_public_key.load_public(client_public_key_b);
 
-    std::shared_ptr<UserGroup> authorised_users;
+
+    std::shared_ptr<User> client = std::make_shared<User>("client", std::move(client_public_key));
+
+    //0: No authorised users objects: Implicity trust anyone
+    std::shared_ptr<UserGroup> authorised_users0;
+    //Empty object: Trust noone
+    std::shared_ptr<UserGroup> authorised_users1 = std::make_shared<UserGroup>();
+    //User given: Trust only that users
+    std::shared_ptr<UserGroup> authorised_users2 = std::make_shared<UserGroup>();
+    authorised_users2->addUser(client);
     
-    server = std::make_shared<IPServer>(5987, authorised_users, std::move(ipserver_private_key));
+    server = std::make_shared<IPServer>(5987, authorised_users2, std::move(ipserver_private_key));
     server->start();
 
     int x;

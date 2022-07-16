@@ -13,7 +13,7 @@
 #include "../identity/identity.h"
 
 namespace NATBuster::Common::Transport {
-    class Session;
+    class OPTSession;
 };
 
 namespace NATBuster::Common::Proto {
@@ -55,9 +55,9 @@ namespace NATBuster::Common::Proto {
             return _last_kex;
         }
 
-        virtual KEX_Event recv(const Utils::ConstBlobView& packet, Transport::Session* out) = 0;
+        virtual KEX_Event recv(const Utils::ConstBlobView& packet, Transport::OPTSession* out) = 0;
 
-        virtual KEX_Event init_kex(Transport::Session* out) = 0;
+        virtual KEX_Event init_kex(Transport::OPTSession* out) = 0;
 
         virtual std::shared_ptr<Identity::User> get_user() = 0;
 

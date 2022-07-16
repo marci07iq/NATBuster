@@ -89,7 +89,7 @@ namespace NATBuster::Server {
             //Create OPT Session
             Common::Crypto::PKey self_copy;
             self_copy.copy_private_from(_self);
-            std::shared_ptr<Common::Transport::Session> session = std::make_shared<Common::Transport::Session>(false, opt, std::move(self_copy), _authorised_users);
+            std::shared_ptr<Common::Transport::OPTSession> session = std::make_shared<Common::Transport::OPTSession>(false, opt, std::move(self_copy), _authorised_users);
 
             std::shared_ptr<IPServerEndpoint> endpoint = IPServerEndpoint::create(client, session, shared_from_this());
         }

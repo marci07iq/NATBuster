@@ -1,5 +1,5 @@
 #include "kex_v1.h"
-#include "session.h"
+#include "opt_session.h"
 
 namespace NATBuster::Common::Proto {
     KEXV1_A::KEXV1_A(
@@ -11,7 +11,7 @@ namespace NATBuster::Common::Proto {
     }
 
 
-    KEX::KEX_Event KEXV1_A::recv(const Utils::ConstBlobView& packet, Transport::Session* out) {
+    KEX::KEX_Event KEXV1_A::recv(const Utils::ConstBlobView& packet, Transport::OPTSession* out) {
         if (packet.size() == 0) return fail(KEX_Event::ErrorMalformed);
 
         PacketType packet_type = (PacketType)(*((uint8_t*)packet.getr()));
@@ -227,7 +227,7 @@ namespace NATBuster::Common::Proto {
         }
     }
 
-    KEX::KEX_Event KEXV1_A::init_kex(Transport::Session* out) {
+    KEX::KEX_Event KEXV1_A::init_kex(Transport::OPTSession* out) {
         //KEX can only be be called when a previos kex is done
         if (_state == S0_New || _state == KF_Done) {
             _m1 = Utils::Blob::factory_empty(5, 0, 0);
@@ -255,7 +255,7 @@ namespace NATBuster::Common::Proto {
     }
 
 
-    KEX::KEX_Event KEXV1_B::recv(const Utils::ConstBlobView& packet, Transport::Session* out) {
+    KEX::KEX_Event KEXV1_B::recv(const Utils::ConstBlobView& packet, Transport::OPTSession* out) {
         if (packet.size() == 0) return fail(KEX_Event::ErrorMalformed);
 
         PacketType packet_type = (PacketType)(*((uint8_t*)packet.getr()));
@@ -472,7 +472,7 @@ namespace NATBuster::Common::Proto {
         }
     }
 
-    KEX::KEX_Event KEXV1_B::init_kex(Transport::Session* out) {
+    KEX::KEX_Event KEXV1_B::init_kex(Transport::OPTSession* out) {
         /*if (_state == S0_New || _state == KF_Done) {
             //Clean memory garbage
             kex_reset();

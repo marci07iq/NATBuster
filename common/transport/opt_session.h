@@ -30,7 +30,7 @@ namespace NATBuster::Common::Transport {
     // A<-B: M2: Version and capabilities
     // Selected version is min(Va, Vb)
 
-    class Session : public OPTBase, public std::enable_shared_from_this<Session> {
+    class OPTSession : public OPTBase, public std::enable_shared_from_this<OPTSession> {
         enum PacketType : uint8_t {
             //Encrypted data packet
             DATA = 0,
@@ -87,7 +87,7 @@ namespace NATBuster::Common::Transport {
         void send_kex(const Utils::ConstBlobView& packet);
         
     public:
-        Session(
+        OPTSession(
             bool is_client,
             std::shared_ptr<OPTBase> underlying,
             Crypto::PKey&& self,
@@ -120,7 +120,7 @@ namespace NATBuster::Common::Transport {
             return _kex->get_user();
         }
 
-        virtual ~Session() {
+        virtual ~OPTSession() {
 
         }
     };

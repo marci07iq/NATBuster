@@ -24,7 +24,7 @@ namespace NATBuster::Common::Transport {
             req_header->type = OPTPipes::packet_decoder::MGMT_OPEN_REQ;
             req_header->id = _id;
 
-            _open_state == OPTPipe::OpenRequsted;
+            _open_state = OPTPipe::OpenRequsted;
 
             _underlying->_underlying->send(req_packet);
         }
@@ -35,7 +35,7 @@ namespace NATBuster::Common::Transport {
             req_header->type = OPTPipes::packet_decoder::MGMT_OPEN_RESP;
             req_header->id = _id;
 
-            _open_state == OPTPipe::Opened;
+            _open_state = OPTPipe::Opened;
 
             _underlying->_underlying->send(req_packet);
         }

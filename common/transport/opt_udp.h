@@ -23,7 +23,7 @@ namespace NATBuster::Common::Transport {
         float ping_rt_mul = 1.5f;
         float jitter_rt_mul = 1.5f;
         //Exponential running average weight of new data point
-        float ping_average_weight = 0.01;
+        float ping_average_weight = 0.01f;
     };
 
     class OPTUDP;
@@ -122,9 +122,9 @@ namespace NATBuster::Common::Transport {
         std::shared_ptr<Utils::PollEventEmitter<Network::UDPHandle, Utils::Void>> _source;
 
         //Running average of ACK pings
-        float _ping = 0.1;
+        float _ping = 0.1f;
         //Running average of ACK ping squares
-        float _ping2 = 0.01;
+        float _ping2 = 0.01f;
         //Jitter = sqrt(ping2 - ping**2)
 
         //Settings objects

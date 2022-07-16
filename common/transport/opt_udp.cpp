@@ -38,11 +38,13 @@ namespace NATBuster::Common::Transport {
             Utils::Blob packet = std::move(it->second);
             _receive_map.erase(it);
 
+            packet_decoder* pkt = packet_decoder::view(packet);
+            packet_decoder::PacketType type = pkt->type;
+
             _reassemble_list.push_back(std::move(packet));
 
-            packet_decoder* pkt = packet_decoder::view(packet);
             //End of frame
-            if (pkt->type == packet_decoder::PacketType::PKT_END || pkt->type == packet_decoder::PacketType::PKT_SINGLE) {
+            if (type == packet_decoder::PacketType::PKT_END || type == packet_decoder::PacketType::PKT_SINGLE) {
 
                 uint32_t new_len = 0;
                 for (auto& it : _reassemble_list) {
@@ -117,8 +119,8 @@ namespace NATBuster::Common::Transport {
                         //Time of flight
                         Time::time_delta_type_us tof = now - it->transmits[seq & packet_decoder::seq_rt_mask];
                         //Update ping
-                        _ping += _settings.ping_average_weight * (tof / 1000000. - _ping);
-                        _ping2 += _settings.ping_average_weight * ((tof / 1000000.) * (tof / 1000000.) - _ping2);
+                        _ping += _settings.ping_average_weight * (tof / 1000000.f - _ping);
+                        _ping2 += _settings.ping_average_weight * ((tof / 1000000.f) * (tof / 1000000.f) - _ping2);
                         //Remove from re-transmit system
                         auto it2 = it++;
                         _transmit_queue.erase(it2);
@@ -312,8 +314,8 @@ namespace NATBuster::Common::Transport {
             {
                 std::lock_guard _lg(_tx_lock);
                 _transmit_queue.push_back(std::move(tx_packet));
+                _socket->send(_transmit_queue.back().packet);
             }
-            _socket->send(packet);
         }
 
     }

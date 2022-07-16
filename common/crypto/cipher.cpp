@@ -131,7 +131,7 @@ namespace NATBuster::Common::Crypto {
         if (size != 12) {
             throw 1;
         }
-        for (int i = 0; i < 12 && i < size; i++) {
+        for (uint32_t i = 0; i < 12 && i < size; i++) {
             _iv.bytes[i] = bytes[i];
         }
     }

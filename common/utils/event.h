@@ -94,7 +94,7 @@ namespace NATBuster::Common::Utils
             //But cb is not used in sorting, so doesn't have to be
             mutable TimerCallback cb;
 
-            Time::time_type_us dst;
+            Time::time_type_us dst = 0;
 
             bool operator<(const timer& rhs) {
                 return dst < rhs.dst;

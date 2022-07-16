@@ -34,7 +34,7 @@ namespace NATBuster::Common::Crypto {
             }
         }
 
-        int len = pass.size();
+        size_t len = pass.size();
         len = (size < len) ? size : len;
 
         memcpy(buf, pass.c_str(), len);
@@ -235,11 +235,13 @@ namespace NATBuster::Common::Crypto {
         Utils::Blob content;
         if (!src.export_public(content)) return false;
         if (!load_public(content)) return false;
+        return true;
     }
     bool PKey::copy_private_from(const PKey& src) {
         Utils::Blob content;
         if (!src.export_private(content)) return false;
         if (!load_private(content)) return false;
+        return true;
     }
 
     bool PKey::sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out) const {

@@ -270,7 +270,7 @@ namespace NATBuster::Common::Network {
     bool TCPC::send(const Utils::ConstBlobView& data) {
         if (_socket.invalid()) return false;
 
-        int progress = 0;
+        uint32_t progress = 0;
 
         while (progress < data.size()) {
             //Send bytes till all sent

@@ -119,7 +119,8 @@ namespace NATBuster::Common::Utils {
         return Blob::factory_copy(view.getr(), view.size(), pre_gap, end_gap);
     }
     Blob Blob::factory_string(const std::string& str) {
-        return factory_copy((uint8_t*)(str.c_str()), str.size(), 0, 0);
+        assert(str.size() < std::numeric_limits<uint32_t>::max());
+        return factory_copy((uint8_t*)(str.c_str()), (uint32_t)str.size(), 0, 0);
     }
 
     Blob Blob::factory_concat(std::initializer_list<ConstBlobView*> list, uint32_t pre_gap, uint32_t end_gap) {

@@ -321,4 +321,74 @@ namespace NATBuster::Common::Crypto {
         EVP_PKEY_CTX_free(ctx);
         return true;
     }
+
+    bool PKey::fingerprint(Hash& hash_ctx, Utils::BlobView& out) {
+        //This is for some other Ec types
+        /*if (!has_key()) return false;
+
+        const ec_key_st* ec_key = EVP_PKEY_get0_EC_KEY(_key);
+
+        if (ec_key == nullptr) return false;
+
+        const EC_POINT* pub = EC_KEY_get0_public_key(ec_key);
+
+        if (ec_key == nullptr) return false;
+
+        BIGNUM* x = BN_new();
+        BIGNUM* y = BN_new();
+
+        if (1 != EC_POINT_get_affine_coordinates_GFp(EC_KEY_get0_group(ec_key), pub, x, y, NULL)) {
+            BN_free(x);
+            BN_free(y);
+            return false;
+        }
+
+        //Should be (32+4+4)*2 = 80
+        Utils::Blob hash_data = Utils::Blob::factory_empty(0, 0, 90);
+        Utils::PackedBlobWriter hash_writer(hash_data);
+
+        int lenx = BN_bn2mpi(x, NULL);
+        if (lenx <= 0) {
+            BN_free(x);
+            BN_free(y);
+            return false;
+        }
+        Utils::BlobSliceView hash_data_record_x = hash_writer.prepare_writeable_record();
+        hash_data_record_x.resize(lenx);
+        BN_bn2mpi(x, hash_data_record_x.getw());
+        hash_writer.finish_writeable_record(hash_data_record_x);
+
+        int leny = BN_bn2mpi(y, NULL);
+        if (leny <= 0) {
+            BN_free(x);
+            BN_free(y);
+            return false;
+        }
+        Utils::BlobSliceView hash_data_record_y = hash_writer.prepare_writeable_record();
+        hash_data_record_x.resize(leny);
+        BN_bn2mpi(y, hash_data_record_y.getw());
+        hash_writer.finish_writeable_record(hash_data_record_y);
+
+        BN_free(x);
+        BN_free(y);
+
+
+        return hash_ctx.calc(hash_data, out);*/
+
+        //This is for .*25519 and .*448, used in this project
+        if (!has_key()) return false;
+
+        size_t len;
+        if (1 != EVP_PKEY_get_raw_public_key(_key, NULL, &len)) return false;
+
+        Utils::Blob hash_data = Utils::Blob::factory_empty(len);
+
+        len = hash_data.size();
+        EVP_PKEY_get_raw_public_key(_key, hash_data.getw(), &len);
+        assert(len <= hash_data.size());
+
+        hash_data.resize(len);
+
+        return hash_ctx.calc(hash_data, out);
+    }
 };

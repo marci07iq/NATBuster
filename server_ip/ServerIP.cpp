@@ -2,10 +2,12 @@
 #include <memory>
 #include <shared_mutex>
 
-#include "ip_server.h"
-
 #include "../common/network/network.h"
 #include "../common/utils/callbacks.h"
+
+#include "../common/utils/hex.h"
+
+#include "ip_server.h"
 
 using namespace NATBuster::Server;
 using NATBuster::Common::Crypto::PKey;
@@ -33,6 +35,12 @@ int main() {
     ipserver_private_key.load_private(ipserver_private_key_b);
     client_public_key.load_public(client_public_key_b);
 
+    NATBuster::Common::Crypto::Hash fingerprint_hasher(NATBuster::Common::Crypto::HashAlgo::SHA256);
+    Blob ipserver_fingerprint;
+    ipserver_private_key.fingerprint(fingerprint_hasher, ipserver_fingerprint);
+    std::cout << "IP Server fingerprint: ";
+    NATBuster::Common::Utils::print_hex(ipserver_fingerprint);
+    std::cout << std::endl;
 
     std::shared_ptr<User> client = std::make_shared<User>("client", std::move(client_public_key));
 

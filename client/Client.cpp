@@ -3,7 +3,10 @@
 #include "../common/crypto/pkey.h"
 #include "../common/utils/blob.h"
 
+#include "../common/utils/hex.h"
+
 #include "ip_client.h"
+#include "c2_client.h"
 
 using namespace NATBuster::Client;
 using NATBuster::Common::Crypto::PKey;
@@ -43,23 +46,48 @@ void get_ip(std::shared_ptr<UserGroup> auth_servers, PKey&& self) {
     }
 }
 
+std::shared_ptr<NATBuster::Client::C2Client> c2_instance;
+
+void login(std::shared_ptr<UserGroup> c2_servers, PKey&& self) {
+    std::cout << "Querying from 127.0.0.1:5987" << std::endl;
+
+    c2_instance = NATBuster::Client::C2Client::create("127.0.0.1", 5987, c2_servers, std::move(self));
+}
+
+std::shared_ptr<NATBuster::Client::C2Client> c2_pipe_instance;
+
 int main() {
     //Keys for testing the features
     std::string client_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGJOEK8OBASAmL7LKy0L5r4Md18JzK5jO9x5rNBXJHa1\n-----END PRIVATE KEY-----";
     std::string ipserver_public_key_s = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAvN41TKTecBATHqVhQzEmiT0ZDvXlEas9vFVR/aoztj0=\n-----END PUBLIC KEY-----";
+    std::string c2server_public_key_s = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAI8tKwhR134ftj9Wa9S97Iu8SEez+ThY34ifnid1+4OU=\n-----END PUBLIC KEY-----";
 
     Blob client_private_key_b = Blob::factory_string(client_private_key_s);
     Blob ipserver_public_key_b = Blob::factory_string(ipserver_public_key_s);
+    Blob c2server_public_key_b = Blob::factory_string(c2server_public_key_s);
 
     PKey client_private_key;
     PKey ipserver_public_key;
+    PKey c2server_public_key;
     client_private_key.load_private(client_private_key_b);
     ipserver_public_key.load_public(ipserver_public_key_b);
+    c2server_public_key.load_public(c2server_public_key_b);
+
+    NATBuster::Common::Crypto::Hash fingerprint_hasher(NATBuster::Common::Crypto::HashAlgo::SHA256);
+    Blob client_fingerprint;
+    client_private_key.fingerprint(fingerprint_hasher, client_fingerprint);
+    std::cout << "Client fingerprint: ";
+    NATBuster::Common::Utils::print_hex(client_fingerprint);
+    std::cout << std::endl;
 
     std::shared_ptr<User> ipserver = std::make_shared<User>("ipserver", std::move(ipserver_public_key));
+    std::shared_ptr<User> c2server = std::make_shared<User>("c2server", std::move(c2server_public_key));
 
     std::shared_ptr<UserGroup> authorised_ip_servers = std::make_shared<UserGroup>();
     authorised_ip_servers->addUser(ipserver);
+
+    std::shared_ptr<UserGroup> authorised_c2_servers = std::make_shared<UserGroup>();
+    authorised_c2_servers->addUser(c2server);
 
     std::string command;
     while(true) {
@@ -83,6 +111,14 @@ int main() {
         }
         else if (command == "keygen") {
             keygen();
+        }
+        else if (command == "login") {
+            PKey self_copy;
+            self_copy.copy_private_from(client_private_key);
+            login(authorised_c2_servers, std::move(self_copy));
+        }
+        else if (command == "open_pipe") {
+            
         }
         else {
             std::cout << "Unknown command. Type help" << std::endl;

@@ -11,7 +11,7 @@ namespace NATBuster::Common::Transport {
     OPTPipe::OPTPipe(
         bool is_client,
         std::shared_ptr<OPTPipes> underlying,
-        uint32_t id) : OPTBase(is_client), _underlying(underlying), _id(id) {
+        uint32_t id) : OPTBase(is_client), _underlying(underlying), _id(id), _open_state(OPTPipe::OpenState::None) {
 
     }
 
@@ -150,7 +150,7 @@ namespace NATBuster::Common::Transport {
     }
 
     std::shared_ptr<Identity::User> OPTPipe::getUser() {
-        return _underlying->_underlying->getUser();
+        return _underlying->getUser();
     }
 
     OPTPipe::~OPTPipe() {
@@ -395,6 +395,10 @@ namespace NATBuster::Common::Transport {
         _floating.dst = end;
 
         updateFloatingNext();
+    }
+
+    std::shared_ptr<Identity::User> OPTPipes::getUser() {
+        return _underlying->getUser();
     }
 
     void OPTPipes::close() {

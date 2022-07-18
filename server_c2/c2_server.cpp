@@ -1,5 +1,7 @@
 #include "c2_server.h"
 
+#include "../common/utils/hex.h"
+
 namespace NATBuster::Server {
     void C2ServerRoute::on_open() {
         //remote pipe accepted, accept incoming pipe
@@ -82,7 +84,13 @@ namespace NATBuster::Server {
         //Insert into lookup table
         std::shared_ptr<Common::Identity::User> user = _underlying->getUser();
         Common::Crypto::Hash hasher = Common::Crypto::Hash(Common::Crypto::HashAlgo::SHA256);
-        user->key.fingerprint(hasher, _identity_fingerprint);
+        if (!user->key.fingerprint(hasher, _identity_fingerprint)) {
+            //Can't have an anon
+            _underlying->close();
+        }
+        std::cout << "Login from client: ";
+        Common::Utils::print_hex(_identity_fingerprint);
+        std::cout << std::endl;
 
         Common::Utils::Blob fingerprint_copy;
         fingerprint_copy.copy_from(_identity_fingerprint);

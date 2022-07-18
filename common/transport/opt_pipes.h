@@ -127,6 +127,8 @@ namespace NATBuster::Common::Transport {
             static inline const packet_decoder* cview(const Utils::ConstBlobView& packet) {
                 return (const packet_decoder*)(packet.getr());
             }
+
+            ~packet_decoder() = delete;
         };
 
         static_assert(offsetof(packet_decoder, type) == 0);
@@ -272,6 +274,8 @@ namespace NATBuster::Common::Transport {
 
             _underlying->sendRaw(full_packet);
         }
+
+        std::shared_ptr<Identity::User> getUser() override;
 
         //Close the event emitter
         //Will issue a close callback unless one has already been issued

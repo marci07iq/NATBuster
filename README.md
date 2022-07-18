@@ -19,6 +19,7 @@ Utility to create a P2P tunnel between any two machines, regardless of their NAT
   - Optional, an advanced user could set these properties, if known and static
   - Multiple servers needed to test NAT properties.
 - Client application: Constantly running in background, connected to C2. Waiting to receive connection requests from other clients.
+  - Should also include features for key generation, user access control, .. so the user doesn't need to edit config files
 
 ## Security:
 - C2 server only acts to facilitate message passing between devices.
@@ -30,3 +31,7 @@ Utility to create a P2P tunnel between any two machines, regardless of their NAT
 
 # Progress
 Early stages of development. Don't expect it to work yet.
+- Object and callback oriented wrapper for windows sockets
+- Object oriented wrapper above the neccessare OpenSSL primitives
+- Components needed for an E2E, authenticated connection
+- IP Server functional

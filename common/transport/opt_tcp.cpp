@@ -104,10 +104,10 @@ namespace NATBuster::Common::Transport {
 
     void OPTTCP::start() {
         //Set callbacks
-        _source->set_open_callback(new Utils::MemberCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_open));
-        _source->set_result_callback(new Utils::MemberCallback<OPTTCP, void, Utils::Void>(weak_from_this(), &OPTTCP::on_receive));
-        _source->set_error_callback(new Utils::MemberCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_error));
-        _source->set_close_callback(new Utils::MemberCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_close));
+        _source->set_open_callback(new Utils::MemberWCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_open));
+        _source->set_result_callback(new Utils::MemberWCallback<OPTTCP, void, Utils::Void>(weak_from_this(), &OPTTCP::on_receive));
+        _source->set_error_callback(new Utils::MemberWCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_error));
+        _source->set_close_callback(new Utils::MemberWCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_close));
 
         _source->start();
     }
@@ -139,16 +139,20 @@ namespace NATBuster::Common::Transport {
 
         wrapped.copy_from(data, 5);
 
+        std::lock_guard _lg(_out_lock);
+
         _socket->send(wrapped);
     }
     void OPTTCP::sendRaw(const Utils::ConstBlobView& data) {
+
         Utils::Blob wrapped = Utils::Blob::factory_empty(5 + data.size());
 
         packet_decoder* header = packet_decoder::view(wrapped);
         header->type = packet_decoder::PKT_RAW;
         header->len = data.size();
-
         wrapped.copy_from(data, 5);
+
+        std::lock_guard _lg(_out_lock);
 
         _socket->send(wrapped);
     }

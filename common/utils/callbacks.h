@@ -72,9 +72,29 @@ namespace NATBuster::Common::Utils {
         }
     };
 
+    //Member function callback, via a raw pointer
+    template <typename CLASS, typename RET, typename... ARGS>
+    class MemberRCallback : public CallbackBase<ARGS...> {
+    public:
+        using fn_type = RET(CLASS::*)(ARGS...);
+    private:
+        fn_type _fn;
+        CLASS* _inst;
+    public:
+
+        MemberRCallback(CLASS* inst, fn_type fn) : _inst(inst), _fn(fn) {
+
+        }
+        inline void operator()(ARGS... args) const override {
+            if (_inst != nullptr) {
+                (_inst->*(_fn))(std::forward<ARGS>(args)...);
+            }
+        }
+    };
+
     //Member function callback, via a weak pointer
     template <typename CLASS, typename RET, typename... ARGS>
-    class MemberCallback : public CallbackBase<ARGS...> {
+    class MemberWCallback : public CallbackBase<ARGS...> {
     public:
         using fn_type = RET(CLASS::*)(ARGS...);
     private:
@@ -82,13 +102,33 @@ namespace NATBuster::Common::Utils {
         std::weak_ptr<CLASS> _inst;
     public:
 
-        MemberCallback(std::weak_ptr<CLASS> inst, fn_type fn) : _inst(inst), _fn(fn) {
+        MemberWCallback(std::weak_ptr<CLASS> inst, fn_type fn) : _inst(inst), _fn(fn) {
 
         }
         inline void operator()(ARGS... args) const override {
             std::shared_ptr<CLASS> inst = _inst.lock();
             if (inst) {
                 (inst.get()->*(_fn))(std::forward<ARGS>(args)...);
+            }
+        }
+    };
+
+    //Member function callback, via a strong pointer
+    template <typename CLASS, typename RET, typename... ARGS>
+    class MemberSCallback : public CallbackBase<ARGS...> {
+    public:
+        using fn_type = RET(CLASS::*)(ARGS...);
+    private:
+        fn_type _fn;
+        std::shared_ptr<CLASS> _inst;
+    public:
+
+        MemberSCallback(std::shared_ptr<CLASS> inst, fn_type fn) : _inst(inst), _fn(fn) {
+
+        }
+        inline void operator()(ARGS... args) const override {
+            if (_inst) {
+                (_inst.get()->*(_fn))(std::forward<ARGS>(args)...);
             }
         }
     };

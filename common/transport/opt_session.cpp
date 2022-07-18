@@ -92,6 +92,7 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTSession::send_internal(PacketType type, const Utils::ConstBlobView& packet) {
+        std::lock_guard _lg(_out_encryption_lock);
         Utils::Blob packet_full = Utils::Blob::factory_empty(1 + packet.size());
 
         (*((uint8_t*)packet_full.getw())) = type;
@@ -101,7 +102,6 @@ namespace NATBuster::Common::Transport {
         Utils::Blob packet_encryped;
         Utils::Blob no_aad;
 
-        //TODO: Thread protection!!
         if (_flags._enc_on_ob) {
             _outbound.encrypt(packet_full, packet_encryped, no_aad);
         }
@@ -132,11 +132,11 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTSession::start() {
-        _underlying->set_open_callback(new Utils::MemberCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_open));
-        _underlying->set_packet_callback(new Utils::MemberCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_packet));
-        _underlying->set_raw_callback(new Utils::MemberCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_raw));
-        _underlying->set_error_callback(new Utils::MemberCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_error));
-        _underlying->set_close_callback(new Utils::MemberCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_close));
+        _underlying->set_open_callback(new Utils::MemberWCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_open));
+        _underlying->set_packet_callback(new Utils::MemberWCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_packet));
+        _underlying->set_raw_callback(new Utils::MemberWCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_raw));
+        _underlying->set_error_callback(new Utils::MemberWCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_error));
+        _underlying->set_close_callback(new Utils::MemberWCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_close));
 
         _underlying->start();
     }

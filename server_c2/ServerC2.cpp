@@ -7,7 +7,7 @@
 #include "../common/utils/callbacks.h"
 
 using namespace NATBuster::Common::Network;
-using NATBuster::Common::Utils::MemberCallback;
+using NATBuster::Common::Utils::MemberWCallback;
 using NATBuster::Common::Utils::Void;
 using NATBuster::Common::Utils::Blob;
 
@@ -42,9 +42,9 @@ public:
     }
 
     void start() {
-        _emitter->set_result_callback(new MemberCallback<IPServer, void, Void>(weak_from_this(), &IPServer::connect_callback));
-        _emitter->set_error_callback(new MemberCallback<IPServer, void>(weak_from_this(), &IPServer::error_callback));
-        _emitter->set_close_callback(new MemberCallback<IPServer, void>(weak_from_this(), &IPServer::close_callback));
+        _emitter->set_result_callback(new MemberWCallback<IPServer, void, Void>(weak_from_this(), &IPServer::connect_callback));
+        _emitter->set_error_callback(new MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::error_callback));
+        _emitter->set_close_callback(new MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::close_callback));
 
         _emitter->start();
     }

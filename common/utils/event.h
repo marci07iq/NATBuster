@@ -408,8 +408,6 @@ namespace NATBuster::Common::Utils
         }
 
         callback_backup();
-
-        //std::cout << "Listen collector exited" << std::endl;
     }
 
     template<typename POLL_SRC, typename RESULT_TYPE>

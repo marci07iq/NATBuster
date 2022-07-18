@@ -40,6 +40,7 @@ namespace NATBuster::Server {
     }
     //Socket was closed
     void IPServerEndpoint::on_close() {
+        std::lock_guard _lg(_server->_connection_lock);
         _server->_connections.erase(shared_from_this());
     }
 
@@ -52,16 +53,19 @@ namespace NATBuster::Server {
     }
 
     void IPServerEndpoint::start() {
-        _server->_connections.insert(shared_from_this());
+        {
+            std::lock_guard _lg(_server->_connection_lock);
+            _server->_connections.insert(shared_from_this());
+        }
 
-        _underlying->set_open_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_open));
+        _underlying->set_open_callback(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_open));
         //_underlying->set_packet_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPServerEndpoint::on_packet));
         //_underlying->set_raw_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPServerEndpoint::on_raw));
         //_underlying->set_error_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_error));
-        _underlying->set_close_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_close));
+        _underlying->set_close_callback(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_close));
 
         //Set the timeout delay
-        _underlying->addDelay(new Common::Utils::MemberCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_timeout), 100000000000);
+        _underlying->addDelay(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_timeout), 100000000000);
 
         _underlying->start();
     }
@@ -117,9 +121,9 @@ namespace NATBuster::Server {
     }
 
     void IPServer::start() {
-        _emitter->set_result_callback(new Common::Utils::MemberCallback<IPServer, void, Common::Utils::Void>(weak_from_this(), &IPServer::connect_callback));
-        _emitter->set_error_callback(new Common::Utils::MemberCallback<IPServer, void>(weak_from_this(), &IPServer::error_callback));
-        _emitter->set_close_callback(new Common::Utils::MemberCallback<IPServer, void>(weak_from_this(), &IPServer::close_callback));
+        _emitter->set_result_callback(new Common::Utils::MemberWCallback<IPServer, void, Common::Utils::Void>(weak_from_this(), &IPServer::connect_callback));
+        _emitter->set_error_callback(new Common::Utils::MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::error_callback));
+        _emitter->set_close_callback(new Common::Utils::MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::close_callback));
 
         _emitter->start();
     }

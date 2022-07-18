@@ -10,10 +10,10 @@ namespace NATBuster::Server {
     class IPServer;
 
     class IPServerEndpoint : public std::enable_shared_from_this<IPServerEndpoint> {
-        //Underliyng OPT
-        std::shared_ptr<Common::Transport::OPTBase> _underlying;
         //The socket, to get address from
         Common::Network::TCPCHandle _socket;
+        //Underliyng OPT
+        std::shared_ptr<Common::Transport::OPTBase> _underlying;
         //The main server pool
         std::shared_ptr<IPServer> _server;
 
@@ -51,10 +51,17 @@ namespace NATBuster::Server {
 
     class IPServer : public std::enable_shared_from_this<IPServer> {
     public:
+        //The currently open connections
         std::set<std::shared_ptr<IPServerEndpoint>> _connections;
+        std::mutex _connection_lock;
+        
+        //Handle to the underlying socket
         Common::Network::TCPSHandle _hwnd;
+        //Handle to the underlying event emitter, to better control the thread
         std::shared_ptr<Common::Network::TCPSEmitter> _emitter;
+        //List of users authorised to use the server
         std::shared_ptr<Common::Identity::UserGroup> _authorised_users;
+        //Identity of this server
         Common::Crypto::PKey _self;
 
         void connect_callback(Common::Utils::Void data);

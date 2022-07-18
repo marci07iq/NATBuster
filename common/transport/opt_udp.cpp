@@ -162,7 +162,7 @@ namespace NATBuster::Common::Transport {
         //Send a ping
         send_ping();
         //Set next delay
-        _source->addDelay(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_ping_timer), _settings.ping_interval);
+        _source->addDelay(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_ping_timer), _settings.ping_interval);
     }
 
     void OPTUDP::on_floating_timer() {
@@ -221,7 +221,7 @@ namespace NATBuster::Common::Transport {
             _source->close();
         }
 
-        _source->updateFloatingNext(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_floating_timer), next_floating_time());
+        _source->updateFloatingNext(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_floating_timer), next_floating_time());
     }
 
     OPTUDP::OPTUDP(
@@ -245,13 +245,13 @@ namespace NATBuster::Common::Transport {
 
     void OPTUDP::start() {
         //Set callbacks
-        _source->set_open_callback(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_open));
-        _source->set_result_callback(new Utils::MemberCallback<OPTUDP, void, Utils::Void>(weak_from_this(), &OPTUDP::on_receive));
-        _source->set_error_callback(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_error));
-        _source->set_close_callback(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_close));
+        _source->set_open_callback(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_open));
+        _source->set_result_callback(new Utils::MemberWCallback<OPTUDP, void, Utils::Void>(weak_from_this(), &OPTUDP::on_receive));
+        _source->set_error_callback(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_error));
+        _source->set_close_callback(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_close));
 
         //Start pinging
-        _source->addDelay(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_ping_timer), _settings.ping_interval);
+        _source->addDelay(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_ping_timer), _settings.ping_interval);
 
         _source->start();
     }
@@ -274,7 +274,7 @@ namespace NATBuster::Common::Transport {
         _external_floating.cb = cb;
         _external_floating.dst = end;
 
-        _source->updateFloatingNext(new Utils::MemberCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_floating_timer), next_floating_time());
+        _source->updateFloatingNext(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_floating_timer), next_floating_time());
     }
 
     void OPTUDP::send(const Utils::ConstBlobView& data) {
@@ -328,6 +328,8 @@ namespace NATBuster::Common::Transport {
         pview->type = packet_decoder::PacketType::UDP_PIPE;
 
         packet.copy_from(data, 1);
+
+        std::lock_guard _lg(_tx_lock);
 
         _socket->send(packet);
     }

@@ -30,7 +30,17 @@ namespace NATBuster::Common::Utils {
         return 0 != memcmp(lhs.getr(), rhs.getr(), lhs.size());
     }
 
-
+    std::strong_ordering operator<=>(const ConstBlobView& lhs, const ConstBlobView& rhs) {
+        const uint8_t* buf_lhs = lhs.getr();
+        const uint8_t* buf_rhs = rhs.getr();
+        for (uint32_t i = 0; i < lhs.size() && i < rhs.size(); i++) {
+            std::strong_ordering res = buf_lhs[i] <=> buf_rhs[i];
+            if (res != std::strong_ordering::equal) {
+                return res;
+            }
+        }
+        return lhs.size() <=> rhs.size();
+    }
 
     BlobView::BlobView() {
 

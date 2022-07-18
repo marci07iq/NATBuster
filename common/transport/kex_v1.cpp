@@ -157,6 +157,8 @@ namespace NATBuster::Common::Proto {
 
             //Send client new key packet
             {
+                std::lock_guard _lg(out->_out_encryption_lock);
+
                 Utils::Blob c_newkey_packet = Utils::Blob::factory_empty(1, 0, 0);
 
                 *((uint8_t*)c_newkey_packet.getw()) = (uint8_t)PacketType::KEXC_NEWKEYS;
@@ -164,18 +166,19 @@ namespace NATBuster::Common::Proto {
                 out->send_kex(c_newkey_packet);
 
                 out->_flags._enc_on_ob = true;
+            
+                //Set outbound keys
+                crypto_size = out->_outbound.key_size();
+                if (!secret_hash_derive_bits(crypto_data, 'B', crypto_size)) return fail(KEX_Event::ErrorCrypto);
+                assert(crypto_size <= crypto_data.size());
+                out->_outbound.set_key(crypto_data.getr(), crypto_size);
+
+                crypto_size = out->_outbound.iv_size();
+                if (!secret_hash_derive_bits(crypto_data, 'D', crypto_size)) return fail(KEX_Event::ErrorCrypto);
+                assert(crypto_size <= crypto_data.size());
+                out->_outbound.set_iv(crypto_data.getr(), crypto_size);
+
             }
-
-            //Set outbound keys
-            crypto_size = out->_outbound.key_size();
-            if (!secret_hash_derive_bits(crypto_data, 'B', crypto_size)) return fail(KEX_Event::ErrorCrypto);
-            assert(crypto_size <= crypto_data.size());
-            out->_outbound.set_key(crypto_data.getr(), crypto_size);
-
-            crypto_size = out->_outbound.iv_size();
-            if (!secret_hash_derive_bits(crypto_data, 'D', crypto_size)) return fail(KEX_Event::ErrorCrypto);
-            assert(crypto_size <= crypto_data.size());
-            out->_outbound.set_iv(crypto_data.getr(), crypto_size);
 
             _state = NATBuster::Common::Proto::KEXV1::K4_CEnc;
 
@@ -353,6 +356,8 @@ namespace NATBuster::Common::Proto {
 
             //Send server new key packet
             {
+                std::lock_guard _lg(out->_out_encryption_lock);
+
                 Utils::Blob s_newkey_packet = Utils::Blob::factory_empty(1, 0, 0);
 
                 *((uint8_t*)s_newkey_packet.getw()) = (uint8_t)PacketType::KEXS_NEWKEYS;
@@ -360,21 +365,22 @@ namespace NATBuster::Common::Proto {
                 out->send_kex(s_newkey_packet);
 
                 out->_flags._enc_on_ob = true;
+
+
+                //Set outbound keys
+                Utils::Blob crypto_data;
+                uint32_t crypto_size;
+
+                crypto_size = out->_outbound.key_size();
+                if (!secret_hash_derive_bits(crypto_data, 'A', crypto_size)) return fail(KEX_Event::ErrorCrypto);
+                assert(crypto_size <= crypto_data.size());
+                out->_outbound.set_key(crypto_data.getr(), crypto_size);
+
+                crypto_size = out->_outbound.iv_size();
+                if (!secret_hash_derive_bits(crypto_data, 'C', crypto_size)) return fail(KEX_Event::ErrorCrypto);
+                assert(crypto_size <= crypto_data.size());
+                out->_outbound.set_iv(crypto_data.getr(), crypto_size);
             }
-
-            //Set outbound keys
-            Utils::Blob crypto_data;
-            uint32_t crypto_size;
-
-            crypto_size = out->_outbound.key_size();
-            if (!secret_hash_derive_bits(crypto_data, 'A', crypto_size)) return fail(KEX_Event::ErrorCrypto);
-            assert(crypto_size <= crypto_data.size());
-            out->_outbound.set_key(crypto_data.getr(), crypto_size);
-
-            crypto_size = out->_outbound.iv_size();
-            if (!secret_hash_derive_bits(crypto_data, 'C', crypto_size)) return fail(KEX_Event::ErrorCrypto);
-            assert(crypto_size <= crypto_data.size());
-            out->_outbound.set_iv(crypto_data.getr(), crypto_size);
 
             _state = NATBuster::Common::Proto::KEXV1::K3_SEnc;
             return KEX_Event::OK;

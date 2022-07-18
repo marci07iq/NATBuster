@@ -322,7 +322,7 @@ namespace NATBuster::Common::Crypto {
         return true;
     }
 
-    bool PKey::fingerprint(Hash& hash_ctx, Utils::BlobView& out) {
+    bool PKey::fingerprint(Hash& hash_ctx, Utils::BlobView& out) const {
         //This is for some other Ec types
         /*if (!has_key()) return false;
 

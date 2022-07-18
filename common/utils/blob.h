@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <initializer_list>
 #include <string>
+#include <map>
+#include <set>
 
 #include "copy_protection.h"
 
@@ -41,6 +43,23 @@ namespace NATBuster::Common::Utils {
     bool operator==(const ConstBlobView& lhs, const ConstBlobView& rhs);
 
     bool operator!=(const ConstBlobView& lhs, const ConstBlobView& rhs);
+
+    std::strong_ordering operator<=>(const ConstBlobView& lhs, const ConstBlobView& rhs);
+
+
+    struct BlobSorter {
+        //To enable searching in maps by any key
+        using is_transparent = void;
+
+        bool operator()(const ConstBlobView& lhs, const ConstBlobView& rhs) const {
+            return lhs < rhs;
+        }
+    };
+
+    template<typename V>
+    using BlobIndexedMap = std::map<Blob, V, BlobSorter>;
+    template<typename V>
+    using BlobSet = std::set<Blob, BlobSorter>;
 
     class BlobView : public ConstBlobView {
     protected:

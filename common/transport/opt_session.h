@@ -54,6 +54,8 @@ namespace NATBuster::Common::Transport {
 
         std::unique_ptr<Proto::KEX> _kex;
 
+        std::recursive_mutex _out_encryption_lock;
+
         struct {
             //First KEX succeeed. Only emits packet to the upper layer after this
             bool _first_kex_ok : 1 = false;
@@ -121,7 +123,7 @@ namespace NATBuster::Common::Transport {
         }
 
         virtual ~OPTSession() {
-
+            close();
         }
     };
 }

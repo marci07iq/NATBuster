@@ -54,6 +54,8 @@ namespace NATBuster::Common::Transport {
         uint32_t _reassamble_total_len = 0;
         std::list<Utils::Blob> _reassamble_list;
 
+        std::mutex _out_lock;
+
         bool skip_from_reassamble_list(uint32_t len) {
             if (len <= _reassamble_total_len) {
                 uint32_t progress = 0;

@@ -64,14 +64,14 @@ namespace NATBuster::Client {
     }
 
     void IPClient::start() {
-        _underlying->set_open_callback(new Common::Utils::MemberCallback<IPClient, void>(weak_from_this(), &IPClient::on_open));
-        _underlying->set_packet_callback(new Common::Utils::MemberCallback<IPClient, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPClient::on_packet));
+        _underlying->set_open_callback(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_open));
+        _underlying->set_packet_callback(new Common::Utils::MemberWCallback<IPClient, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPClient::on_packet));
         //_underlying->set_raw_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPServerEndpoint::on_raw));
-        _underlying->set_error_callback(new Common::Utils::MemberCallback<IPClient, void>(weak_from_this(), &IPClient::on_error));
-        _underlying->set_close_callback(new Common::Utils::MemberCallback<IPClient, void>(weak_from_this(), &IPClient::on_close));
+        _underlying->set_error_callback(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_error));
+        _underlying->set_close_callback(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_close));
 
         //Set the timeout delay
-        _underlying->addDelay(new Common::Utils::MemberCallback<IPClient, void>(weak_from_this(), &IPClient::on_timeout), 100000000000);
+        _underlying->addDelay(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_timeout), 100000000000);
 
         _underlying->start();
     }

@@ -40,12 +40,17 @@ namespace NATBuster::Common::Transport {
         }
 
         //Send ordered packet
+        //Safe to call from any thread, even during a callback
         virtual void send(const Utils::ConstBlobView& packet) = 0;
         //Send UDP-like packet (no order / arrival guarantee, likely faster)
+        //Safe to call from any thread, even during a callback
         virtual void sendRaw(const Utils::ConstBlobView& packet) = 0;
         //Close connection (gracefully) if possible
+        //Will issue a close callback unless one has already been issued
+        //Safe to call from any thread, even during a callback
         virtual void close() = 0;
 
+        //Only call from a callback
         virtual std::shared_ptr<Identity::User> getUser() {
             return Identity::User::Anonymous;
         }

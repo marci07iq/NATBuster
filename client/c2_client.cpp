@@ -1,11 +1,13 @@
 #include "c2_client.h"
 
+#include "../common/utils/hex.h"
+
 namespace NATBuster::Client {
     void C2Client::on_open() {
 
     }
     void C2Client::on_pipe(Common::Transport::OPTPipeOpenData pipe_req) {
-
+        Common::Utils::print_hex(pipe_req.content);
     }
     void C2Client::on_packet(const Common::Utils::ConstBlobView& data) {
         
@@ -14,7 +16,7 @@ namespace NATBuster::Client {
 
     }
     void C2Client::on_close() {
-        //_waker.wake();
+        
     }
 
 

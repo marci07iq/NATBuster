@@ -31,7 +31,7 @@ namespace NATBuster::Server {
 
     }
 
-    void C2ServerRoute::start() {
+    void C2ServerRoute::start(const Common::Utils::ConstBlobView& data) {
         {
             std::lock_guard _lg(_server->_route_lock);
             _self = _server->_routes.insert(_server->_routes.end(), shared_from_this());
@@ -48,7 +48,7 @@ namespace NATBuster::Server {
         //Set the timeout delay
         //_underlying->addDelay(new Common::Utils::MemberWCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_timeout), 100000000000);
 
-        _pipe_b->start();
+        _pipe_b->start_client(data);
     }
 
     void C2ServerRoute::close() {
@@ -83,8 +83,7 @@ namespace NATBuster::Server {
         //Identity is now available
         //Insert into lookup table
         std::shared_ptr<Common::Identity::User> user = _underlying->getUser();
-        Common::Crypto::Hash hasher = Common::Crypto::Hash(Common::Crypto::HashAlgo::SHA256);
-        if (!user->key.fingerprint(hasher, _identity_fingerprint)) {
+        if (!user->key.fingerprint(_identity_fingerprint)) {
             //Can't have an anon
             _underlying->close();
         }
@@ -112,17 +111,23 @@ namespace NATBuster::Server {
             //Pipe going to another user
             if (header->type == Common::Transport::C2PipeRequest::packet_decoder::PIPE_USER) {
                 //Destination fingerprint
-                const Common::Utils::ConstBlobSliceView fingerprint = pipe_req.content.cslice_right(1);
-                if (fingerprint.size() == 32) {
-                    {
-                        std::lock_guard _lg(_server->_connection_lock);
-                        
-                        //Find if the requested client is connected
-                        C2Server::connection_lookup_type::iterator other = _server->_connection_lookup.find(fingerprint);
-                        if (other != _server->_connection_lookup.end()) {
-                            //Request a new pipe to the other
-                            std::shared_ptr<Common::Transport::OPTPipe> other_pipe = other->second->_underlying->openPipe();
-                            
+                const Common::Utils::ConstBlobSliceView dst_fingerprint = pipe_req.content.cslice_right(1);
+                //Source fingerprint
+                Common::Utils::Blob src_fingerprint;
+                if (pipe_req.pipe->getUser()->key.fingerprint(src_fingerprint)) {
+                    if (dst_fingerprint.size() == 32) {
+                        {
+                            std::lock_guard _lg(_server->_connection_lock);
+
+                            //Find if the requested client is connected
+                            C2Server::connection_lookup_type::iterator other = _server->_connection_lookup.find(dst_fingerprint);
+                            if (other != _server->_connection_lookup.end()) {
+                                //Request a new pipe to the other
+                                std::shared_ptr<Common::Transport::OPTPipe> other_pipe = other->second->_underlying->openPipe();
+
+                                std::shared_ptr<C2ServerRoute> route = C2ServerRoute::create(_server, pipe_req.pipe, other_pipe);
+                                route->start(src_fingerprint);
+                            }
                         }
                     }
                 }

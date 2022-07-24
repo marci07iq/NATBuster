@@ -89,7 +89,7 @@ namespace NATBuster::Common::Crypto {
             return 1 == EVP_PKEY_eq(_key, rhs._key);
         }
 
-        bool fingerprint(Hash& hash_ctx, Utils::BlobView& out) const;
+        bool fingerprint(Utils::BlobView& out) const;
 
         ~PKey() {
             erase();

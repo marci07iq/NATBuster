@@ -322,7 +322,7 @@ namespace NATBuster::Common::Crypto {
         return true;
     }
 
-    bool PKey::fingerprint(Hash& hash_ctx, Utils::BlobView& out) const {
+    bool PKey::fingerprint(Utils::BlobView& out) const {
         //This is for some other Ec types
         /*if (!has_key()) return false;
 
@@ -388,6 +388,8 @@ namespace NATBuster::Common::Crypto {
         assert(len <= hash_data.size());
 
         hash_data.resize(len);
+
+        Hash hash_ctx(HashAlgo::SHA256);
 
         return hash_ctx.calc(hash_data, out);
     }

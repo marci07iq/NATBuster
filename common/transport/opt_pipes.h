@@ -49,6 +49,9 @@ namespace NATBuster::Common::Transport {
         //Use to accept a server pipe, or actually open the client pipe
         void start();
 
+        //Start a client pipe with additional data
+        void start_client(const Utils::ConstBlobView& data);
+
         //Send ordered packet
         void send(const Utils::ConstBlobView& packet);
         //Send UDP-like packet (no order / arrival guarantee, likely faster)

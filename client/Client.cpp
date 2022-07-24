@@ -118,7 +118,7 @@ int main() {
             login(authorised_c2_servers, std::move(self_copy));
         }
         else if (command == "open_pipe") {
-            
+            c2_instance->
         }
         else {
             std::cout << "Unknown command. Type help" << std::endl;

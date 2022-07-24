@@ -17,8 +17,7 @@ int main() {
         if (!key.generate_ed25519()) goto error;
 
         Blob fingerprint;
-        Hash hasher(HashAlgo::SHA256);
-        if (!key.fingerprint(hasher, fingerprint)) goto error;
+        if (!key.fingerprint(fingerprint)) goto error;
 
         print_hex(fingerprint);
 

@@ -36,5 +36,6 @@ namespace NATBuster::Client {
             uint16_t ip,
             std::shared_ptr<Common::Identity::UserGroup> authorised_server,
             Common::Crypto::PKey&& self);
+
     };
 }

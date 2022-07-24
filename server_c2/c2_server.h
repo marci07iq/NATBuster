@@ -130,16 +130,16 @@ namespace NATBuster::Server {
             std::shared_ptr<Common::Transport::OPTPipe> pipe,
             std::shared_ptr<Common::Transport::OPTPipe> remote_pipe
             );
-
-        void start();
-
-        void close();
     public:
         static std::shared_ptr<C2ServerRoute> create(
             std::shared_ptr<C2Server> server,
             std::shared_ptr<Common::Transport::OPTPipe> pipe,
             std::shared_ptr<Common::Transport::OPTPipe> remote_pipe
             );
+
+        void start(const Common::Utils::ConstBlobView& data);
+
+        void close();
 
         ~C2ServerRoute();
     };    

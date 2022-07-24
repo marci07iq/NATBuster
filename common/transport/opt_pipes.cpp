@@ -36,22 +36,8 @@ namespace NATBuster::Common::Transport {
     void OPTPipe::start() {
         //An unopened client pipe
         if (_open_state == OPTPipe::OpenState::None) {
-            Utils::Blob req_packet = Utils::Blob::factory_empty(5);
-
-            OPTPipes::packet_decoder* req_header = OPTPipes::packet_decoder::view(req_packet);
-            req_header->type = OPTPipes::packet_decoder::PIPE_OPEN_REQ;
-            req_header->content.pipe.id = _id;
-
-            _open_state = OPTPipe::OpenRequstSent;
-
-            _underlying->_underlying->send(req_packet);
-
-            //Add a callback to close the connection if the open still hasnt been accepted
-            addDelay(
-                new Utils::MemberSCallback<OPTPipe, void>(
-                    shared_from_this(), &OPTPipe::on_open_expired),
-                10000000
-            );
+            Utils::Blob empty_data;
+            start_client(empty_data);
         }
         //A server pipe, which received a request
         else if (_open_state == OPTPipe::OpenState::OpenRequstRecv) {
@@ -64,6 +50,32 @@ namespace NATBuster::Common::Transport {
             _open_state = OPTPipe::Opened;
 
             _underlying->_underlying->send(req_packet);
+        }
+    }
+
+    //Start a client pipe with additional data
+    void OPTPipe::start_client(const Utils::ConstBlobView& data) {
+        if (_open_state == OPTPipe::OpenState::None) {
+            Utils::Blob req_packet = Utils::Blob::factory_empty(5 + data.size());
+
+            //Create header
+            OPTPipes::packet_decoder* req_header = OPTPipes::packet_decoder::view(req_packet);
+            req_header->type = OPTPipes::packet_decoder::PIPE_OPEN_REQ;
+            req_header->content.pipe.id = _id;
+
+            //Additional request data
+            req_packet.copy_from(data, 5);
+
+            _open_state = OPTPipe::OpenRequstSent;
+
+            _underlying->_underlying->send(req_packet);
+
+            //Add a callback to close the connection if the open still hasnt been accepted
+            addDelay(
+                new Utils::MemberSCallback<OPTPipe, void>(
+                    shared_from_this(), &OPTPipe::on_open_expired),
+                10000000
+            );
         }
     }
 

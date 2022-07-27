@@ -35,9 +35,8 @@ int main() {
     c2server_private_key.load_private(c2server_private_key_b);
     client_public_key.load_public(client_public_key_b);
 
-    NATBuster::Common::Crypto::Hash fingerprint_hasher(NATBuster::Common::Crypto::HashAlgo::SHA256);
     Blob c2server_fingerprint;
-    c2server_private_key.fingerprint(fingerprint_hasher, c2server_fingerprint);
+    c2server_private_key.fingerprint(c2server_fingerprint);
     std::cout << "IP Server fingerprint: ";
     NATBuster::Common::Utils::print_hex(c2server_fingerprint);
     std::cout << std::endl;

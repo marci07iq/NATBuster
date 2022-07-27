@@ -14,6 +14,8 @@
 
 namespace NATBuster::Common::Network {
 
+    static const int SELECT_MAX = FD_SETSIZE;
+
     void NetworkError(NetworkErrorCodes internal_id, int os_id);
 
     //
@@ -158,7 +160,7 @@ namespace NATBuster::Common::Network {
         }
 
         Utils::PollResponse<Utils::Void> check(Time::Timeout timeout);
-        static Utils::PollResponse<MY_HWND> find(const std::list<MY_HWND>& sockets, Time::Timeout timeout);
+        static Utils::PollResponse<MY_HWND> find(std::list<MY_HWND>& sockets, Time::Timeout timeout);
     };
 
     //
@@ -209,7 +211,9 @@ namespace NATBuster::Common::Network {
 
         bool send(const Utils::ConstBlobView& data);
         bool readFilter(Utils::BlobView& data, uint32_t max_len = 3000);
-        bool read(Utils::BlobView& data, NetworkAddress& address, uint32_t max_len = 3000);
+        bool read(Utils::BlobView& data, NetworkAddress& address, uint32_t max_len = 3000, bool conn_reset_fatal = true);
+
+        void replaceRemote(NetworkAddress remote_address);
 
         ~UDP();
     };
@@ -249,7 +253,7 @@ namespace NATBuster::Common::Network {
     }
 
     template <typename MY_HWND>
-    Utils::PollResponse<MY_HWND> SocketBase<MY_HWND>::find(const std::list<MY_HWND>& sockets, Time::Timeout timeout) {
+    Utils::PollResponse<MY_HWND> SocketBase<MY_HWND>::find(std::list<MY_HWND>& sockets, Time::Timeout timeout) {
         FD_SET collection;
 
         FD_ZERO(&collection);
@@ -279,12 +283,13 @@ namespace NATBuster::Common::Network {
             return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::Timeout);
         }
 
-        for (auto&& socket : sockets) {
+        for (auto& socket : sockets) {
             SocketWrapper& sw = socket->_socket;
 
             if (sw.valid()) {
                 if (FD_ISSET(socket->_socket.get(), &collection)) {
-                    return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::OK);
+                    MY_HWND res = socket;
+                    return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::OK, std::move(res));
                 }
             }
         }

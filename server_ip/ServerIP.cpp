@@ -35,9 +35,8 @@ int main() {
     ipserver_private_key.load_private(ipserver_private_key_b);
     client_public_key.load_public(client_public_key_b);
 
-    NATBuster::Common::Crypto::Hash fingerprint_hasher(NATBuster::Common::Crypto::HashAlgo::SHA256);
     Blob ipserver_fingerprint;
-    ipserver_private_key.fingerprint(fingerprint_hasher, ipserver_fingerprint);
+    ipserver_private_key.fingerprint(ipserver_fingerprint);
     std::cout << "IP Server fingerprint: ";
     NATBuster::Common::Utils::print_hex(ipserver_fingerprint);
     std::cout << std::endl;

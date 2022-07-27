@@ -7,13 +7,15 @@
 
 #include "ip_client.h"
 #include "c2_client.h"
+#include "router.h"
+#include "punch_sym_sym.h"
 
 using namespace NATBuster::Client;
 using NATBuster::Common::Crypto::PKey;
 using NATBuster::Common::Utils::Blob;
 using NATBuster::Common::Identity::User;
 using NATBuster::Common::Identity::UserGroup;
-
+using NATBuster::Client::HolepunchSym;
 
 void keygen() {
     using namespace NATBuster::Common::Crypto;
@@ -28,7 +30,7 @@ void keygen() {
 
     key.export_file_public(filename + "_public.txt");
     key.export_file_private(filename + "_private.txt");
-    
+
 }
 
 void get_ip(std::shared_ptr<UserGroup> auth_servers, PKey&& self) {
@@ -56,6 +58,43 @@ void login(std::shared_ptr<UserGroup> c2_servers, PKey&& self) {
 
 std::shared_ptr<NATBuster::Client::C2Client> c2_pipe_instance;
 
+void open_pipe() {
+
+}
+
+void punch() {
+    std::string remote;
+    std::cout << "Remote address: ";
+    std::cin >> remote;
+
+    std::string magic_ob;
+    std::cout << "Outbound magic: ";
+    std::cin >> magic_ob;
+    std::string magic_ib;
+    std::cout << "Inbound magic: ";
+    std::cin >> magic_ib;
+
+    bool asd;
+    std::cout << "GO?";
+    std::cin >> asd;
+
+    if (asd) {
+        std::shared_ptr<HolepunchSym> punch = HolepunchSym::create(remote, Blob::factory_string(magic_ob), Blob::factory_string(magic_ib));
+        punch->sync_launch();
+        if (punch->done()) {
+            std::cout << "Done" << std::endl;
+            NATBuster::Common::Network::UDPHandle socket = punch->get_socket();
+            if (socket && socket->valid()) {
+                std::cout << "Success" << std::endl;
+                socket->send(Blob::factory_string("Hello!"));
+            }
+        }
+        else {
+            std::cout << "Error" << std::endl;
+        }
+    }
+}
+
 int main() {
     //Keys for testing the features
     std::string client_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGJOEK8OBASAmL7LKy0L5r4Md18JzK5jO9x5rNBXJHa1\n-----END PRIVATE KEY-----";
@@ -73,9 +112,8 @@ int main() {
     ipserver_public_key.load_public(ipserver_public_key_b);
     c2server_public_key.load_public(c2server_public_key_b);
 
-    NATBuster::Common::Crypto::Hash fingerprint_hasher(NATBuster::Common::Crypto::HashAlgo::SHA256);
     Blob client_fingerprint;
-    client_private_key.fingerprint(fingerprint_hasher, client_fingerprint);
+    client_private_key.fingerprint(client_fingerprint);
     std::cout << "Client fingerprint: ";
     NATBuster::Common::Utils::print_hex(client_fingerprint);
     std::cout << std::endl;
@@ -90,7 +128,7 @@ int main() {
     authorised_c2_servers->addUser(c2server);
 
     std::string command;
-    while(true) {
+    while (true) {
         std::cout << "> ";
         std::cin >> command;
 
@@ -118,7 +156,10 @@ int main() {
             login(authorised_c2_servers, std::move(self_copy));
         }
         else if (command == "open_pipe") {
-            c2_instance->
+            //c2_instance->
+        }
+        else if (command == "punch") {
+            punch();
         }
         else {
             std::cout << "Unknown command. Type help" << std::endl;

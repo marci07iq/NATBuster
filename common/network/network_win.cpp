@@ -385,20 +385,28 @@ namespace NATBuster::Common::Network {
         return false;
     }
 
-    bool UDP::read(Utils::BlobView& data, NetworkAddress& address, uint32_t max_len) {
+    bool UDP::read(Utils::BlobView& data, NetworkAddress& address, uint32_t max_len, bool conn_reset_fatal) {
         data.resize(max_len);
 
         int size = *address.sizew();
         int iResult = recvfrom(_socket.get(), (char*)data.getw(), data.size(), 0, (sockaddr*)address.getw(), &size);
         *address.sizew() = size;
         if (iResult == SOCKET_ERROR) {
-            NetworkError(NetworkErrorCodeReciveData, WSAGetLastError());
-            _socket.close();
+            int wsaerror = WSAGetLastError();
+            //Error if UDP message could not be delivered
+            if (conn_reset_fatal || wsaerror != WSAECONNRESET) {
+                NetworkError(NetworkErrorCodeReciveData, wsaerror);
+                //_socket.close();
+            }
             return false;
         }
 
         data.resize(iResult);
         return true;
+    }
+
+    void UDP::replaceRemote(NetworkAddress remote_address) {
+        _remote_address = remote_address;
     }
 
     UDP::~UDP() {

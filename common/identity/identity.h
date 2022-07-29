@@ -5,6 +5,7 @@
 
 #include "../crypto/pkey.h"
 #include "../crypto/hash.h"
+#include "../utils/hex.h"
 
 namespace NATBuster::Common::Identity {
     /*enum SettingOverride : int8_t {
@@ -80,6 +81,8 @@ namespace NATBuster::Common::Identity {
             return key.has_key();
         }
     };
+
+    std::ostream& operator<<(std::ostream& os, const User& user);
 
     class UserGroup {
         Utils::BlobIndexedMap<std::shared_ptr<User>> _identites;

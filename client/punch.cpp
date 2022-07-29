@@ -179,6 +179,7 @@ namespace NATBuster::Client {
             std::lock_guard _lg(_c2_client->_open_punchers_lock);
             if (_self != _c2_client->_open_punchers.end()) {
                 _c2_client->_open_punchers.erase(_self);
+                std::cout << "Puncher self erasing" << std::endl;
             }
         }
     }
@@ -211,6 +212,7 @@ namespace NATBuster::Client {
         {
             std::lock_guard _lg(_c2_client->_open_punchers_lock);
             _self = _c2_client->_open_punchers.insert(_c2_client->_open_punchers.end(), shared_from_this());
+            std::cout << "Puncher self registering" << std::endl;
         }
 
         _underlying->set_open_callback(new Common::Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_open));

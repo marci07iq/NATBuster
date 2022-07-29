@@ -15,12 +15,15 @@ namespace NATBuster::Client {
                 //Destination fingerprint
                 const Common::Utils::ConstBlobSliceView src_fingerprint = pipe_req.content.cslice_right(1);
 
-                std::cout << "Pipe request src ";
-                Common::Utils::print_hex(src_fingerprint);
-                std::cout << std::endl;
+                /*std::cout << "Pipe request from ";
+                Common::Utils::print_hex(src_fingerprint.cslice_left(8));
+                std::cout << std::endl;*/
 
                 std::shared_ptr<Common::Identity::User> user = _authorised_clients->findUser(src_fingerprint);
+
                 if (user) {
+                    std::cout << "Pipe request from " << *user << std::endl;
+
                     Common::Crypto::PKey self_key;
                     self_key.copy_private_from(_self);
                     std::shared_ptr<Common::Identity::UserGroup> trusted_users = std::make_shared<Common::Identity::UserGroup>();

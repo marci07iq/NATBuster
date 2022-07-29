@@ -115,7 +115,7 @@ namespace NATBuster::Server {
                 //Source fingerprint
                 Common::Utils::Blob src_fingerprint;
                 if (pipe_req.pipe->getUser()->key.fingerprint(src_fingerprint)) {
-                    std::cout << "Pipe request from " << pipe_req.pipe->getUser()->name << std::endl;
+                    std::cout << "Pipe request from " << *pipe_req.pipe->getUser() << std::endl;
                     
                     if (dst_fingerprint.size() == 32) {
                         {
@@ -124,7 +124,7 @@ namespace NATBuster::Server {
                             //Find if the requested client is connected
                             C2Server::connection_lookup_type::iterator other = _server->_connection_lookup.find(dst_fingerprint);
                             std::cout << "Pipe request dst ";
-                            Common::Utils::print_hex(dst_fingerprint);
+                            Common::Utils::print_hex(dst_fingerprint.cslice_left(8));
                             std::cout << std::endl;
                             if (other != _server->_connection_lookup.end()) {
                                 //Create pipe open data

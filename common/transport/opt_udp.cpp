@@ -159,6 +159,7 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTUDP::on_ping_timer() {
+        std::cout << "Sending ping" << std::endl;
         //Send a ping
         send_ping();
         //Set next delay
@@ -197,7 +198,7 @@ namespace NATBuster::Common::Transport {
                     pkt->content.packet.seq = (pkt->content.packet.seq & packet_decoder::seq_num_mask) | new_rt;
 
                     //Expand re-transmit time storage
-                    if (_transmit_queue.front().transmits.size() <= new_rt) {
+                    if (_transmit_queue.front().transmits.size() < new_rt) {
                         _transmit_queue.front().transmits.push_back(now);
                         assert(_transmit_queue.front().transmits.size() == new_rt);
                     }
@@ -244,6 +245,8 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTUDP::start() {
+        std::cout << "OPT UDP Starting" << std::endl;
+
         //Set callbacks
         _source->set_open_callback(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_open));
         _source->set_result_callback(new Utils::MemberWCallback<OPTUDP, void, Utils::Void>(weak_from_this(), &OPTUDP::on_receive));

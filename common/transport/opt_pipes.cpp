@@ -3,7 +3,9 @@
 
 namespace NATBuster::Common::Transport {
     void OPTPipe::on_open_expired() {
+        std::cout << "Pipe expiry CB" << std::endl;
         if (_open_state == OpenRequstSent) {
+            std::cout << "Pipe expired" << std::endl;
             close();
         }
     }

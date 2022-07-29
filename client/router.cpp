@@ -38,6 +38,7 @@ namespace NATBuster::Client {
             std::lock_guard _lg(_c2_client->_open_routers_lock);
             if (_self != _c2_client->_open_routers.end()) {
                 _c2_client->_open_routers.erase(_self);
+                std::cout << "Router self erasing" << std::endl;
             }
         }
     }
@@ -54,7 +55,10 @@ namespace NATBuster::Client {
         {
             std::lock_guard _lg(_c2_client->_open_routers_lock);
             _self = _c2_client->_open_routers.insert(_c2_client->_open_routers.end(), shared_from_this());
+            std::cout << "Router self registering" << std::endl;
         }
+
+        _underlying->start();
     }
 
     std::shared_ptr<Router> Router::create(

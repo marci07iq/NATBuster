@@ -50,7 +50,7 @@ namespace NATBuster::Common::Network {
 
         inline void close() {
             if (valid()) {
-                std::cout << "CLOSE SOCKET" << std::endl;
+                //std::cout << "CLOSE SOCKET" << std::endl;
                 closesocket(_socket);
                 _socket = INVALID_SOCKET;
             }
@@ -119,10 +119,10 @@ namespace NATBuster::Common::Network {
 
         inline uint16_t get_port() const {
             if (_address.ss_family == AF_INET) {
-                return ((sockaddr_in*)(&_address))->sin_port;
+                return ntohs(((sockaddr_in*)(&_address))->sin_port);
             }
             if (_address.ss_family == AF_INET6) {
-                return ((sockaddr_in6*)(&_address))->sin6_port;
+                return ntohs(((sockaddr_in6*)(&_address))->sin6_port);
             }
             return 0;
         }
@@ -136,6 +136,8 @@ namespace NATBuster::Common::Network {
             return !(this->operator==(rhs));
         }
     };
+
+    std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr);
 
     template <typename MY_HWND>
     class SocketBase {
@@ -214,6 +216,13 @@ namespace NATBuster::Common::Network {
         bool read(Utils::BlobView& data, NetworkAddress& address, uint32_t max_len = 3000, bool conn_reset_fatal = true);
 
         void replaceRemote(NetworkAddress remote_address);
+
+        inline const NetworkAddress& getLocal() const {
+            return _local_address;
+        }
+        inline const NetworkAddress& getRemote() const {
+            return _remote_address;
+        }
 
         ~UDP();
     };

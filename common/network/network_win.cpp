@@ -89,6 +89,12 @@ namespace NATBuster::Common::Network {
         ((sockaddr_in*)&_address)->sin_port = htons(port);
     }
 
+    std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr)
+    {
+        os << addr.get_addr() << ":" << addr.get_port() << std::endl;
+        return os;
+    }
+
     //
     // TCP Server OS implementation
     // 

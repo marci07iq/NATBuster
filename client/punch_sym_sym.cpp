@@ -5,6 +5,10 @@ namespace NATBuster::Client {
 
     void HolepunchSym::sync_launch_static(std::shared_ptr<HolepunchSym> obj) {
         obj->sync_launch();
+        if (obj->_thread.get_id() == std::this_thread::get_id()) {
+            //This is the end of the thread, let it go so it can clear itself
+            obj->_thread.detach();
+        }
     }
 
     HolepunchSym::HolepunchSym(
@@ -94,14 +98,18 @@ namespace NATBuster::Client {
                         if (read_status) {
                             //Got the magic value, this is the correct socket
                             if (data == _magic_ib) {
-                                std::cout << "Holepunch successful from " << src.get_addr() << ":" << src.get_port() << std::endl;
                                 socket->replaceRemote(src);
+                                std::cout << "Holepunch successful from "
+                                    << socket->getRemote().get_addr() << ":" << socket->getRemote().get_port() << " to "
+                                    << socket->getLocal().get_addr() << ":" << socket->getLocal().get_port() << std::endl;
 
-                                std::lock_guard _lg(_data_lock);
-                                _socket = socket;
-                                //If we received the remote magic, it is likely that their socket was opened later
-                                //So they never got our magic. Send it again
-                                _socket->send(_magic_ob);
+                                {
+                                    std::lock_guard _lg(_data_lock);
+                                    _socket = socket;
+                                    //If we received the remote magic, it is likely that their socket was opened later
+                                    //So they never got our magic. Send it again
+                                    _socket->send(_magic_ob);
+                                }
                                 goto done;
                             }
                         }
@@ -146,6 +154,8 @@ namespace NATBuster::Client {
 
     done:
         _waker.wake();
+
+        _punch_callback(get_socket());
     }
 
     void HolepunchSym::async_launch() {

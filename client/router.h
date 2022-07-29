@@ -16,6 +16,8 @@
 namespace NATBuster::Client {
     class RouterTCPRoute;
 
+    class C2Client;
+
     class Router : public std::enable_shared_from_this<Router> {
 #pragma pack(push, 1)
         //To decode the TCP forward requests
@@ -36,6 +38,12 @@ namespace NATBuster::Client {
 
         static_assert(offsetof(request_decoder, dest_port) == 0);
 #pragma pack(pop)
+
+        //The C2 client this puncher belongs to
+        std::shared_ptr<C2Client> _c2_client;
+
+        //The iterator to self registration
+        std::list<std::shared_ptr<Router>>::iterator _self;
 
         //The underlying comms layer
         std::shared_ptr<Common::Transport::OPTPipes> _underlying;
@@ -69,6 +77,7 @@ namespace NATBuster::Client {
 
 
         Router(
+            std::shared_ptr<C2Client> c2_client,
             std::shared_ptr<Common::Transport::OPTPipes> underlying,
             uint16_t remote_port,
             Common::Network::TCPSHandle tcp_server_socket
@@ -79,6 +88,7 @@ namespace NATBuster::Client {
         friend class RouterTCPRoute;
     public:
         static std::shared_ptr<Router> create(
+            std::shared_ptr<C2Client> c2_client,
             std::shared_ptr<Common::Transport::OPTPipes> underlying,
             uint16_t remote_port,
             Common::Network::TCPSHandle tcp_server_socket
@@ -139,5 +149,9 @@ namespace NATBuster::Client {
             std::shared_ptr<Router> router);
 
         void close();
+
+        inline bool is_client() const {
+            return _is_client;
+        }
     };
 }

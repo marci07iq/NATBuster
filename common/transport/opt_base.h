@@ -55,6 +55,10 @@ namespace NATBuster::Common::Transport {
             return Identity::User::Anonymous;
         }
 
+        inline bool is_client() const {
+            return _is_client;
+        }
+
         virtual ~OPTBase() {
 
         }

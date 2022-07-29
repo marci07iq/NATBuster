@@ -36,7 +36,8 @@ namespace NATBuster::Client {
     }
 
     void C2Client::on_punch(std::shared_ptr<Common::Transport::OPTSession> punched_session) {
-        //std::shared_ptr<Router> router = Router::create(punched_session, )
+        std::shared_ptr<Common::Transport::OPTPipes> pipes = Common::Transport::OPTPipes::create(punched_session->is_client(), punched_session);
+        std::shared_ptr<Router> router = Router::create(shared_from_this(), pipes, 0, Common::Network::TCPSHandle());
     }
 
 

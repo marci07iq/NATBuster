@@ -19,7 +19,12 @@ namespace NATBuster::Client {
 
     }
     void Puncher::on_close() {
-
+        {
+            std::lock_guard _lg(_c2_client->_open_punchers_lock);
+            if (_self != _c2_client->_open_punchers.end()) {
+                _c2_client->_open_punchers.erase(_self);
+            }
+        }
     }
 
     void Puncher::on_punch(Common::Network::UDPHandle punched) {

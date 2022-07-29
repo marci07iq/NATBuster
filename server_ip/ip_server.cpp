@@ -80,8 +80,6 @@ namespace NATBuster::Server {
     }
 
 
-
-
     void IPServer::connect_callback(Common::Utils::Void data) {
         std::cout << "CONNECT AVAIL" << std::endl;
         Common::Network::TCPCHandle client = _hwnd->accept();

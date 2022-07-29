@@ -97,18 +97,30 @@ void punch() {
 
 int main() {
     //Keys for testing the features
-    std::string client_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGJOEK8OBASAmL7LKy0L5r4Md18JzK5jO9x5rNBXJHa1\n-----END PRIVATE KEY-----";
+    std::string client1_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGJOEK8OBASAmL7LKy0L5r4Md18JzK5jO9x5rNBXJHa1\n-----END PRIVATE KEY-----";
+    std::string client2_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIC96lygW3jpzwL7tpDydgRtIySnPX8ISLiGZD/0y3R38\n-----END PRIVATE KEY-----";
+    std::string client1_public_key_s = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAdAjRiFt95Jev54VoKPaOiV48CokwJ9lKWOrMRpON1nY=\n-----END PUBLIC KEY-----";
+    std::string client2_public_key_s = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAQHQNt6AhqhFJYYMi4M0Li1Ny8KMI3+scg+PgzbuhF3M=\n-----END PUBLIC KEY-----";
     std::string ipserver_public_key_s = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAvN41TKTecBATHqVhQzEmiT0ZDvXlEas9vFVR/aoztj0=\n-----END PUBLIC KEY-----";
     std::string c2server_public_key_s = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAI8tKwhR134ftj9Wa9S97Iu8SEez+ThY34ifnid1+4OU=\n-----END PUBLIC KEY-----";
 
+    std::cout << "Client #?";
+    int client_num;
+    std::cin >> client_num;
+    std::string client_private_key_s = (client_num == 1) ? client1_private_key_s : client2_private_key_s;
+    std::string remote_public_key_s = (client_num == 1) ? client2_public_key_s : client1_public_key_s;
+
     Blob client_private_key_b = Blob::factory_string(client_private_key_s);
+    Blob remote_public_key_b = Blob::factory_string(remote_public_key_s);
     Blob ipserver_public_key_b = Blob::factory_string(ipserver_public_key_s);
     Blob c2server_public_key_b = Blob::factory_string(c2server_public_key_s);
 
     PKey client_private_key;
+    PKey remote_public_key;
     PKey ipserver_public_key;
     PKey c2server_public_key;
     client_private_key.load_private(client_private_key_b);
+    remote_public_key.load_private(remote_public_key_b);
     ipserver_public_key.load_public(ipserver_public_key_b);
     c2server_public_key.load_public(c2server_public_key_b);
 
@@ -118,7 +130,10 @@ int main() {
     NATBuster::Common::Utils::print_hex(client_fingerprint);
     std::cout << std::endl;
 
-    std::shared_ptr<User> client = std::make_shared<User>("client1", std::move(client_private_key));
+    PKey self_copy;
+    self_copy.copy_public_from(client_private_key);
+    std::shared_ptr<User> client = std::make_shared<User>("client", std::move(self_copy));
+    std::shared_ptr<User> remote = std::make_shared<User>("remote", std::move(remote_public_key));
     std::shared_ptr<User> ipserver = std::make_shared<User>("ipserver", std::move(ipserver_public_key));
     std::shared_ptr<User> c2server = std::make_shared<User>("c2server", std::move(c2server_public_key));
 
@@ -160,7 +175,7 @@ int main() {
             login(authorised_c2_servers, authorised_c2_clients, std::move(self_copy));
         }
         else if (command == "open_pipe") {
-            //c2_instance->
+            
         }
         else if (command == "punch") {
             punch();

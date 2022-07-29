@@ -1,4 +1,5 @@
 #include "router.h"
+#include "c2_client.h"
 
 namespace NATBuster::Client {
 
@@ -33,29 +34,40 @@ namespace NATBuster::Client {
 
     }
     void Router::on_close() {
-        
+        {
+            std::lock_guard _lg(_c2_client->_open_routers_lock);
+            if (_self != _c2_client->_open_routers.end()) {
+                _c2_client->_open_routers.erase(_self);
+            }
+        }
     }
 
 
     Router::Router(
+        std::shared_ptr<C2Client> c2_client,
         std::shared_ptr<Common::Transport::OPTPipes> underlying,
         uint16_t remote_port,
         Common::Network::TCPSHandle tcp_server_socket
-    ) : _underlying(underlying),
+    ) : _c2_client(c2_client),
+        _underlying(underlying),
         _remote_port(remote_port),
         _tcp_server_socket(tcp_server_socket),
         _tcp_server_emitter(tcp_server_socket) {
     }
 
     void Router::start() {
-
+        {
+            std::lock_guard _lg(_c2_client->_open_routers_lock);
+            _self = _c2_client->_open_routers.insert(_c2_client->_open_routers.end(), shared_from_this());
+        }
     }
 
     std::shared_ptr<Router> Router::create(
+        std::shared_ptr<C2Client> c2_client,
         std::shared_ptr<Common::Transport::OPTPipes> underlying,
         uint16_t remote_port,
         Common::Network::TCPSHandle tcp_server_socket) {
-        std::shared_ptr<Router> res = std::shared_ptr<Router>(new Router(underlying, remote_port, tcp_server_socket));
+        std::shared_ptr<Router> res = std::shared_ptr<Router>(new Router(c2_client, underlying, remote_port, tcp_server_socket));
         res->start();
         return res;
     }
@@ -112,7 +124,7 @@ namespace NATBuster::Client {
         _pipe(router->_underlying->openPipe()),
         _router(router),
         _socket(socket),
-        _emitter(socket)
+        _emitter(_socket)
     {
 
     }

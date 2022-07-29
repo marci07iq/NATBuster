@@ -50,10 +50,10 @@ void get_ip(std::shared_ptr<UserGroup> auth_servers, PKey&& self) {
 
 std::shared_ptr<NATBuster::Client::C2Client> c2_instance;
 
-void login(std::shared_ptr<UserGroup> c2_servers, PKey&& self) {
+void login(std::shared_ptr<UserGroup> c2_servers, std::shared_ptr<UserGroup> c2_clients, PKey&& self) {
     std::cout << "Querying from 127.0.0.1:5987" << std::endl;
 
-    c2_instance = NATBuster::Client::C2Client::create("127.0.0.1", 5987, c2_servers, std::move(self));
+    c2_instance = NATBuster::Client::C2Client::create("127.0.0.1", 5987, c2_servers, c2_clients, std::move(self));
 }
 
 std::shared_ptr<NATBuster::Client::C2Client> c2_pipe_instance;
@@ -118,8 +118,12 @@ int main() {
     NATBuster::Common::Utils::print_hex(client_fingerprint);
     std::cout << std::endl;
 
+    std::shared_ptr<User> client = std::make_shared<User>("client1", std::move(client_private_key));
     std::shared_ptr<User> ipserver = std::make_shared<User>("ipserver", std::move(ipserver_public_key));
     std::shared_ptr<User> c2server = std::make_shared<User>("c2server", std::move(c2server_public_key));
+
+    std::shared_ptr<UserGroup> authorised_c2_clients = std::make_shared<UserGroup>();
+    authorised_c2_clients->addUser(client);
 
     std::shared_ptr<UserGroup> authorised_ip_servers = std::make_shared<UserGroup>();
     authorised_ip_servers->addUser(ipserver);
@@ -153,7 +157,7 @@ int main() {
         else if (command == "login") {
             PKey self_copy;
             self_copy.copy_private_from(client_private_key);
-            login(authorised_c2_servers, std::move(self_copy));
+            login(authorised_c2_servers, authorised_c2_clients, std::move(self_copy));
         }
         else if (command == "open_pipe") {
             //c2_instance->

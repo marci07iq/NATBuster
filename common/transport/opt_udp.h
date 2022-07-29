@@ -213,10 +213,10 @@ namespace NATBuster::Common::Transport {
         );
 
     public:
-        OPTUDPHandle create(
+        static OPTUDPHandle create(
             bool is_client,
             Network::UDPHandle socket,
-            OPTUDPSettings settings
+            OPTUDPSettings settings = OPTUDPSettings()
         );
 
         void start();

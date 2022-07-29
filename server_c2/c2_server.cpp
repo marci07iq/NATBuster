@@ -205,7 +205,7 @@ namespace NATBuster::Server {
             //Create OPT Session
             Common::Crypto::PKey self_copy;
             self_copy.copy_private_from(_self);
-            std::shared_ptr<Common::Transport::OPTSession> session = std::make_shared<Common::Transport::OPTSession>(false, opt, std::move(self_copy), _authorised_users);
+            std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, std::move(self_copy), _authorised_users);
             std::shared_ptr<Common::Transport::OPTPipes> pipes = Common::Transport::OPTPipes::create(false, session);
 
             std::shared_ptr<C2ServerEndpoint> endpoint = C2ServerEndpoint::create(client, pipes, shared_from_this());

@@ -102,12 +102,12 @@ namespace NATBuster::Client {
         std::shared_ptr<Common::Transport::OPTPipe> _pipe;
 
         //Client side: Accepts a TCP server connection, opens a pipe to the remote
+        //Server side: Receives the pipe, forwards it to a new tcp client socket
         bool _is_client;
 
         Common::Network::TCPCHandle _socket;
         Common::Network::TCPCEmitter _emitter;
 
-        //Used only in server mode
         void on_socket_open();
         void on_pipe_packet(const Common::Utils::ConstBlobView& data);
         void on_socket_packet(Common::Utils::Void);
@@ -116,26 +116,26 @@ namespace NATBuster::Client {
         void on_socket_close();
 
         RouterTCPRoute(
-            uint16_t port,
+            uint16_t local_port,
             std::shared_ptr<Common::Transport::OPTPipe> pipe,
             std::shared_ptr<Router> router);
 
         RouterTCPRoute(
-            Common::Network::TCPCHandle,
-            std::shared_ptr<Common::Transport::OPTPipe> pipe,
+            Common::Network::TCPCHandle socket,
+            uint16_t remote_port,
             std::shared_ptr<Router> router
             );
 
         void start();
     public:
         static std::shared_ptr<RouterTCPRoute> create_server(
-            uint16_t port,
+            uint16_t local_port,
             std::shared_ptr<Common::Transport::OPTPipe> pipe,
             std::shared_ptr<Router> router);
 
         static std::shared_ptr<RouterTCPRoute> create_client(
-            Common::Network::TCPCHandle,
-            std::shared_ptr<Common::Transport::OPTPipe> pipe,
+            Common::Network::TCPCHandle socket,
+            uint16_t remote_port,
             std::shared_ptr<Router> router);
 
         void close();

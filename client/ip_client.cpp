@@ -60,7 +60,7 @@ namespace NATBuster::Client {
         //Create OPT TCP
         Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(true, socket);
         //Create OPT Session
-        _underlying = std::make_shared<Common::Transport::OPTSession>(true, opt, std::move(self), authorised_server);
+        _underlying = Common::Transport::OPTSession::create(true, opt, std::move(self), authorised_server);
     }
 
     void IPClient::start() {

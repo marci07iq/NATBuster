@@ -23,15 +23,24 @@ Utility to create a P2P tunnel between any two machines, regardless of their NAT
 
 ## Security:
 - C2 server only acts to facilitate message passing between devices.
+- All communications to the control servers are encrypted.
 - All communications between devices E2E encrypted when running through the C2 server.
 - Optionally, opened tunnel also E2E encrypted, to achieve port forward and VPN like behaviour simultaneously.
 - Permission to open a tunnel to your machine is restricted with public keys, similair to SSH.
 - Using widely accepted high security algorithms (Ed25519, ECDH, AES-256-GCM)
 - NOTE: Do not use this in security critical applications until properly tested and examined by experts.
 
-# Progress
+# Progress:
 Early stages of development. Don't expect it to work yet.
 - Object and callback oriented wrapper for windows sockets
 - Object oriented wrapper above the neccessare OpenSSL primitives
 - Components needed for an E2E, authenticated connection
 - IP Server functional
+- UDP punching works if used manually
+
+# Todo:
+- Create socket wrapper for linux
+- Rewrite socket threading model: Callback should be associated per socket, not thread. Many sockets should be allocated to one thread, dynamically add/remove them.
+- Connect C2 to hole puncher
+- Connect punched socket to the port forwarding Router
+- Add hole punching for less restrictive NATs

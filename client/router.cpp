@@ -61,8 +61,10 @@ namespace NATBuster::Client {
     }
 
     void RouterTCPRoute::on_socket_open() {
-        //Local connection accepted: Open pipe
-        _pipe->start();
+        if (!_is_client) {
+            //Local connection accepted: Open pipe
+            _pipe->start();
+        }
     }
     void RouterTCPRoute::on_pipe_packet(const Common::Utils::ConstBlobView& data) {
         _socket->send(data);
@@ -90,15 +92,28 @@ namespace NATBuster::Client {
     }
 
     RouterTCPRoute::RouterTCPRoute(
-        uint16_t port,
+        uint16_t local_port,
         std::shared_ptr<Common::Transport::OPTPipe> pipe,
         std::shared_ptr<Router> router) :
+        _is_client(false),
         _pipe(pipe),
         _router(router),
-        _socket(std::make_shared<Common::Network::TCPC>("localhost", port)),
+        _socket(std::make_shared<Common::Network::TCPC>("localhost", local_port)),
         _emitter(_socket)
     {
 
+    }
+
+    RouterTCPRoute::RouterTCPRoute(
+        Common::Network::TCPCHandle socket,
+        uint16_t remote_port,
+        std::shared_ptr<Router> router) :
+        _is_client(true),
+        _pipe(router->_underlying->openPipe()),
+        _router(router),
+        _socket(socket),
+        _emitter(socket)
+    {
 
     }
 
@@ -108,8 +123,8 @@ namespace NATBuster::Client {
             _self = _router->_open_tcp.insert(_router->_open_tcp.end(), shared_from_this());
         }
 
-
         _emitter.set_open_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_socket_open));
+
         _pipe->set_packet_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &RouterTCPRoute::on_pipe_packet));
         _emitter.set_result_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void, Common::Utils::Void>(weak_from_this(), &RouterTCPRoute::on_socket_packet));
 
@@ -123,10 +138,19 @@ namespace NATBuster::Client {
     }
 
     std::shared_ptr<RouterTCPRoute> RouterTCPRoute::create_server(
-        uint16_t port,
+        uint16_t local_port,
         std::shared_ptr<Common::Transport::OPTPipe> pipe,
         std::shared_ptr<Router> router) {
-        std::shared_ptr< RouterTCPRoute> res = std::shared_ptr< RouterTCPRoute>(new RouterTCPRoute(port, pipe, router));
+        std::shared_ptr< RouterTCPRoute> res = std::shared_ptr< RouterTCPRoute>(new RouterTCPRoute(local_port, pipe, router));
+        res->start();
+        return res;
+    }
+
+    std::shared_ptr<RouterTCPRoute> RouterTCPRoute::create_client(
+        Common::Network::TCPCHandle socket,
+        uint16_t remote_port,
+        std::shared_ptr<Router> router) {
+        std::shared_ptr< RouterTCPRoute> res = std::shared_ptr< RouterTCPRoute>(new RouterTCPRoute(socket, remote_port, router));
         res->start();
         return res;
     }

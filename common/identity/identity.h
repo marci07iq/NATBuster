@@ -82,16 +82,32 @@ namespace NATBuster::Common::Identity {
     };
 
     class UserGroup {
-        std::list<std::shared_ptr<User>> _identites;
+        Utils::BlobIndexedMap<std::shared_ptr<User>> _identites;
     public:
-        //Find key among known identities
-        std::shared_ptr<User> findUser(const Crypto::PKey& key) const {
-            for (const auto& it : _identites) {
-                if (it->key.is_same(key)) {
-                    return it;
-                }
+        //Find fingerprint among known identities
+        std::shared_ptr<User> findUser(const Utils::ConstBlobView& key) const {
+            auto it = _identites.find(key);
+            if (it != _identites.end()) {
+                return it->second;
             }
             return std::shared_ptr<User>();
+        }
+
+        //Find key among known identities
+        std::shared_ptr<User> findUser(const Crypto::PKey& key) const {
+            Utils::Blob fingerprint;
+            key.fingerprint(fingerprint);
+            return findUser(fingerprint);
+        }
+
+        //Get the user associate with a key
+        //If key is not known, returns anonymous
+        std::shared_ptr<User> findUserDefault(const Utils::ConstBlobView& fingerprint) const {
+            std::shared_ptr<User> known = findUser(fingerprint);
+            if (known) {
+                return known;
+            }
+            return User::Anonymous;
         }
 
         //Get the user associate with a key
@@ -107,7 +123,7 @@ namespace NATBuster::Common::Identity {
         bool isMember(const Crypto::PKey& key) const {
             if (!key.has_key()) return false;
             for (const auto& it : _identites) {
-                if (it->key.is_same(key)) {
+                if (it.second->key.is_same(key)) {
                     return true;
                 }
             }
@@ -119,12 +135,14 @@ namespace NATBuster::Common::Identity {
             if (!identity->key.has_key()) {
                 return false;
             }
-            std::shared_ptr<User> known = findUser(identity->key);
+            Utils::Blob fingerprint;
+            identity->key.fingerprint(fingerprint);
+            std::shared_ptr<User> known = findUser(fingerprint);
             if (known) {
                 return false;
             }
             else {
-                _identites.push_back(identity);
+                _identites.emplace(std::move(fingerprint), identity);
                 return true;
             }
         }

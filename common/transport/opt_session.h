@@ -88,8 +88,15 @@ namespace NATBuster::Common::Transport {
         void send_internal(PacketType type, const Utils::ConstBlobView& packet);
         void send_kex(const Utils::ConstBlobView& packet);
         
-    public:
         OPTSession(
+            bool is_client,
+            std::shared_ptr<OPTBase> underlying,
+            Crypto::PKey&& self,
+            std::shared_ptr<Identity::UserGroup> known_remotes
+        );
+
+    public:
+        static std::shared_ptr<OPTSession> create(
             bool is_client,
             std::shared_ptr<OPTBase> underlying,
             Crypto::PKey&& self,

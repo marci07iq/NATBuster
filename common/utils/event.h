@@ -141,10 +141,6 @@ namespace NATBuster::Common::Utils
                 delete _timers.top();
                 _timers.pop();
             }
-            if (_timers.size() == 0) {
-                //No timers left, next timer is in infinte time
-                return Time::TIME_DELTA_INFINTE;
-            }
             //Call floating timer
             //Multiple times (if the user keeps re-setting it)
             while (_floating_timer.cb.has_function() && _floating_timer.dst <= Time::now()) {
@@ -295,7 +291,7 @@ namespace NATBuster::Common::Utils
         static void loop(std::unique_ptr<std::shared_ptr<PollEventEmitter>> emitter_i);
 
     public:
-        
+
         PollEventEmitter(const POLL_SRC& source);
 
         //Start the event emitter
@@ -362,13 +358,16 @@ namespace NATBuster::Common::Utils
             emitter_u.reset();
 
             std::lock_guard lg(emitter->_lock);
-            
+
             //Backup the close callback
             //Since this (may) be called after the object is already gone
             callback_backup.move_from_safe_other(emitter->_close_callback);
 
-            //Start open callback
-            emitter->_open_callback();
+            //Only issue open callback if the socket isnt totally dead
+            if (emitter->_source->valid()) {
+                //Start open callback
+                emitter->_open_callback();
+            }
 
             emitter_w = emitter;
             //Release all hold to the shared_ptr.

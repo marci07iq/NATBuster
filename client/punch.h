@@ -30,8 +30,18 @@ namespace NATBuster::Client {
         } _state = S0_New;
 
 #pragma pack(push, 1)
-        struct packet_decoder : Common::Utils::NonStack {
+        struct nat_descriptor {
+            enum NATType : uint8_t {
+                Forwaded = 1,
+                Cone = 2,
+                Symmetric = 3
+            } type;
+            uint16_t port_min;
+            uint16_t port_max;
+            uint16_t rate_limit;
+        };
 
+        struct packet_decoder : Common::Utils::NonStack {
             enum PacketType : uint8_t {
                 //Self description
                 PUNCH_DESCRIBE = 1,
@@ -42,16 +52,7 @@ namespace NATBuster::Client {
             } type;
             union {
                 struct {
-                    enum NATType : uint8_t {
-                        Forwaded = 1,
-                        Cone = 2,
-                        Symmetric = 3
-                    } nat_type;
-                    union {
-                        struct { uint16_t port; } forwarded;
-                        struct { uint16_t port; } cone;
-                        struct { uint16_t rate_max; } symmetric;
-                    } punch_data;
+                    nat_descriptor nat;
                     //The magic that the other side expects to receive
                     uint8_t magic[64];
                     //A PacketBlob containing the remote machines IP address/hostname as a string
@@ -72,12 +73,12 @@ namespace NATBuster::Client {
         };
 
         static_assert(offsetof(packet_decoder, type) == 0);
-        static_assert(offsetof(packet_decoder, content.describe.nat_type) == 1);
-        static_assert(offsetof(packet_decoder, content.describe.punch_data.forwarded.port) == 2);
-        static_assert(offsetof(packet_decoder, content.describe.punch_data.cone.port) == 2);
-        static_assert(offsetof(packet_decoder, content.describe.punch_data.symmetric.rate_max) == 2);
-        static_assert(offsetof(packet_decoder, content.describe.magic) == 4);
-        static_assert(offsetof(packet_decoder, content.describe.ip_data) == 68);
+        static_assert(offsetof(packet_decoder, content.describe.nat.type) == 1);
+        static_assert(offsetof(packet_decoder, content.describe.nat.port_min) == 2);
+        static_assert(offsetof(packet_decoder, content.describe.nat.port_max) == 4);
+        static_assert(offsetof(packet_decoder, content.describe.nat.rate_limit) == 6);
+        static_assert(offsetof(packet_decoder, content.describe.magic) == 8);
+        static_assert(offsetof(packet_decoder, content.describe.ip_data) == 72);
 #pragma pack(pop)
 
         //The C2 client this puncher belongs to
@@ -91,7 +92,8 @@ namespace NATBuster::Client {
         //The underlying comms layer to the other sides puncher
         std::shared_ptr<Common::Transport::OPTBase> _underlying;
 
-        std::unique_ptr<HolepunchSym> _puncher;
+        Common::Utils::Blob _outbound_magic_content;
+        std::shared_ptr<HolepunchSym> _puncher;
 
         PunchCallback _punch_callback;
 
@@ -114,6 +116,8 @@ namespace NATBuster::Client {
         );
 
         void start();
+        
+        void fail();
     public:
         static std::shared_ptr<Puncher> create(
             std::shared_ptr<C2Client> c2_client,

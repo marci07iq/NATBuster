@@ -213,6 +213,9 @@ namespace NATBuster::Common::Transport {
         );
 
     public:
+        //Expose as public, for the puncher
+        static const uint8_t MGMT_HELLO = packet_decoder::PacketType::MGMT_HELLO;
+
         static OPTUDPHandle create(
             bool is_client,
             Network::UDPHandle socket,

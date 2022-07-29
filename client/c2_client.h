@@ -25,11 +25,13 @@ namespace NATBuster::Client {
         friend class Puncher;
 
         //Open routers
+    public:
         std::list<std::shared_ptr<Router>> _open_routers;
         std::mutex _open_routers_lock;
+    private:
         friend class Router;
 
-        Common::Crypto::PKey self;
+        Common::Crypto::PKey _self;
 
         void on_open();
         //On incoming pipe from the C2 connection
@@ -71,6 +73,25 @@ namespace NATBuster::Client {
             Common::Utils::Blob fingerprint;
             key.fingerprint(fingerprint);
             return openPipe(fingerprint);
+        }
+
+        std::shared_ptr<NATBuster::Client::Puncher> punch(Common::Crypto::PKey&& self, std::shared_ptr<Common::Identity::User> remote_user) {
+            std::shared_ptr<NATBuster::Common::Transport::OPTPipe> pipe = openPipe(remote_user->key);
+
+            Common::Crypto::PKey self_key;
+            self_key.copy_private_from(self);
+            
+            std::shared_ptr<Common::Identity::UserGroup> remote_userg = std::make_shared<Common::Identity::UserGroup>();
+            remote_userg->addUser(remote_user);
+
+            std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(true, pipe, std::move(self_key), remote_userg);
+
+            std::shared_ptr<NATBuster::Client::Puncher> puncher = NATBuster::Client::Puncher::create(shared_from_this(), true, std::move(self), remote_userg, session);
+            puncher->set_punch_callback(new Common::Utils::MemberWCallback<C2Client, void, std::shared_ptr<Common::Transport::OPTSession>>(weak_from_this(), &C2Client::on_punch));
+
+            puncher->start();
+
+            return puncher;
         }
     };
 }

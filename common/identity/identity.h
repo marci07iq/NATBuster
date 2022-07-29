@@ -57,10 +57,10 @@ namespace NATBuster::Common::Identity {
     };
 
     class PermGroup : public Permissions {
-        std::string _name;
         std::shared_ptr<PermGroup> _base;
     public:
-        PermGroup(const std::string& name, std::shared_ptr<PermGroup> base) : _name(name), _base(base) {
+        std::string name;
+        PermGroup(const std::string& name, std::shared_ptr<PermGroup> base) : name(name), _base(base) {
 
         }
     };

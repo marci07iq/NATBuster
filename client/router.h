@@ -15,6 +15,7 @@
 
 namespace NATBuster::Client {
     class RouterTCPRoute;
+    class RouterTCPS;
 
     class C2Client;
 
@@ -48,13 +49,17 @@ namespace NATBuster::Client {
         //The underlying comms layer
         std::shared_ptr<Common::Transport::OPTPipes> _underlying;
 
+        //The opened TCPS sockets to send to the remote side
+        std::list<std::shared_ptr<RouterTCPS>> _open_tcps;
+        friend class RouterTCPS;
+        std::mutex _tcps_lock;
+
         //The opened TCP sockets
-        std::list<std::shared_ptr<RouterTCPRoute>> _open_tcp;
+        std::list<std::shared_ptr<RouterTCPRoute>> _open_routes;
+        friend class RouterTCPRoute;
         std::mutex _route_lock;
 
-        Common::Network::TCPSHandle _tcp_server_socket;
-        uint16_t _remote_port;
-        Common::Network::TCPSEmitter _tcp_server_emitter;
+        
 
         //Collection of TCP server sockets that need to be forwareded
         /*Common::Network::SocketHWNDPool<Common::Network::TCPSHandle> _tcp_server_sockets;
@@ -78,21 +83,18 @@ namespace NATBuster::Client {
 
         Router(
             std::shared_ptr<C2Client> c2_client,
-            std::shared_ptr<Common::Transport::OPTPipes> underlying,
-            uint16_t remote_port,
-            Common::Network::TCPSHandle tcp_server_socket
+            std::shared_ptr<Common::Transport::OPTPipes> underlying
         );
 
         void start();
 
-        friend class RouterTCPRoute;
     public:
         static std::shared_ptr<Router> create(
             std::shared_ptr<C2Client> c2_client,
-            std::shared_ptr<Common::Transport::OPTPipes> underlying,
-            uint16_t remote_port,
-            Common::Network::TCPSHandle tcp_server_socket
+            std::shared_ptr<Common::Transport::OPTPipes> underlying
         );
+
+        void pushPort(uint16_t local_port, uint16_t remote_port);
 
         /*std::shared_ptr<Common::Transport::OPTPipe> openPipe(const Common::Crypto::PKey& key) {
             Common::Utils::Blob fingerprint;
@@ -100,6 +102,36 @@ namespace NATBuster::Client {
             return openPipe(fingerprint);
         }*/
     };
+
+    class RouterTCPS : public std::enable_shared_from_this<RouterTCPS> {
+        std::shared_ptr<Router> _router;
+
+        //The iterator to self registration
+        std::list<std::shared_ptr<RouterTCPS>>::iterator _self;
+
+        Common::Network::TCPSHandle _tcp_server_socket;
+        uint16_t _remote_port;
+        Common::Network::TCPSEmitter _tcp_server_emitter;
+
+        void on_open();
+        void on_accept(Common::Utils::Void);
+        void on_error();
+        void on_close();
+
+        RouterTCPS(
+            std::shared_ptr<Router> router,
+            uint16_t local_port,
+            uint16_t remote_port);
+
+        void start();
+
+    public:
+        static std::shared_ptr<RouterTCPS> create(
+            std::shared_ptr<Router> router,
+            uint16_t local_port,
+            uint16_t remote_port);
+    };
+
 
     class RouterTCPRoute : public std::enable_shared_from_this<RouterTCPRoute> {
         //The main router, for registering identity
@@ -126,27 +158,30 @@ namespace NATBuster::Client {
         void on_socket_close();
 
         RouterTCPRoute(
-            uint16_t local_port,
+            std::shared_ptr<Router> router,
             std::shared_ptr<Common::Transport::OPTPipe> pipe,
-            std::shared_ptr<Router> router);
+            uint16_t local_port
+            );
 
         RouterTCPRoute(
+            std::shared_ptr<Router> router,
             Common::Network::TCPCHandle socket,
-            uint16_t remote_port,
-            std::shared_ptr<Router> router
+            uint16_t remote_port
             );
 
         void start();
     public:
         static std::shared_ptr<RouterTCPRoute> create_server(
-            uint16_t local_port,
+            std::shared_ptr<Router> router,
             std::shared_ptr<Common::Transport::OPTPipe> pipe,
-            std::shared_ptr<Router> router);
+            uint16_t local_port
+        );
 
         static std::shared_ptr<RouterTCPRoute> create_client(
+            std::shared_ptr<Router> router,
             Common::Network::TCPCHandle socket,
-            uint16_t remote_port,
-            std::shared_ptr<Router> router);
+            uint16_t remote_port
+            );
 
         void close();
 

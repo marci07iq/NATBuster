@@ -115,18 +115,31 @@ namespace NATBuster::Server {
                 //Source fingerprint
                 Common::Utils::Blob src_fingerprint;
                 if (pipe_req.pipe->getUser()->key.fingerprint(src_fingerprint)) {
+                    std::cout << "Pipe request from " << pipe_req.pipe->getUser()->name << std::endl;
+                    
                     if (dst_fingerprint.size() == 32) {
                         {
                             std::lock_guard _lg(_server->_connection_lock);
 
                             //Find if the requested client is connected
                             C2Server::connection_lookup_type::iterator other = _server->_connection_lookup.find(dst_fingerprint);
+                            std::cout << "Pipe request dst ";
+                            Common::Utils::print_hex(dst_fingerprint);
+                            std::cout << std::endl;
                             if (other != _server->_connection_lookup.end()) {
+                                //Create pipe open data
+                                Common::Utils::Blob open_data = Common::Utils::Blob::factory_empty(1 + src_fingerprint.size());
+
+                                *((uint8_t*)open_data.getw()) = Common::Transport::C2PipeRequest::packet_decoder::PIPE_USER;
+                                open_data.copy_from(src_fingerprint, 1);
+
                                 //Request a new pipe to the other
                                 std::shared_ptr<Common::Transport::OPTPipe> other_pipe = other->second->_underlying->openPipe();
 
                                 std::shared_ptr<C2ServerRoute> route = C2ServerRoute::create(_server, pipe_req.pipe, other_pipe);
-                                route->start(src_fingerprint);
+                                route->start(open_data);
+
+                                std::cout << "Forwareded.";
                             }
                         }
                     }
@@ -172,6 +185,7 @@ namespace NATBuster::Server {
 
         _underlying->set_open_callback(new Common::Utils::MemberWCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_open));
         _underlying->set_packet_callback(new Common::Utils::MemberWCallback<C2ServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &C2ServerEndpoint::on_packet));
+        _underlying->set_pipe_callback(new Common::Utils::MemberWCallback<C2ServerEndpoint, void, Common::Transport::OPTPipeOpenData>(weak_from_this(), &C2ServerEndpoint::on_pipe));
         //_underlying->set_raw_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPServerEndpoint::on_raw));
         //_underlying->set_error_callback(new Common::Utils::MemberCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_error));
         _underlying->set_close_callback(new Common::Utils::MemberWCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_close));

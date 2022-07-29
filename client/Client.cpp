@@ -56,14 +56,10 @@ void login(std::shared_ptr<UserGroup> c2_servers, std::shared_ptr<UserGroup> c2_
     c2_instance = NATBuster::Client::C2Client::create("127.0.0.1", 5987, c2_servers, c2_clients, std::move(self));
 }
 
-std::shared_ptr<NATBuster::Client::C2Client> c2_pipe_instance;
+//std::shared_ptr<NATBuster::Client::Router> router;
 
-void open_pipe() {
-
-}
-
-void punch() {
-    std::string remote;
+void punch(PKey&& self, std::shared_ptr<User> remote_user) {
+    /*std::string remote;
     std::cout << "Remote address: ";
     std::cin >> remote;
 
@@ -92,8 +88,23 @@ void punch() {
         else {
             std::cout << "Error" << std::endl;
         }
-    }
+    }*/
+    c2_instance->punch(std::move(self), remote_user);
 }
+
+void forward() {
+    std::cout << "Source port: ";
+    uint16_t local_port;
+    std::cin >> local_port;
+    std::cout << "Destination port: ";
+    uint16_t remote_port;
+    std::cin >> remote_port;
+
+    std::lock_guard _lg(c2_instance->_open_routers_lock);
+
+    NATBuster::Client::RouterTCPS::create(c2_instance->_open_routers.front(), local_port, remote_port);
+}
+
 
 int main() {
     //Keys for testing the features
@@ -120,7 +131,7 @@ int main() {
     PKey ipserver_public_key;
     PKey c2server_public_key;
     client_private_key.load_private(client_private_key_b);
-    remote_public_key.load_private(remote_public_key_b);
+    remote_public_key.load_public(remote_public_key_b);
     ipserver_public_key.load_public(ipserver_public_key_b);
     c2server_public_key.load_public(c2server_public_key_b);
 
@@ -138,7 +149,7 @@ int main() {
     std::shared_ptr<User> c2server = std::make_shared<User>("c2server", std::move(c2server_public_key));
 
     std::shared_ptr<UserGroup> authorised_c2_clients = std::make_shared<UserGroup>();
-    authorised_c2_clients->addUser(client);
+    authorised_c2_clients->addUser(remote);
 
     std::shared_ptr<UserGroup> authorised_ip_servers = std::make_shared<UserGroup>();
     authorised_ip_servers->addUser(ipserver);
@@ -174,11 +185,13 @@ int main() {
             self_copy.copy_private_from(client_private_key);
             login(authorised_c2_servers, authorised_c2_clients, std::move(self_copy));
         }
-        else if (command == "open_pipe") {
-            
+        else if (command == "forward") {
+            forward();
         }
         else if (command == "punch") {
-            punch();
+            PKey self_copy;
+            self_copy.copy_private_from(client_private_key);
+            punch(std::move(self_copy), remote);
         }
         else {
             std::cout << "Unknown command. Type help" << std::endl;

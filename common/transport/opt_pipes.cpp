@@ -196,6 +196,8 @@ namespace NATBuster::Common::Transport {
                     _pipes.insert({ header->content.pipe.id, pipe });
                     _lg.unlock();
 
+                    std::cout << "Pipe request " << header->content.pipe.id << std::endl;
+
                     //Issue callback about new incoming pipe
                     _pipe_callback(OPTPipeOpenData{
                         .pipe = pipe,
@@ -214,6 +216,8 @@ namespace NATBuster::Common::Transport {
                     std::shared_ptr pipe = it->second.lock();
                     _lg.unlock();
                     if (pipe) {
+                        std::cout << "Pipe response " << header->content.pipe.id << std::endl;
+
                         if (pipe->_open_state == OPTPipe::OpenRequstSent) {
                             pipe->_open_state = OPTPipe::Opened;
                             pipe->_open_callback();
@@ -233,6 +237,8 @@ namespace NATBuster::Common::Transport {
                 _lg.unlock();
 
                 if (pipe) {
+                    std::cout << "Pipe close " << header->content.pipe.id << std::endl;
+
                     if (pipe->_open_state != OPTPipe::Closed) {
                         pipe->_open_state = OPTPipe::Closed;
                         //Issue close callback

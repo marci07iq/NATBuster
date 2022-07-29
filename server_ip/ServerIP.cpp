@@ -41,7 +41,7 @@ int main() {
 
     Blob ipserver_fingerprint;
     ipserver_private_key.fingerprint(ipserver_fingerprint);
-    std::cout << "IP Server fingerprint: ";
+    std::cout << "C2 Server fingerprint: ";
     NATBuster::Common::Utils::print_hex(ipserver_fingerprint);
     std::cout << std::endl;
 

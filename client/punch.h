@@ -115,7 +115,6 @@ namespace NATBuster::Client {
             std::shared_ptr<Common::Transport::OPTBase> underlying
         );
 
-        void start();
         
         void fail();
     public:
@@ -126,6 +125,8 @@ namespace NATBuster::Client {
             std::shared_ptr<Common::Identity::UserGroup> trusted_users,
             std::shared_ptr<Common::Transport::OPTBase> underlying
         );
+
+        void start();
 
         inline void set_punch_callback(PunchCallback::raw_type punch_callback) {
             _punch_callback = punch_callback;

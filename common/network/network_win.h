@@ -228,6 +228,7 @@ namespace NATBuster::Common::Network {
     };
 
 
+
     template <typename MY_HWND>
     Utils::PollResponse<Utils::Void> SocketBase<MY_HWND>::check(Time::Timeout timeout) {
         FD_SET collection;

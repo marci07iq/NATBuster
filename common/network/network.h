@@ -19,6 +19,11 @@ namespace NATBuster::Common::Network {
         { T::element_type::find(elems, to) } -> std::same_as<Utils::PollResponse<T>>;
     };
 
+    template <typename T>
+    class SocketEventBinding {
+
+    };
+
     typedef Utils::PollEventEmitter<TCPSHandle, Utils::Void> TCPSEmitter;
     typedef Utils::PollEventEmitter<TCPCHandle, Utils::Void> TCPCEmitter;
     typedef Utils::PollEventEmitter<UDPHandle, Utils::Void> UDPEmitter;

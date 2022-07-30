@@ -136,8 +136,10 @@ int main()
         return 1;
     }
 
-    ZeroMemory(&AcceptOverlapped, sizeof(WSAOVERLAPPED));
-    AcceptOverlapped.hEvent = EventArray[EventTotal];
+    WSAEventSelect(AcceptSocket, EventArray[EventTotal], FD_READ | FD_CLOSE);
+
+    /*ZeroMemory(&AcceptOverlapped, sizeof(WSAOVERLAPPED));
+    AcceptOverlapped.hEvent = EventArray[EventTotal];*/
 
     DataBuf.len = DATA_BUFSIZE;
     DataBuf.buf = buffer;
@@ -146,15 +148,16 @@ int main()
 
     std::cout << "Prepare for waiting @ " << std::this_thread::get_id() << std::endl;
 
+    //Start waker thread, with a HANDLE to this
     HANDLE hThisThread;
-    DuplicateHandle(GetCurrentProcess(),
+    DuplicateHandle(
+        GetCurrentProcess(),
         GetCurrentThread(),
         GetCurrentProcess(),
         &hThisThread,
         0,
         TRUE,
         DUPLICATE_SAME_ACCESS);
-
     std::thread waker(remote_wake, hThisThread);
 
     //-----------------------------------------
@@ -164,12 +167,12 @@ int main()
         //-----------------------------------------
         // Call WSARecv to receive data into DataBuf on 
         // the accepted socket in overlapped I/O mode
-        if (WSARecv(AcceptSocket, &DataBuf, 1, &RecvBytes, &Flags, &AcceptOverlapped, NULL) ==
+        /*if (WSARecv(AcceptSocket, &DataBuf, 1, &RecvBytes, &Flags, &AcceptOverlapped, NULL) ==
             SOCKET_ERROR) {
             iResult = WSAGetLastError();
             if (iResult != WSA_IO_PENDING)
                 wprintf(L"WSARecv failed with error = %d\n", iResult);
-        }
+        }*/
 
 
         //Index = WaitForMultipleObjectsEx(EventTotal, EventArray, FALSE, 10000, TRUE);
@@ -188,62 +191,40 @@ int main()
         else if (Index == WAIT_OBJECT_0) {
             std::cout << "EVENT" << std::endl;
 
+            WSANETWORKEVENTS NetworkEvents;
+            WSAEnumNetworkEvents(AcceptSocket, EventArray[0], &NetworkEvents);
+
             //-----------------------------------------
             // Reset the signaled event
             bResult = WSAResetEvent(EventArray[Index - WAIT_OBJECT_0]);
             if (bResult == FALSE) {
                 wprintf(L"WSAResetEvent failed with error = %d\n", WSAGetLastError());
             }
-            //-----------------------------------------
-            // Determine the status of the overlapped event
-            bResult =
-                WSAGetOverlappedResult(AcceptSocket, &AcceptOverlapped, &BytesTransferred, FALSE,
-                    &Flags);
-            std::cout << "Flags " << Flags << std::endl;
-            if (bResult == FALSE) {
-                wprintf(L"WSAGetOverlappedResult failed with error = %d\n", WSAGetLastError());
-            }
-            //-----------------------------------------
-            // If the connection has been closed, close the accepted socket
-            if (BytesTransferred == 0) {
-                wprintf(L"Closing accept Socket %d\n", AcceptSocket);
-                closesocket(ListenSocket);
-                closesocket(AcceptSocket);
-                WSACloseEvent(EventArray[Index - WSA_WAIT_EVENT_0]);
-                WSACleanup();
-                std::cout << "Done, please join thread" << std::endl;
-                waker.join();
-                return 1;
-            }
-
-            DataBuf.len = BytesTransferred;
-
-            if (BytesTransferred != 0) {
-                //-----------------------------------------
-                // If data has been received, echo the received data
-                // from DataBuf back to the client
-                iResult =
-                    WSASend(AcceptSocket, &DataBuf, 1, &RecvBytes, Flags, NULL, NULL);
-                if (iResult != 0) {
-                    wprintf(L"WSASend failed with error = %d\n", WSAGetLastError());
+            
+            if (NetworkEvents.lNetworkEvents & FD_READ) {
+                int recvd = recv(AcceptSocket, buffer, 4096, 0);
+                std::cout << "READ " << recvd << std::endl;
+                if (recvd == 0) {
+                    closesocket(AcceptSocket);
+                    break;
+                }
+                else {
+                    send(AcceptSocket, buffer, recvd, 0);
                 }
             }
-            //-----------------------------------------         
-            // Reset the changed flags and overlapped structure
-            Flags = 0;
-            ZeroMemory(&AcceptOverlapped, sizeof(WSAOVERLAPPED));
 
-            AcceptOverlapped.hEvent = EventArray[Index - WAIT_OBJECT_0];
-
-            //-----------------------------------------
-            // Reset the data buffer
-            DataBuf.len = DATA_BUFSIZE;
-            DataBuf.buf = buffer;
+            if (NetworkEvents.lNetworkEvents & FD_CLOSE) {
+                std::cout << "CLOSE " << std::endl;
+                closesocket(AcceptSocket);
+                break;
+            }
         }
         else {
             std::cout << "UNKNOWN " << Index << std::endl;
         }
     }
+
+    WSACloseEvent(EventArray[0]);
 
     std::cout << "Done, please join thread" << std::endl;
     waker.join();

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 namespace NATBuster::Common::Utils {
     //Class that cant be copied
     class NonCopyable
@@ -28,11 +30,26 @@ namespace NATBuster::Common::Utils {
         ~NonStack() = delete;
     };
 
-
-    class AbstractBase {
+    //Object that can only be consturcted as a shared_ptr
+    //Calls init before returning from create
+    template <typename SELF>
+    class SharedOnly : public std::enable_shared_from_this<SELF> {
     protected:
-        AbstractBase() = default;
-        AbstractBase(const AbstractBase&) = default;
-        AbstractBase(AbstractBase&&) = default;
+        SharedOnly() {
+
+        }
+
+        virtual void init() {
+
+        }
+    public:
+        template<typename ...ARGS>
+        std::shared_ptr<SELF> create(ARGS... args) {
+            std::shared_ptr<SELF> res = std::shared_ptr<SELF>(new SELF(std::forward(args...)));
+            res->init();
+            return res;
+        }
     };
+
+
 };

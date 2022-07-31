@@ -1,8 +1,93 @@
 #ifdef WIN32
 
+#include "network.h"
 #include "network_win.h"
 
 namespace NATBuster::Common::Network {
+    NetworkAddressImpl::NetworkAddressImpl() {
+        ZeroMemory(&_address, sizeof(SOCKADDR_STORAGE));
+    }
+    ErrorCode NetworkAddressImpl::resolve(const std::string& name, uint16_t port) {
+        ZeroMemory(&_address, sizeof(SOCKADDR_STORAGE));
+
+        if (name.length()) {
+            //Resolve host name to IP
+            hostent* server_ip = gethostbyname(name.c_str());
+
+            if (server_ip == nullptr) {
+                return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
+            }
+
+            if ((server_ip->h_addrtype != AF_INET) || (server_ip->h_addr_list[0] == 0)) {
+                return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
+            }
+
+            ((sockaddr_in*)&_address)->sin_addr.s_addr = *(u_long*)server_ip->h_addr_list[0];
+        }
+        else {
+            //Any address
+            ((sockaddr_in*)&_address)->sin_addr.s_addr = INADDR_ANY;
+        }
+
+        //Address
+        _address.ss_family = AF_INET;
+        ((sockaddr_in*)&_address)->sin_family = AF_INET;
+        ((sockaddr_in*)&_address)->sin_port = htons(port);
+
+        return ErrorCode::OK;
+    }
+
+    std::ostream& operator<<(std::ostream& os, const NetworkAddressImpl& addr)
+    {
+        os << addr.get_addr() << ":" << addr.get_port() << std::endl;
+        return os;
+    }
+
+
+    SocketImpl::SocketImpl(SOCKET socket) : _socket(socket) {
+
+    }
+    SocketImpl::SocketImpl(SocketImpl&& other) noexcept {
+        _socket = other._socket;
+        other._socket = INVALID_SOCKET;
+    }
+    SocketImpl& SocketImpl::operator=(SocketImpl&& other) noexcept {
+        close();
+        _socket = other._socket;
+        other._socket = INVALID_SOCKET;
+    }
+    inline void SocketImpl::set(SOCKET socket) {
+        close();
+        _socket = socket;
+    }
+
+    inline SOCKET SocketImpl::get() {
+        return _socket;
+    }
+
+    inline bool SocketImpl::is_valid() const {
+        return _socket != INVALID_SOCKET;
+    }
+    inline bool SocketImpl::is_invalid() const {
+        return _socket == INVALID_SOCKET;
+    }
+
+    inline void SocketImpl::close() {
+        if (is_valid()) {
+            //std::cout << "CLOSE SOCKET" << std::endl;
+            closesocket(_socket);
+            _socket = INVALID_SOCKET;
+        }
+    }
+    SocketImpl::~SocketImpl() {
+        close();
+    }
+
+
+
+    
+
+
     //Log errors
     void NetworkError(NetworkErrorCodes internal_id, int os_id) {
 
@@ -15,7 +100,7 @@ namespace NATBuster::Common::Network {
         std::cerr << "Error code: " << internal_id << ", " << os_id << ":";
         std::wcerr << s;
         std::cerr << std::endl;
-        
+
         LocalFree(s);
 
     }
@@ -55,46 +140,6 @@ namespace NATBuster::Common::Network {
 
         const WSAWrapper WSAContainer::wsa(2, 2);
     }
-    NetworkAddress::NetworkAddress() {
-        ZeroMemory(&_address, sizeof(sockaddr_in));
-    }
-
-    NetworkAddress::NetworkAddress(const std::string& name, uint16_t port) {
-        ZeroMemory(&_address, sizeof(SOCKADDR_STORAGE));
-
-        if (name.length()) {
-            //Resolve host name to IP
-            hostent* server_ip = gethostbyname(name.c_str());
-
-            if (server_ip == nullptr) {
-                NetworkError(NetworkErrorCodeResolveAddress, WSAGetLastError());
-                return;
-            }
-
-            if ((server_ip->h_addrtype != AF_INET) || (server_ip->h_addr_list[0] == 0)) {
-                NetworkError(NetworkErrorCodeResolveAddress, WSAGetLastError());
-                return;
-            }
-
-            ((sockaddr_in*)&_address)->sin_addr.s_addr = *(u_long*)server_ip->h_addr_list[0];
-        }
-        else {
-            //Any address
-            ((sockaddr_in*)&_address)->sin_addr.s_addr = INADDR_ANY;
-        }
-
-        //Address
-        _address.ss_family = AF_INET;
-        ((sockaddr_in*)&_address)->sin_family = AF_INET;
-        ((sockaddr_in*)&_address)->sin_port = htons(port);
-    }
-
-    std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr)
-    {
-        os << addr.get_addr() << ":" << addr.get_port() << std::endl;
-        return os;
-    }
-
     //
     // TCP Server OS implementation
     // 
@@ -121,7 +166,7 @@ namespace NATBuster::Common::Network {
 
         // Create the server listen socket
         _socket.set(::socket(result->ai_family, result->ai_socktype, result->ai_protocol));
-        if (_socket.invalid()) {
+        if (_socket.is_invalid()) {
             NetworkError(NetworkErrorCodeCreateListenSocket, WSAGetLastError());
             freeaddrinfo(result);
             return;
@@ -184,7 +229,7 @@ namespace NATBuster::Common::Network {
         NetworkAddress local_addr;
 
         _socket.set(::socket(AF_INET6, SOCK_STREAM, 0));
-        if (_socket.invalid()) {
+        if (_socket.is_invalid()) {
             NetworkError(NetworkErrorCodeCreateClientSocket, WSAGetLastError());
             return;
         }
@@ -274,7 +319,7 @@ namespace NATBuster::Common::Network {
     }
 
     bool TCPC::send(const Utils::ConstBlobView& data) {
-        if (_socket.invalid()) return false;
+        if (_socket.is_invalid()) return false;
 
         uint32_t progress = 0;
 
@@ -304,7 +349,7 @@ namespace NATBuster::Common::Network {
         //Allow writing to the entire area
         //Pre-allocates buffer
         data.resize(max_len);
-        
+
         int progress = 0;
 
         //Even if min 0 requested, still do one round
@@ -353,7 +398,7 @@ namespace NATBuster::Common::Network {
 
         // Create the UDP socket
         _socket.set(::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
-        if (_socket.invalid()) {
+        if (_socket.is_invalid()) {
             NetworkError(NetworkErrorCodeCreateClientSocket, WSAGetLastError());
             return;
         }

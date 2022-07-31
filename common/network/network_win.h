@@ -2,75 +2,38 @@
 
 #ifdef WIN32
 
-#include <iostream>
-#include <stdio.h>
-#include <array>
+#define NOMINMAX
 
-#include "../os.h"
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#include <windows.h>
+
+#include <winsock2.h>
+#include <mswsock.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+
+#pragma comment(lib, "Ws2_32.lib")
+
+#undef NOMINMAX
+
+#include <array>
+#include <stdint.h>
+#include <string>
 
 #include "network_common.h"
+#include "network.h"
 #include "../utils/copy_protection.h"
 #include "../utils/blob.h"
+#include "../error/codes.h"
 
 namespace NATBuster::Common::Network {
 
-    static const int SELECT_MAX = FD_SETSIZE;
-
-    void NetworkError(NetworkErrorCodes internal_id, int os_id);
-
-    //
-    // Wrap OS sockets into a non-copyable object
-    //
-
-    class SocketWrapper : Utils::NonCopyable {
-        SOCKET _socket;
-    public:
-        SocketWrapper(SOCKET socket = INVALID_SOCKET) : _socket(socket) {
-
-        }
-
-        SocketWrapper(SocketWrapper&& other) noexcept {
-            _socket = other._socket;
-            other._socket = INVALID_SOCKET;
-        }
-
-        SocketWrapper& operator=(SocketWrapper&& other) noexcept {
-            close();
-            _socket = other._socket;
-            other._socket = INVALID_SOCKET;
-        }
-
-        inline bool valid() const {
-            return _socket != INVALID_SOCKET;
-        }
-
-        inline bool invalid() const {
-            return _socket == INVALID_SOCKET;
-        }
-
-        inline void close() {
-            if (valid()) {
-                //std::cout << "CLOSE SOCKET" << std::endl;
-                closesocket(_socket);
-                _socket = INVALID_SOCKET;
-            }
-        }
-
-        inline void set(SOCKET socket) {
-            close();
-            _socket = socket;
-        }
-
-        inline SOCKET get() {
-            return _socket;
-        }
-
-        ~SocketWrapper() {
-            close();
-        }
-    };
-
-    class NetworkAddress {
+    //Network address OS defined implementation
+    //Represent an address (IP and port), IPV4 or IPV6
+    class NetworkAddressImpl {
         enum Type {
             Unknown,
             IPV4,
@@ -81,22 +44,19 @@ namespace NATBuster::Common::Network {
 
         DWORD _address_length = sizeof(_address);
     public:
-        NetworkAddress();
+        NetworkAddressImpl();
+        ErrorCode resolve(const std::string& name, uint16_t port);
 
-        NetworkAddress(const std::string& name, uint16_t port);
-
-        inline const SOCKADDR_STORAGE* get() const {
+        inline const SOCKADDR_STORAGE* get_data() const {
             return (SOCKADDR_STORAGE*)&_address;
         }
-
-        inline SOCKADDR_STORAGE* getw() {
+        inline SOCKADDR_STORAGE* get_dataw() {
             return (SOCKADDR_STORAGE*)&_address;
         }
 
         inline const DWORD size() const {
             return _address_length;
         }
-
         inline DWORD* sizew() {
             return &_address_length;
         }
@@ -116,7 +76,6 @@ namespace NATBuster::Common::Network {
             }
             return std::string();
         }
-
         inline uint16_t get_port() const {
             if (_address.ss_family == AF_INET) {
                 return ntohs(((sockaddr_in*)(&_address))->sin_port);
@@ -127,22 +86,85 @@ namespace NATBuster::Common::Network {
             return 0;
         }
 
-        inline bool operator==(const NetworkAddress& rhs) const {
+        inline bool operator==(const NetworkAddressImpl& rhs) const {
             if (_address_length != rhs._address_length) return false;
             return memcmp(&_address, &rhs._address, _address_length) == 0;
         }
-
-        inline bool operator!=(const NetworkAddress& rhs) const {
+        inline bool operator!=(const NetworkAddressImpl& rhs) const {
             return !(this->operator==(rhs));
         }
     };
 
-    std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr);
+    std::ostream& operator<<(std::ostream& os, const NetworkAddressImpl& addr);
 
-    template <typename MY_HWND>
+    //RAII move-only wrapper for OS sockets
+    class SocketImpl : Utils::NonCopyable {
+        SOCKET _socket = INVALID_SOCKET;
+    public:
+        SocketImpl(SOCKET socket = INVALID_SOCKET);
+        SocketImpl(SocketImpl&& other);
+        SocketImpl& operator=(SocketImpl&& other);
+        inline void set(SOCKET socket);
+
+        inline SOCKET get();
+
+        inline bool is_valid() const;
+        inline bool is_invalid() const;
+
+        inline void close();
+        ~SocketImpl();
+    };
+
+
+
+    //RAII wrapped WSA Event structure
+    class EventImpl {
+        WSAEVENT _event = INVALID_HANDLE_VALUE;
+    public:
+        EventImpl(EventImpl&& other) noexcept {
+            _event = other._event;
+            other._event = INVALID_HANDLE_VALUE;
+        }
+        EventImpl& operator=(EventImpl&& other) noexcept {
+            _event = other._event;
+            other._event = INVALID_HANDLE_VALUE;
+        }
+
+        void close() {
+            if (_event != INVALID_HANDLE_VALUE) {
+                WSACloseEvent(_event);
+                _event = INVALID_HANDLE_VALUE;
+            }
+        }
+        ~EventImpl() {
+            close();
+        }
+    };
+
+
+
+    class SocketPoolImpl {
+    public:
+        using 
+
+        struct SocketEvent {
+            SocketImpl socket;
+            EventImpl evt;
+
+
+        };
+
+        std::list<SocketEvent> _sockets;
+
+    public:
+
+    };
+
+
+    /*template <typename MY_HWND>
     class SocketBase {
     protected:
-        SocketWrapper _socket;
+        SocketImpl _socket;
 
         SocketBase() {
 
@@ -154,8 +176,8 @@ namespace NATBuster::Common::Network {
         template<typename HWND>
         friend class SocketBase;
     public:
-        inline bool valid() {
-            return _socket.valid();
+        inline bool is_valid() {
+            return _socket.is_valid();
         }
         inline void close() {
             return _socket.close();
@@ -235,7 +257,7 @@ namespace NATBuster::Common::Network {
 
         FD_ZERO(&collection);
 
-        if (_socket.valid()) {
+        if (_socket.is_valid()) {
             FD_SET(_socket.get(), &collection);
         }
         else {
@@ -253,7 +275,7 @@ namespace NATBuster::Common::Network {
             return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::Timeout);
         }
 
-        if (_socket.valid()) {
+        if (_socket.is_valid()) {
             if (FD_ISSET(_socket.get(), &collection)) {
                 return Utils::PollResponse<Utils::Void>(Utils::PollResponseType::OK);
             }
@@ -270,9 +292,9 @@ namespace NATBuster::Common::Network {
 
         int entries = 0;
         for (auto&& socket : sockets) {
-            SocketWrapper& sw = socket->_socket;
+            SocketImpl& sw = socket->_socket;
 
-            if (sw.valid()) {
+            if (sw.is_valid()) {
                 FD_SET(sw.get(), &collection);
                 ++entries;
             }
@@ -294,9 +316,9 @@ namespace NATBuster::Common::Network {
         }
 
         for (auto& socket : sockets) {
-            SocketWrapper& sw = socket->_socket;
+            SocketImpl& sw = socket->_socket;
 
-            if (sw.valid()) {
+            if (sw.is_valid()) {
                 if (FD_ISSET(socket->_socket.get(), &collection)) {
                     MY_HWND res = socket;
                     return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::OK, std::move(res));
@@ -305,7 +327,7 @@ namespace NATBuster::Common::Network {
         }
 
         return Utils::PollResponse<MY_HWND>(Utils::PollResponseType::UnknownError);
-    }
+    }*/
 
 }
 

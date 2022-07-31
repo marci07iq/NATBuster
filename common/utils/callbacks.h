@@ -34,7 +34,7 @@ namespace NATBuster::Common::Utils {
 
         }
         inline void operator()(ARGS... args) const override {
-            
+
         }
     };
 
@@ -141,11 +141,131 @@ namespace NATBuster::Common::Utils {
     public:
         using raw_type = CallbackBase<ARGS...>*;
     private:
+        static const CallbackBase<ARGS...> checkout = NoCallback<ARGS...>();
+        //An other constant like nullptr meaning that the callback is currently running
+        //Do not delete this value.
+        static raw_type checkout_ptr = &checkout;
+
+        //The currently set callback
+        std::atomic<raw_type> _cb = nullptr;
+
+        //If you cant compile on your platform, you can remove this line
+        //It is only to make sure things are fast
+        static_assert(decltype(_cb)::is_always_lock_free);
+
+        //Helper to dispose of unneeded raw ptrs
+        //Safe to call with null or checkout
+        inline static void dispose(raw_type cb) {
+            if (cb != nullptr && cb != checkout_ptr) {
+                delete cb;
+            }
+        }
+
+        inline void replace(raw_type cb) {
+            //Set new callback, and dispose of old one
+            dispose(_cb.exchange(cb));
+        }
+
+        inline raw_type extract() {
+            //Extract the new callback, and leave nullptr
+            raw_type old_cb = _cb.exchange(nullptr);
+            //If checked out, can't extract, and must return null
+            if (old_cb == checkout_ptr) return nullptr;
+            return old_cb;
+        }
+
+        inline raw_type checkout() {
+            //Extract the new callback, and leave nullptr
+            raw_type old_cb = _cb.exchange(checkout_ptr);
+            //If checked out, can't extract, and must return null
+            if (old_cb == checkout_ptr) return nullptr;
+            return old_cb;
+        }
+
+        inline raw_type checkback(raw_type back) {
+            raw_type found = checkout_ptr;
+            //Try to swap back
+            if (!_cb.compare_exchange_strong(found, back)) {
+                //If couldnt swap back, dispose of old value
+                dispose(back);
+            }
+        }
+    public:
+        //Set to null
+
+        Callback() {
+            _cb = nullptr;
+        }
+        Callback(const std::nullptr_t& null) {
+            _cb = nullptr;
+        }
+
+        //Set to user set fn
+
+        //Pass in a new pointer, and do NOT keep any other refernce to it.
+        Callback(raw_type cb) {
+            _cb = cb;
+        }
+        //Completely thread safe
+        //Pass in a new pointer, and do NOT keep any other refernce to it.
+        //Note: passing in nullptr is undefined behaviour
+        Callback& operator=(raw_type cb) {
+            assert(cb != nullptr);
+            replace(cb);
+            return *this;
+        }
+
+        //Completely threadsafe for *this
+        //Safe to call on any data.
+        //WARNING: If data is currently executing a callback, both callbacks will become null.
+        void move_from_safe_other(Callback& data) {
+            replace(data.extract());
+        }
+
+        //Complety threadsafe
+        void clear() {
+            replace(nullptr);
+        }
+
+        //Complety threadsafe
+        void call_and_clear(ARGS... args) {
+            raw_type cb = extract();
+            if (cb != nullptr && cb != checkout_ptr) {
+                cb->operator()(std::forward(args));
+            }
+            dispose(cb);
+        }
+
+        //Complety threadsafe
+        void call(ARGS... args) {
+            raw_type cb = checkout();
+            if (cb != nullptr && cb != checkout_ptr) {
+                cb->operator()(std::forward<ARGS>(args)...);
+            }
+            checkback(cb);
+        }
+
+        //Complety threadsafe
+        inline void operator()(ARGS... args) {
+            call(std::forward<ARGS>(args)...);
+        }
+
+        ~Callback() {
+            replace(nullptr);
+        }
+    };
+
+    /*
+    template <typename... ARGS>
+    class Callback : Utils::NonCopyable {
+    public:
+        using raw_type = CallbackBase<ARGS...>*;
+    private:
         //Callback to run, if no _new_cb set
         raw_type _cb = nullptr;
         //To replace _cb with before the next run
         std::atomic<raw_type> _new_cb = nullptr;
-        
+
         //If you cant compile on your platform, you can remove this line
         //It is only to make sure things are fast
         static_assert(decltype(_new_cb)::is_always_lock_free);
@@ -164,7 +284,6 @@ namespace NATBuster::Common::Utils {
             }
         }
 
-    public:
         void replace(raw_type cb) {
             //Set new callback
             raw_type old_new_cb = _new_cb.exchange(cb);
@@ -174,7 +293,7 @@ namespace NATBuster::Common::Utils {
             }
 
         }
-
+    public:
         //Set to null
 
         Callback() {
@@ -183,10 +302,6 @@ namespace NATBuster::Common::Utils {
         Callback(const std::nullptr_t& null) {
             _cb = nullptr;
         }
-        Callback& operator=(const std::nullptr_t& null) {
-            replace(nullptr);
-            return *this;
-        }
 
         //Set to user set fn
 
@@ -194,14 +309,17 @@ namespace NATBuster::Common::Utils {
         Callback(raw_type cb) {
             _cb = cb;
         }
+        //Completely thread safe
         //Pass in a new pointer, and do NOT keep any other refernce to it.
+        //Note: passing in nullptr is undefined behaviour
         Callback& operator=(raw_type cb) {
+            assert(cb != nullptr);
             replace(cb);
             return *this;
         }
 
-        //Create from other instance
-        //Only call if other is NOT currently executing a callback.
+        //Completely threadsafe for *this
+        //data must not currently be executing the callback
         void move_from_safe_other(Callback& data)  {
             //Update data to the latest state
             data.update_cb_from_new();
@@ -210,7 +328,23 @@ namespace NATBuster::Common::Utils {
             data._cb = nullptr;
         }
 
-        //For one time use timers
+        //Not threadsafe, must not be called together with:
+        //clear, call, call_and_clear, operator()
+        void clear() {
+            if (this != nullptr) {
+                update_cb_from_new();
+
+                //Check out cb
+                raw_type cb = _cb;
+                _cb = nullptr;
+                if (cb != nullptr) {
+                    delete cb;
+                }
+            }
+        }
+
+        //Not threadsafe, must not be called together with:
+        //clear, call, call_and_clear, operator()
         void call_and_clear(ARGS... args) {
             if (this != nullptr) {
                 update_cb_from_new();
@@ -225,7 +359,9 @@ namespace NATBuster::Common::Utils {
             }
         }
 
-        void operator()(ARGS... args) {
+        //Not threadsafe, must not be called together with:
+        //clear, call, call_and_clear, operator()
+        void call(ARGS... args) {
             if (this != nullptr) {
                 update_cb_from_new();
 
@@ -236,21 +372,23 @@ namespace NATBuster::Common::Utils {
             }
         }
 
-        bool has_function() {
-            return (_cb != nullptr) || (_new_cb.load() != nullptr);
+        //Not threadsafe, must not be called together with:
+        //clear, call, call_and_clear, operator()
+        inline void operator()(ARGS... args) {
+            call(std::forward<ARGS>(args)...);
         }
 
-        ~Callback() {
-            if (_cb != nullptr) {
-                delete _cb;
-                _cb = nullptr;
-            }
-
-            raw_type new_cb = _new_cb.load();
-            if (new_cb != nullptr) {
-                delete new_cb;
-                new_cb = nullptr;
-            }
+    ~Callback() {
+        if (_cb != nullptr) {
+            delete _cb;
+            _cb = nullptr;
         }
-    };
+
+        raw_type new_cb = _new_cb.load();
+        if (new_cb != nullptr) {
+            delete new_cb;
+            new_cb = nullptr;
+        }
+    }
+    }; */
 }

@@ -1,30 +1,38 @@
 #pragma once
 
-#include <memory>
-#include <string>
+#include <iostream>
 #include <stdint.h>
+#include <string>
 
-#include "network_win.h"
+#include "../error/codes.h"
+#include "../utils/blob.h"
+#include "../utils/callbacks.h"
 
 namespace NATBuster::Common::Network {
-    template <typename T>
-    concept SocketHwnd = requires(const T & t, const std::list<T> &elems, Time::Timeout to)
-    {
-        //{ (int)5 } -> std::same_as<int>;
-        //Validity check. If false, the event emitter returns
-        { t->valid() } -> std::same_as<bool>;
-        //Close function, for when the event emitter needs to exit
-        { t->close() } -> std::same_as<void>;
-        //Gets the next response
-        { T::element_type::find(elems, to) } -> std::same_as<Utils::PollResponse<T>>;
+    //Network address abstract representation
+    class NetworkAddressImpl;
+    class NetworkAddress {
+    public:
+        std::unique_ptr<NetworkAddressImpl>_impl;
+
+        
     };
 
-    template <typename T>
-    class SocketEventBinding {
+    //An OS dependant socket implementation, used for 
+    class SocketOSEvent;
 
+    class SocketEventEmitter {
+    public:
+        using OpenCallback = Utils::Callback<>;
+        using PacketCallback = Utils::Callback<const Utils::ConstBlobView&>;
+        using AcceptCallback = Utils::Callback<std::unique_ptr<SocketOSEvent>>;
+        using ErrorCallback = Utils::Callback<>;
+        using CloseCallback = Utils::Callback<>;
+
+    private:
+
+        std::unique_ptr<SocketOSEvent> _socket_event;
+
+    public:
     };
-
-    typedef Utils::PollEventEmitter<TCPSHandle, Utils::Void> TCPSEmitter;
-    typedef Utils::PollEventEmitter<TCPCHandle, Utils::Void> TCPCEmitter;
-    typedef Utils::PollEventEmitter<UDPHandle, Utils::Void> UDPEmitter;
 }

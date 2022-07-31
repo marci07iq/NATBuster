@@ -78,7 +78,7 @@ namespace NATBuster::Client {
                         auto it = sockets.begin();
 
                         while (it != sockets.end()) {
-                            if ((*it)->valid()) {
+                            if ((*it)->is_valid()) {
                                 ++it;
                             }
                             else {
@@ -137,7 +137,7 @@ namespace NATBuster::Client {
 
                 //Create new socket
                 Common::Network::UDPHandle new_socket = std::make_shared<Common::Network::UDP>(_remote, ports[used_ports]);
-                if (new_socket->valid()) {
+                if (new_socket->is_valid()) {
                     ++used_ports;
                     socket_buckets.back().push_back(new_socket);
                     new_socket->send(_magic_ob);

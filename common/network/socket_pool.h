@@ -8,7 +8,7 @@
 #include <list>
 
 namespace NATBuster::Common::Network {
-    template<SocketHwnd HWND>
+    /*template<SocketHwnd HWND>
     class SocketHWNDPool {
         std::list<HWND> _sockets;
 
@@ -17,7 +17,7 @@ namespace NATBuster::Common::Network {
             auto it = _sockets.begin();
 
             while (it != _sockets.end()) {
-                if ((*it)->valid()) {
+                if ((*it)->is_valid()) {
                     ++it;
                 }
                 else {
@@ -36,7 +36,7 @@ namespace NATBuster::Common::Network {
 
         }
 
-        bool valid() {
+        bool is_valid() {
             return _sockets.size();
         }
 
@@ -45,12 +45,12 @@ namespace NATBuster::Common::Network {
                 it->close();
             }
             prune();
-            assert(!valid());
+            assert(!is_valid());
         }
 
         HWND check(Time::Timeout to) {
             prune();
             return HWND::element_type::find(_sockets, to);
         }
-    };
+    };*/
 }

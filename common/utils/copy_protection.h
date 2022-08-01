@@ -34,12 +34,10 @@ namespace NATBuster::Common::Utils {
     //Calls init before returning from create
     template <typename SELF>
     class SharedOnly : public std::enable_shared_from_this<SELF> {
+    private:
+
     protected:
         SharedOnly() {
-
-        }
-
-        virtual void init() {
 
         }
     public:

@@ -245,8 +245,8 @@ namespace NATBuster::Common::Crypto {
     }
 
     bool PKey::sign(const Utils::ConstBlobView& data_in, Utils::BlobView& sig_out) const {
-        //TODO: Error check;
         EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
+        if (md_ctx == nullptr) return false;
 
         if (1 != EVP_DigestSignInit(md_ctx, nullptr, nullptr, nullptr, _key)) {
             EVP_MD_CTX_free(md_ctx);
@@ -274,8 +274,8 @@ namespace NATBuster::Common::Crypto {
         return true;
     }
     bool PKey::verify(const Utils::ConstBlobView& data_in, const Utils::ConstBlobView& sig_in) const {
-        //TODO: Error check;
         EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
+        if (md_ctx == nullptr) return false;
 
         if (1 != EVP_DigestVerifyInit(md_ctx, nullptr, nullptr, nullptr, _key)) {
             EVP_MD_CTX_free(md_ctx);

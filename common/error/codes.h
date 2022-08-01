@@ -20,6 +20,12 @@ namespace NATBuster::Common {
         NETWORK_ERROR_SYSTEM = TYPE_ERROR | SYSTEM_NETWORK | 0x0001,
         //Can't resolve a hostname
         NETWORK_ERROR_RESOLVE_HOSTNAME = TYPE_ERROR | SYSTEM_NETWORK | 0x0002,
+        //Can't create socket
+        NETWORK_ERROR_CREATE_SOCKET = TYPE_ERROR | SYSTEM_NETWORK | 0x0003,
+        //Can't bind server socket
+        NETWORK_ERROR_SERVER_BIND = TYPE_ERROR | SYSTEM_NETWORK | 0x0004,
+        //Can't listen to server socket
+        NETWORK_ERROR_SERVER_LISTEN = TYPE_ERROR | SYSTEM_NETWORK | 0x0005,
     };
 
     void ThrowError(ErrorCode code) {

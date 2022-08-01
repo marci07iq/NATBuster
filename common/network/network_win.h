@@ -40,7 +40,9 @@ namespace NATBuster::Common::Network {
         DWORD _address_length = sizeof(_address);
 
         NetworkAddressOSData();
-        
+        NetworkAddressOSData(NetworkAddressOSData& other);
+        NetworkAddressOSData& operator=(NetworkAddressOSData& other);
+
         inline const SOCKADDR_STORAGE* get_data() const {
             return (SOCKADDR_STORAGE*)&_address;
         }
@@ -92,119 +94,24 @@ namespace NATBuster::Common::Network {
         HANDLE _this_thread;
         std::list<Common::Utils::Callback<>> _tasks;
         std::list<std::shared_ptr<SocketEventHandle>> _added_socket_objects;
+        std::list<std::shared_ptr<SocketEventHandle>> _closed_socket_objects;
         std::mutex _system_lock;
 
-        static void __stdcall apc_fun(ULONG_PTR data) {
+        void close(int idx);
 
-        }
+        static void __stdcall apc_fun(ULONG_PTR data);
     public:
-        void bind() {
-            std::lock_guard _lg(_system_lock);
-            DuplicateHandle(
-                GetCurrentProcess(),
-                GetCurrentThread(),
-                GetCurrentProcess(),
-                &_this_thread,
-                0,
-                TRUE,
-                DUPLICATE_SAME_ACCESS);
-        }
+        void bind();
 
-        void wait(Time::time_delta_type_us delay) {
-            int64_t delay_ms = (delay + 999) / 1000;
-            DWORD timeout = (delay_ms < std::numeric_limits<DWORD>::max()) ? delay_ms : INFINITE;
-            if (delay < 0) timeout = INFINITE;
+        void wait(Time::time_delta_type_us delay);
 
-            DWORD ncount = _socket_events.size();
+        void run_now(Common::Utils::Callback<>::raw_type fn);
 
-            DWORD res = WSAWaitForMultipleEvents(
-                ncount,
-                _socket_events.data(),
-                FALSE, 10000, TRUE);
+        void interrupt();
 
-            if (res == WAIT_IO_COMPLETION) {
-                //APC triggered
-            }
-            else if (res == WAIT_TIMEOUT) {
-                //Timeout triggered
-            }
-            else if (WAIT_OBJECT_0 <= res && res < (WAIT_OBJECT_0 + ncount)) {
-                int index = res - WAIT_OBJECT_0;
+        void add_socket(std::shared_ptr<SocketEventHandle> socket);
 
-                WSANETWORKEVENTS set_events;
-                //TODO: Handle errors
-                int res2 = WSAEnumNetworkEvents(
-                    _socket_objects[index]->_socket->get(),
-                    _socket_events[index],
-                    &set_events);
-
-                if (set_events.lNetworkEvents & FD_CONNECT) {
-                    _socket_objects[index]->_callback_connect();
-                }
-
-                if (set_events.lNetworkEvents & FD_READ) {
-                    Utils::Blob data = Utils::Blob::factory_empty(4000);
-                    WSABUF buffer;
-                    buffer.buf = (CHAR*)data.getw();
-                    buffer.len = data.size();
-                    DWORD received;
-                    DWORD flags = 0;
-                    int res = WSARecv(
-                        _socket_objects[index]->_socket->get(),
-                        &buffer,
-                        1,
-                        &received,
-                        &flags,
-                        NULL,
-                        NULL);
-
-                    //Closed
-                    if (received == 0) {
-                        //TODO: Prevent double firing
-                        _socket_objects[index]->_callback_close();
-                    }
-                    else {
-                        data.resize(received);
-                        _socket_objects[index]->_callback_packet(data);
-                    }
-                }
-
-                if (set_events.lNetworkEvents & FD_ACCEPT) {
-                    TCPCHandleU hwnd;
-
-                    //TODO
-
-                    _socket_objects[index]->_callback_accept(std::move(hwnd));
-                }
-
-                if (set_events.lNetworkEvents & FD_CLOSE) {
-                    _socket_objects[index]->_callback_close();
-                }
-            }
-
-            //Execute updates
-            {
-                std::lock_guard _lg(_system_lock);
-                //TODO
-            }
-        }
-
-        void run_now(Common::Utils::Callback<>::raw_type fn) {
-            std::lock_guard _lg(_system_lock);
-            _tasks.push_back(fn);
-            QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
-        }
-
-        void interrupt() {
-            std::lock_guard _lg(_system_lock);
-            QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
-        }
-
-        void add_socket(std::shared_ptr<SocketEventHandle> socket) {
-            std::lock_guard _lg(_system_lock);
-            _added_socket_objects.push_back(socket);
-            QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
-        }
+        void close_socket(std::shared_ptr<SocketEventHandle> socket);
     };
 
 

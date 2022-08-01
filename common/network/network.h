@@ -22,6 +22,12 @@ namespace NATBuster::Common::Network {
             IPV6
         };
 
+        NetworkAddress();
+        NetworkAddress(NetworkAddress& other);
+        NetworkAddress(NetworkAddress&& other);
+        NetworkAddress& operator=(NetworkAddress& other);
+        NetworkAddress& operator=(NetworkAddress&& other);
+
         ErrorCode resolve(const std::string& name, uint16_t port);
 
         inline Type get_type() const;
@@ -33,7 +39,7 @@ namespace NATBuster::Common::Network {
         inline bool operator!=(const NetworkAddress& rhs) const;
 
     };
-    std::ostream& operator<<(std::ostream& os, const NetworkAddressOSData& addr);
+    std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr);
 
     //OS RAII socket implementation
     class SocketOSData;
@@ -53,20 +59,23 @@ namespace NATBuster::Common::Network {
 
 
     class SocketBase : Utils::NonCopyable {
+    protected:
         SocketOSHandle _socket;
 
         friend class SocketEventEmitter;
         friend class SocketEventEmitterImpl;
+
     public:
         SocketBase() {
 
         }
-        SocketBase(SocketOSHandle socket) : _socket(std::move(socket)) {
+        SocketBase(SocketOSHandle&& socket) : _socket(std::move(socket)) {
 
         }
+        void set(SocketOSHandle&& socket) {
+            _socket = std::move(socket);
+        }
 
-        //Set the socket
-        void set(SocketOSHandle socket);
         //Extract the underlying socket
         SocketOSHandle extract() {
             return std::move(_socket);
@@ -74,11 +83,13 @@ namespace NATBuster::Common::Network {
 
         inline bool is_valid();
 
+        inline bool is_invalid();
+
         inline void close();
     };
 
 
-    class SocketEventHandle : public SocketBase {
+    class SocketEventHandle : private SocketBase {
     public:
         //Called from client side TCPC, when connected
         using ConnectCallback = Utils::Callback<>;
@@ -88,24 +99,34 @@ namespace NATBuster::Common::Network {
         using AcceptCallback = Utils::Callback<TCPCHandleU&&>;
         //Called from TCPC and UDP when packet received
         using PacketCallback = Utils::Callback<const Utils::ConstBlobView&>;
+        //Called from UDP when any packet is received
+        using UnfilteredPacketCallback = Utils::Callback<const Utils::ConstBlobView&, NetworkAddress&>;
         //Called from any socket, when an error occurs
         using ErrorCallback = Utils::Callback<ErrorCode>;
         //Called from any socket, when closed by remote or local.
         using CloseCallback = Utils::Callback<>;
 
     private:
-        std::shared_ptr<SocketEventEmitter> _base;
 
         ConnectCallback _callback_connect;
         //BindCallback _callback_bind;
         AcceptCallback _callback_accept;
         PacketCallback _callback_packet;
+        UnfilteredPacketCallback _callback_unfiltered_packet;
         ErrorCallback _callback_error;
         CloseCallback _callback_close;
 
         friend class SocketEventEmitter;
         friend class SocketEventEmitterImpl;
-    public:
+
+    protected:
+        using SocketBase::_socket;
+
+        SocketEventHandle();
+        SocketEventHandle(SocketOSHandle&& socket);
+
+        std::shared_ptr<SocketEventEmitter> _base;
+
         inline void set_callback_connect(ConnectCallback::raw_type callback_connect) {
             _callback_connect = callback_connect;
         }
@@ -118,6 +139,13 @@ namespace NATBuster::Common::Network {
         inline void set_callback_packet(PacketCallback::raw_type callback_packet) {
             _callback_packet = callback_packet;
         }
+        inline void set_callback_unfiltered_packet(UnfilteredPacketCallback::raw_type callback_unfiltered_packet) {
+            _callback_unfiltered_packet = callback_unfiltered_packet;
+        }
+    public:
+        using SocketBase::is_valid;
+        using SocketBase::is_invalid;
+
         inline void set_callback_error(ErrorCallback::raw_type callback_error) {
             _callback_error = callback_error;
         }
@@ -126,49 +154,122 @@ namespace NATBuster::Common::Network {
         }
     };
 
-    class TCPS : public SocketEventHandle {
+    class TCPS : public SocketEventHandle, public Utils::SharedOnly<TCPS> {
         std::list<TCPSHandleU>::iterator _self;
 
-        TCPCHandleU accept();
+        TCPS();
+
+        ErrorCode bind(const std::string& name, uint16_t port);
 
         friend class SocketEventEmitter;
+        friend class SocketEventEmitterImpl;
     public:
-        void bind(const std::string& name, uint16_t port);
+        using SocketEventHandle::set_callback_accept;
 
-        void close();
+        std::pair<Utils::shared_unique_ptr<TCPS>, ErrorCode>
+            create(const std::string& name, uint16_t port) {
+
+            Utils::shared_unique_ptr<TCPS> res = Utils::shared_unique_ptr<TCPS>();
+            ErrorCode code = res->bind(name, port);
+
+            return std::make_pair<Utils::shared_unique_ptr<TCPS>, ErrorCode>
+                (std::move(res), code);
+        }
+
+        void drop();
     };
 
-    class TCPC : public SocketEventHandle {
+    class TCPC : public SocketEventHandle, public Utils::SharedOnly<TCPC> {
         std::list<TCPCHandleU>::iterator _self;
 
         NetworkAddress _remote_address;
 
-        bool recv(Utils::Blob& dst);
+        TCPC();
+
+        TCPC(SocketOSHandle&& socket, NetworkAddress&& remote_address);
+
+        ErrorCode connect(const std::string& name, uint16_t port);
 
         friend class SocketEventEmitter;
+        friend class SocketEventEmitterImpl;
     public:
-        void connect(const std::string& name, uint16_t port);
+        using SocketEventHandle::set_callback_connect;
+        using SocketEventHandle::set_callback_packet;
+
+        std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
+            create(const std::string& name, uint16_t port) {
+
+            Utils::shared_unique_ptr<TCPC> res = Utils::shared_unique_ptr<TCPC>();
+            ErrorCode code = res->connect(name, port);
+
+            return std::make_pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
+                (std::move(res), code);
+        }
 
         NetworkAddress& get_remote();
 
         void send(Utils::ConstBlobView& data);
 
-        void close();
+        void drop();
     };
 
-    class UDP {
+    class UDP : public SocketEventHandle, public Utils::SharedOnly<UDP> {
         std::list<UDPHandleU>::iterator _self;
 
         NetworkAddress _local_address;
         NetworkAddress _remote_address;
 
-        bool recv(Utils::Blob& dst, NetworkAddress& src);
+        //Bind local socket
+        ErrorCode bind(NetworkAddress&& local);
+        ErrorCode bind(const std::string& name, uint16_t port) {
+            NetworkAddress address;
+            ErrorCode code = address.resolve(name, port);
+            if (code != ErrorCode::OK) return code;
+            return bind(address);
+        }
+
+        UDP();
 
         friend class SocketEventEmitter;
+        friend class SocketEventEmitterImpl;
     public:
+        using SocketEventHandle::set_callback_packet;
+        using SocketEventHandle::set_callback_unfiltered_packet;
+
+
+        std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
+            create(NetworkAddress&& local) {
+
+            Utils::shared_unique_ptr<UDP> res = Utils::shared_unique_ptr<UDP>();
+            ErrorCode code = res->bind(std::move(local));
+
+            return std::make_pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
+                (std::move(res), code);
+        }
+        std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
+            create(const std::string& local_name, uint16_t local_port) {
+
+            Utils::shared_unique_ptr<UDP> res = Utils::shared_unique_ptr<UDP>();
+            ErrorCode code = res->bind(name, port);
+
+            return std::make_pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
+                (std::move(res), code);
+        }
+
+        //Set remote socket
+        ErrorCode set_remote(NetworkAddress&& remote) {
+            _remote_address = std::move(remote);
+        }
+        ErrorCode set_remote(const std::string& name, uint16_t port) {
+            NetworkAddress address;
+            ErrorCode code = address.resolve(name, port);
+            if (code != ErrorCode::OK) return code;
+            return set_remote(std::move(address));
+        }
+
         void send(Utils::ConstBlobView& data);
 
-        void close();
+        void drop();
     };
 
     //EventEmitterProvider with socket watching capability
@@ -180,7 +281,9 @@ namespace NATBuster::Common::Network {
         std::list<TCPCHandleU> _sockets_tcpc;
         std::list<UDPHandleU> _sockets_udp;
 
-        ~SocketEventEmitter();
+        std::mutex _sockets_lock;
+
+        virtual ~SocketEventEmitter();
     public:
         void bind();
 
@@ -190,8 +293,12 @@ namespace NATBuster::Common::Network {
 
         void interrupt();
 
-        void add_socket(TCPSHandleU);
-        void add_socket(TCPCHandleU);
-        void add_socket(UDPHandleU);
+        void add_socket(TCPSHandleU hwnd);
+        void add_socket(TCPCHandleU hwnd);
+        void add_socket(UDPHandleU hwnd);
+
+        void close_socket(TCPSHandleS hwnd);
+        void close_socket(TCPCHandleS hwnd);
+        void close_socket(UDPHandleS hwnd);
     };
 }

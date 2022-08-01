@@ -47,11 +47,33 @@ namespace NATBuster::Common::Network {
         _address_length = sizeof(SOCKADDR_STORAGE);
         ZeroMemory(&_address, _address_length);
     }
+    NetworkAddressOSData::NetworkAddressOSData(NetworkAddressOSData& other) {
+        _address = other._address;
+        _address_length = other._address_length;
+
+    }
+    NetworkAddressOSData& NetworkAddressOSData::operator=(NetworkAddressOSData& other) {
+        _address = other._address;
+        _address_length = other._address_length;
+    }
 
     //NetworkAddress functions implemented
 
+    NetworkAddress::NetworkAddress() : _impl(std::make_unique<NetworkAddressOSData>()) {
+    }
+    NetworkAddress::NetworkAddress(NetworkAddress& other) : _impl(std::make_unique<NetworkAddressOSData>(*other._impl)) {
+    }
+    NetworkAddress::NetworkAddress(NetworkAddress&& other) : _impl(std::move(other._impl)) {
+    }
+    NetworkAddress& NetworkAddress::operator=(NetworkAddress& other) {
+        _impl->operator=(*other._impl);
+    }
+    NetworkAddress& NetworkAddress::operator=(NetworkAddress&& other) {
+        _impl = std::move(other._impl);
+    }
+
     ErrorCode NetworkAddress::resolve(const std::string& name, uint16_t port) {
-        ZeroMemory(&_address, sizeof(SOCKADDR_STORAGE));
+        ZeroMemory(&_impl->_address, sizeof(SOCKADDR_STORAGE));
 
         if (name.length()) {
             //Resolve host name to IP
@@ -65,21 +87,32 @@ namespace NATBuster::Common::Network {
                 return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
             }
 
-            ((sockaddr_in*)&_address)->sin_addr.s_addr = *(u_long*)server_ip->h_addr_list[0];
+            ((sockaddr_in*)&_impl->_address)->sin_addr.s_addr = *(u_long*)server_ip->h_addr_list[0];
         }
         else {
             //Any address
-            ((sockaddr_in*)&_address)->sin_addr.s_addr = INADDR_ANY;
+            ((sockaddr_in*)&_impl->_address)->sin_addr.s_addr = INADDR_ANY;
         }
 
         //Address
-        _address.ss_family = AF_INET;
-        ((sockaddr_in*)&_address)->sin_family = AF_INET;
-        ((sockaddr_in*)&_address)->sin_port = htons(port);
+        _impl->_address.ss_family = AF_INET;
+        ((sockaddr_in*)&_impl->_address)->sin_family = AF_INET;
+        ((sockaddr_in*)&_impl->_address)->sin_port = htons(port);
 
         return ErrorCode::OK;
     }
 
+    inline NetworkAddress::Type NetworkAddress::get_type() const {
+        if (_impl->_address.ss_family == AF_INET) {
+            return NetworkAddress::Type::IPV4;
+        }
+        else if (_impl->_address.ss_family == AF_INET6) {
+            return NetworkAddress::Type::IPV6;
+        }
+        else {
+            return NetworkAddress::Type::Unknown;
+        }
+    }
     std::string NetworkAddress::get_addr() const {
         if (_impl->_address.ss_family == AF_INET) {
             std::array<char, 16> res;
@@ -104,6 +137,9 @@ namespace NATBuster::Common::Network {
         }
         return 0;
     }
+    inline NetworkAddressOSData* NetworkAddress::get_impl() const {
+        return _impl.get();
+    }
 
     bool NetworkAddress::operator==(const NetworkAddress& rhs) const {
         if (_impl->_address_length != rhs._impl->_address_length) return false;
@@ -119,7 +155,7 @@ namespace NATBuster::Common::Network {
         return os;
     }
 
-    //SocketImpl
+    //SocketOSData
 
     SocketOSData::SocketOSData(SOCKET socket) : _socket(socket) {
 
@@ -167,9 +203,383 @@ namespace NATBuster::Common::Network {
         close();
     }
 
-    //
-    // TCP Server OS implementation
-    // 
+    //SocketBase
+
+    inline bool SocketBase::is_valid() {
+        return _socket->is_valid();
+    }
+    inline bool SocketBase::is_invalid() {
+        return _socket->is_invalid();
+    }
+
+    inline void SocketBase::close() {
+        return _socket->close();
+    }
+
+    //TCPS
+
+    TCPS::TCPS() {
+
+    }
+
+    ErrorCode TCPS::bind(const std::string& name, uint16_t port) {
+        int iResult;
+
+        // Protocol
+        struct addrinfo hints;
+        ZeroMemory(&hints, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+        hints.ai_flags = AI_PASSIVE;
+
+        // Resolve the server address and port
+        std::string port_s = std::to_string(port);
+        addrinfo* result = nullptr;
+        iResult = ::getaddrinfo(nullptr, port_s.c_str(), &hints, &result);
+        if (iResult != 0) {
+            return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
+        }
+
+        // Create the server listen socket
+        _socket->set(::socket(result->ai_family, result->ai_socktype, result->ai_protocol));
+        if (is_invalid()) {
+            freeaddrinfo(result);
+            return ErrorCode::NETWORK_ERROR_CREATE_SOCKET;
+        }
+
+        // Bind the listen socket
+        iResult = ::bind(_socket->get(), result->ai_addr, (int)result->ai_addrlen);
+        if (iResult == SOCKET_ERROR) {
+            freeaddrinfo(result);
+            _socket->close();
+            return ErrorCode::NETWORK_ERROR_SERVER_BIND;
+        }
+
+        freeaddrinfo(result);
+
+        // Set socket to listening mode
+        iResult = ::listen(_socket->get(), SOMAXCONN);
+        if (iResult == SOCKET_ERROR) {
+            _socket->close();
+            return ErrorCode::NETWORK_ERROR_SERVER_LISTEN;
+        }
+
+        return ErrorCode::OK;
+    }
+
+    void TCPS::drop() {
+        _base->drop_socket(shared_from_this());
+    }
+
+    TCPC::TCPC() {
+
+    }
+    TCPC::TCPC(SocketOSHandle&& socket) : SocketEventHandle(std::move(socket)) {
+
+    }
+
+    ErrorCode TCPC::connect(const std::string& name, uint16_t port) {
+        int iResult;
+
+        // Protocol
+        struct addrinfo hints;
+        ZeroMemory(&hints, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+        hints.ai_flags = AI_PASSIVE;
+
+        // Resolve the server address and port
+        std::string port_s = std::to_string(port);
+        addrinfo* result = nullptr;
+        iResult = ::getaddrinfo(nullptr, port_s.c_str(), &hints, &result);
+        if (iResult != 0) {
+            return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
+        }
+
+        // Create the server listen socket
+        _socket->set(::socket(result->ai_family, result->ai_socktype, result->ai_protocol));
+        if (is_invalid()) {
+            freeaddrinfo(result);
+            return ErrorCode::NETWORK_ERROR_CREATE_SOCKET;
+        }
+
+        // Bind the listen socket
+        iResult = ::bind(_socket->get(), result->ai_addr, (int)result->ai_addrlen);
+        if (iResult == SOCKET_ERROR) {
+            freeaddrinfo(result);
+            _socket->close();
+            return ErrorCode::NETWORK_ERROR_SERVER_BIND;
+        }
+
+        freeaddrinfo(result);
+
+        // Set socket to listening mode
+        iResult = ::listen(_socket->get(), SOMAXCONN);
+        if (iResult == SOCKET_ERROR) {
+            _socket->close();
+            return ErrorCode::NETWORK_ERROR_SERVER_LISTEN;
+        }
+
+        return ErrorCode::OK;
+    }
+
+    void TCPC::send(Utils::ConstBlobView& data) {
+        ::send(_socket->get(), (const char*)data.getr(), data.size(), 0);
+    }
+
+    void TCPC::drop() {
+        _base->drop_socket(shared_from_this());
+    }
+    
+    void UDP::send(Utils::ConstBlobView& data) {
+        ::send(_socket->get(), (const char*)data.getr(), data.size(), 0);
+    }
+
+    //SocketEventEmitterImpl
+
+    void SocketEventEmitterImpl::close(int idx) {
+
+    }
+
+    void __stdcall SocketEventEmitterImpl::apc_fun(ULONG_PTR data) {
+
+    }
+
+    void SocketEventEmitterImpl::bind() {
+        std::lock_guard _lg(_system_lock);
+        DuplicateHandle(
+            GetCurrentProcess(),
+            GetCurrentThread(),
+            GetCurrentProcess(),
+            &_this_thread,
+            0,
+            TRUE,
+            DUPLICATE_SAME_ACCESS);
+    }
+
+    void SocketEventEmitterImpl::wait(Time::time_delta_type_us delay) {
+        int64_t delay_ms = (delay + 999) / 1000;
+        DWORD timeout = (delay_ms < std::numeric_limits<DWORD>::max()) ? delay_ms : INFINITE;
+        if (delay < 0) timeout = INFINITE;
+
+        DWORD ncount = _socket_events.size();
+
+        assert(_socket_events.size() == _socket_objects.size());
+
+        DWORD res = WSAWaitForMultipleEvents(
+            ncount,
+            _socket_events.data(),
+            FALSE, 10000, TRUE);
+
+        if (res == WAIT_IO_COMPLETION) {
+            //APC triggered
+        }
+        else if (res == WAIT_TIMEOUT) {
+            //Timeout triggered
+        }
+        else if (WAIT_OBJECT_0 <= res && res < (WAIT_OBJECT_0 + ncount)) {
+            int index = res - WAIT_OBJECT_0;
+
+            std::shared_ptr<SocketEventHandle> socket_hwnd = _socket_objects[index];
+            SOCKET socket = socket_hwnd->_socket->get();
+
+            WSANETWORKEVENTS set_events;
+            //TODO: Handle errors
+            int res2 = WSAEnumNetworkEvents(
+                socket,
+                _socket_events[index],
+                &set_events);
+
+            if (set_events.lNetworkEvents & FD_CONNECT) {
+                _socket_objects[index]->_callback_connect();
+            }
+
+            if (set_events.lNetworkEvents & FD_READ) {
+                Utils::Blob data = Utils::Blob::factory_empty(4000);
+                WSABUF buffer;
+                buffer.buf = (CHAR*)data.getw();
+                buffer.len = data.size();
+                DWORD received;
+                DWORD flags = 0;
+                int res3 = WSARecv(
+                    socket,
+                    &buffer,
+                    1,
+                    &received,
+                    &flags,
+                    NULL,
+                    NULL);
+
+                //Closed
+                if (received == 0) {
+                    std::lock_guard _lg(_system_lock);
+                    _closed_socket_objects.push_back(socket_hwnd);
+                }
+                else {
+                    data.resize(received);
+                    _socket_objects[index]->_callback_packet(data);
+                }
+            }
+
+            if (set_events.lNetworkEvents & FD_ACCEPT) {
+                TCPCHandleU hwnd;
+
+                int iResult;
+                NetworkAddress remote_address;
+                SOCKET clientSocket;
+
+                // Accept a client socket
+                int len = remote_address.get_impl()->size();
+                SOCKET client = WSAAccept(socket, (sockaddr*)remote_address.get_impl()->get_dataw(), &len, NULL, NULL);
+                *remote_address.get_impl()->sizew() = len;
+
+                if (client == INVALID_SOCKET) {
+                    int error = WSAGetLastError();
+                    if (error != WSAEWOULDBLOCK && error != WSAECONNRESET) {
+                        close_socket(socket_hwnd);
+                    }
+                }
+                else {
+                    SocketOSHandle accepted = std::make_unique<SocketOSData>(client);
+                    TCPCHandleU new_client(new TCPC(std::move(accepted)));
+
+                    _socket_objects[index]->_callback_accept(std::move(hwnd));
+                }
+            }
+
+            if (set_events.lNetworkEvents & FD_CLOSE) {
+                std::lock_guard _lg(_system_lock);
+                _closed_socket_objects.push_back(socket_hwnd);
+            }
+        }
+
+        //Execute updates
+        {
+            std::lock_guard _lg(_system_lock);
+            
+            while (_closed_socket_objects.size()) {
+                std::shared_ptr<SocketEventHandle> close_socket = _closed_socket_objects.front();
+                _closed_socket_objects.pop_front();
+
+                for (int i = 0; i < _socket_objects.size(); i++) {
+                    if (_socket_objects[i] == close_socket) {
+                        //Close socket and event
+                        _socket_objects[i]->close();
+                        WSACloseEvent(_socket_events[i]);
+                        _socket_objects[i]->_callback_close();
+
+                        //Move to front
+                        _socket_objects[i] = _socket_objects[_socket_objects.size() - 1];
+                        _socket_objects.resize(_socket_objects.size() - 1);
+                        _socket_events[i] = _socket_events[_socket_events.size() - 1];
+                        _socket_events.resize(_socket_events.size() - 1);
+
+                        assert(_socket_events.size() == _socket_objects.size());
+                        break;
+                    }
+                }
+            }
+
+            while (_added_socket_objects.size()) {
+                std::shared_ptr<SocketEventHandle> add_socket = _added_socket_objects.front();
+                _added_socket_objects.pop_front();
+
+                //Create events objects
+                HANDLE new_event = WSACreateEvent();
+                //Bind to socket
+                add_socket->_socket->set_events(new_event);
+
+                _socket_events.push_back(new_event);
+                _socket_objects.push_back(add_socket);
+                assert(_socket_events.size() == _socket_objects.size());
+            }
+        }
+    }
+
+    void SocketEventEmitterImpl::run_now(Common::Utils::Callback<>::raw_type fn) {
+        std::lock_guard _lg(_system_lock);
+        _tasks.push_back(fn);
+        QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+    }
+
+    void SocketEventEmitterImpl::interrupt() {
+        std::lock_guard _lg(_system_lock);
+        QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+    }
+
+    void SocketEventEmitterImpl::add_socket(std::shared_ptr<SocketEventHandle> socket) {
+        std::lock_guard _lg(_system_lock);
+        _added_socket_objects.push_back(socket);
+        QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+    }
+
+    void SocketEventEmitterImpl::close_socket(std::shared_ptr<SocketEventHandle> socket) {
+        std::lock_guard _lg(_system_lock);
+        _closed_socket_objects.push_back(socket);
+        QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+    }
+
+    //SocketEventEmitter
+
+    void SocketEventEmitter::bind() {
+        _impl->bind();
+    }
+
+    void SocketEventEmitter::wait(Time::time_delta_type_us delay) {
+        _impl->wait(delay);
+    }
+
+    void SocketEventEmitter::run_now(Common::Utils::Callback<>::raw_type fn) {
+        _impl->run_now(fn);
+    }
+
+    void SocketEventEmitter::interrupt() {
+        _impl->interrupt();
+    }
+
+    void SocketEventEmitter::add_socket(TCPSHandleU hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        TCPSHandleS hwnds = hwnd;
+        hwnds->_self = _sockets_tcps.emplace(_sockets_tcps.end(), std::move(hwnd));
+        _impl->add_socket(hwnds);
+    }
+    void SocketEventEmitter::add_socket(TCPCHandleU hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        TCPCHandleS hwnds = hwnd;
+        hwnds->_self = _sockets_tcpc.emplace(_sockets_tcpc.end(), std::move(hwnd));
+        _impl->add_socket(hwnds);
+    }
+    void SocketEventEmitter::add_socket(UDPHandleU hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        UDPHandleS hwnds = hwnd;
+        hwnds->_self = _sockets_udp.emplace(_sockets_udp.end(), std::move(hwnd));
+        _impl->add_socket(hwnds);
+    }
+
+    void SocketEventEmitter::close_socket(TCPSHandleS hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        _sockets_tcps.erase(hwnd->_self);
+        _impl->close_socket(hwnd);
+
+    }
+    void SocketEventEmitter::close_socket(TCPCHandleS hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        _sockets_tcpc.erase(hwnd->_self);
+        _impl->close_socket(hwnd);
+    }
+    void SocketEventEmitter::close_socket(UDPHandleS hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        _sockets_udp.erase(hwnd->_self);
+        _impl->close_socket(hwnd);
+    }
 
     /*
     TCPS::TCPS(const std::string& name, uint16_t port) {

@@ -14,6 +14,7 @@
 
 #include "callbacks.h"
 #include "time.h"
+#include "shared_unique.h"
 
 namespace NATBuster::Common::Utils
 {
@@ -24,10 +25,13 @@ namespace NATBuster::Common::Utils
         EventEmitterProvider() {
 
         }
+
+        virtual ~EventEmitterProvider() {
+
+        }
     public:
         //Bind the emitter to the current thread
         virtual void bind() = 0;
-
 
         //Only call from same thread used to bind
         //<0: Infinte
@@ -37,23 +41,15 @@ namespace NATBuster::Common::Utils
         //May return sooner for other reasons
         virtual void wait(Time::time_delta_type_us delay) = 0;
 
-        //Only call from same thread used to bind
-        //Run all runnow jobs, and any housekeeping
-        //May be implemented as a 0 lenght wait
-        virtual void yield() {
-            wait(0);
-        }
+        //Can call from any thread
+        //Make wait returns and run fn ASAP
+        //No guarantee made on order, fn may run only when wait is called again
+        virtual void run_now(Common::Utils::Callback<>::raw_type fn) = 0;
 
         //Can call from any thread
         //Make wait return ASAP
-        virtual void interrupt() = 0;
-
-        //Can call from any thread
-        //Stop waiting, and make same thread run fn ASAP
-        virtual void run_now(Common::Utils::Callback<>::raw_type fn) = 0;
-
-        virtual ~EventEmitterProvider() {
-
+        virtual void interrupt() {
+            run_now(nullptr);
         }
     };
 
@@ -83,7 +79,7 @@ namespace NATBuster::Common::Utils
         ShutdownCallback _callback_shutdown;
 
         //OS dependant provider of delay (and maybe other events)
-        std::unique_ptr<EventEmitterProvider> _delay;
+        shared_unique_ptr<EventEmitterProvider> _delay;
 
         //List of timers to add
         std::list<std::shared_ptr<timer>> _timer_additions;
@@ -193,22 +189,22 @@ namespace NATBuster::Common::Utils
         }
     public:
         //Start on this thread (consumes thread)
-        void start_sync(std::unique_ptr<EventEmitterProvider> delay) {
+        void start_sync(shared_unique_ptr<EventEmitterProvider> delay) {
             {
                 std::lock_guard _lg(_system_lock);
                 assert(_running == false);
                 _running = true;
-                _delay = delay;
+                _delay = std::move(delay);
             }
             loop(shared_from_this());
         }
 
         //Starts on a new thread
-        void start_async(std::unique_ptr<EventEmitterProvider> delay) {
+        void start_async(shared_unique_ptr<EventEmitterProvider> delay) {
             std::lock_guard _lg(_system_lock);
             assert(_running == false);
             _running = true;
-            _delay = delay;
+            _delay = std::move(delay);
             _thread = std::thread(EventEmitter::loop, shared_from_this());
         }
 

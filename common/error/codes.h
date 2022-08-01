@@ -21,4 +21,8 @@ namespace NATBuster::Common {
         //Can't resolve a hostname
         NETWORK_ERROR_RESOLVE_HOSTNAME = TYPE_ERROR | SYSTEM_NETWORK | 0x0002,
     };
+
+    void ThrowError(ErrorCode code) {
+        std::cerr << "ERROR " << (uint32_t)code << std::endl;
+    }
 }

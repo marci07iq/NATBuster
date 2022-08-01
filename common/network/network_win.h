@@ -33,20 +33,14 @@ namespace NATBuster::Common::Network {
 
     //Network address OS defined implementation
     //Represent an address (IP and port), IPV4 or IPV6
-    class NetworkAddressImpl {
-        enum Type {
-            Unknown,
-            IPV4,
-            IPV6
-        } _type;
-
+    class NetworkAddressOSData {
+    public:
         SOCKADDR_STORAGE _address;
 
         DWORD _address_length = sizeof(_address);
-    public:
-        NetworkAddressImpl();
-        ErrorCode resolve(const std::string& name, uint16_t port);
 
+        NetworkAddressOSData();
+        
         inline const SOCKADDR_STORAGE* get_data() const {
             return (SOCKADDR_STORAGE*)&_address;
         }
@@ -60,50 +54,20 @@ namespace NATBuster::Common::Network {
         inline DWORD* sizew() {
             return &_address_length;
         }
-
-        inline std::string get_addr() const {
-            if (_address.ss_family == AF_INET) {
-                std::array<char, 16> res;
-                inet_ntop(AF_INET, &((sockaddr_in*)(&_address))->sin_addr, res.data(), res.size());
-                std::string res_str(res.data());
-                return res_str;
-            }
-            if (_address.ss_family == AF_INET6) {
-                std::array<char, 46> res;
-                inet_ntop(AF_INET6, &((sockaddr_in6*)(&_address))->sin6_addr, res.data(), res.size());
-                std::string res_str(res.data());
-                return res_str;
-            }
-            return std::string();
-        }
-        inline uint16_t get_port() const {
-            if (_address.ss_family == AF_INET) {
-                return ntohs(((sockaddr_in*)(&_address))->sin_port);
-            }
-            if (_address.ss_family == AF_INET6) {
-                return ntohs(((sockaddr_in6*)(&_address))->sin6_port);
-            }
-            return 0;
-        }
-
-        inline bool operator==(const NetworkAddressImpl& rhs) const {
-            if (_address_length != rhs._address_length) return false;
-            return memcmp(&_address, &rhs._address, _address_length) == 0;
-        }
-        inline bool operator!=(const NetworkAddressImpl& rhs) const {
-            return !(this->operator==(rhs));
-        }
     };
 
-    std::ostream& operator<<(std::ostream& os, const NetworkAddressImpl& addr);
+    std::ostream& operator<<(std::ostream& os, const NetworkAddressOSData& addr);
+
+    //OS Event wrapper
+    typedef HANDLE EventOSHandle;
 
     //RAII move-only wrapper for OS sockets
-    class SocketImpl : Utils::NonCopyable {
+    class SocketOSData : Utils::NonCopyable {
         SOCKET _socket = INVALID_SOCKET;
     public:
-        SocketImpl(SOCKET socket = INVALID_SOCKET);
-        SocketImpl(SocketImpl&& other);
-        SocketImpl& operator=(SocketImpl&& other);
+        SocketOSData(SOCKET socket = INVALID_SOCKET);
+        SocketOSData(SocketOSData&& other);
+        SocketOSData& operator=(SocketOSData&& other);
         inline void set(SOCKET socket);
 
         inline SOCKET get();
@@ -111,54 +75,138 @@ namespace NATBuster::Common::Network {
         inline bool is_valid() const;
         inline bool is_invalid() const;
 
+        void set_events(EventOSHandle& hwnd);
+
         inline void close();
-        ~SocketImpl();
+        ~SocketOSData();
     };
 
+    class SocketEventEmitterImpl : Utils::NonCopyable {
+        //Only access from thread
 
+        std::vector<EventOSHandle> _socket_events;
+        std::vector<std::shared_ptr<SocketEventHandle>> _socket_objects;
 
-    //RAII wrapped WSA Event structure
-    class EventImpl {
-        WSAEVENT _event = INVALID_HANDLE_VALUE;
+        //Access from any thread
+
+        HANDLE _this_thread;
+        std::list<Common::Utils::Callback<>> _tasks;
+        std::list<std::shared_ptr<SocketEventHandle>> _added_socket_objects;
+        std::mutex _system_lock;
+
+        static void __stdcall apc_fun(ULONG_PTR data) {
+
+        }
     public:
-        EventImpl(EventImpl&& other) noexcept {
-            _event = other._event;
-            other._event = INVALID_HANDLE_VALUE;
-        }
-        EventImpl& operator=(EventImpl&& other) noexcept {
-            _event = other._event;
-            other._event = INVALID_HANDLE_VALUE;
+        void bind() {
+            std::lock_guard _lg(_system_lock);
+            DuplicateHandle(
+                GetCurrentProcess(),
+                GetCurrentThread(),
+                GetCurrentProcess(),
+                &_this_thread,
+                0,
+                TRUE,
+                DUPLICATE_SAME_ACCESS);
         }
 
-        void close() {
-            if (_event != INVALID_HANDLE_VALUE) {
-                WSACloseEvent(_event);
-                _event = INVALID_HANDLE_VALUE;
+        void wait(Time::time_delta_type_us delay) {
+            int64_t delay_ms = (delay + 999) / 1000;
+            DWORD timeout = (delay_ms < std::numeric_limits<DWORD>::max()) ? delay_ms : INFINITE;
+            if (delay < 0) timeout = INFINITE;
+
+            DWORD ncount = _socket_events.size();
+
+            DWORD res = WSAWaitForMultipleEvents(
+                ncount,
+                _socket_events.data(),
+                FALSE, 10000, TRUE);
+
+            if (res == WAIT_IO_COMPLETION) {
+                //APC triggered
+            }
+            else if (res == WAIT_TIMEOUT) {
+                //Timeout triggered
+            }
+            else if (WAIT_OBJECT_0 <= res && res < (WAIT_OBJECT_0 + ncount)) {
+                int index = res - WAIT_OBJECT_0;
+
+                WSANETWORKEVENTS set_events;
+                //TODO: Handle errors
+                int res2 = WSAEnumNetworkEvents(
+                    _socket_objects[index]->_socket->get(),
+                    _socket_events[index],
+                    &set_events);
+
+                if (set_events.lNetworkEvents & FD_CONNECT) {
+                    _socket_objects[index]->_callback_connect();
+                }
+
+                if (set_events.lNetworkEvents & FD_READ) {
+                    Utils::Blob data = Utils::Blob::factory_empty(4000);
+                    WSABUF buffer;
+                    buffer.buf = (CHAR*)data.getw();
+                    buffer.len = data.size();
+                    DWORD received;
+                    DWORD flags = 0;
+                    int res = WSARecv(
+                        _socket_objects[index]->_socket->get(),
+                        &buffer,
+                        1,
+                        &received,
+                        &flags,
+                        NULL,
+                        NULL);
+
+                    //Closed
+                    if (received == 0) {
+                        //TODO: Prevent double firing
+                        _socket_objects[index]->_callback_close();
+                    }
+                    else {
+                        data.resize(received);
+                        _socket_objects[index]->_callback_packet(data);
+                    }
+                }
+
+                if (set_events.lNetworkEvents & FD_ACCEPT) {
+                    TCPCHandleU hwnd;
+
+                    //TODO
+
+                    _socket_objects[index]->_callback_accept(std::move(hwnd));
+                }
+
+                if (set_events.lNetworkEvents & FD_CLOSE) {
+                    _socket_objects[index]->_callback_close();
+                }
+            }
+
+            //Execute updates
+            {
+                std::lock_guard _lg(_system_lock);
+                //TODO
             }
         }
-        ~EventImpl() {
-            close();
+
+        void run_now(Common::Utils::Callback<>::raw_type fn) {
+            std::lock_guard _lg(_system_lock);
+            _tasks.push_back(fn);
+            QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+        }
+
+        void interrupt() {
+            std::lock_guard _lg(_system_lock);
+            QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+        }
+
+        void add_socket(std::shared_ptr<SocketEventHandle> socket) {
+            std::lock_guard _lg(_system_lock);
+            _added_socket_objects.push_back(socket);
+            QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
         }
     };
 
-
-
-    class SocketPoolImpl {
-    public:
-        using 
-
-        struct SocketEvent {
-            SocketImpl socket;
-            EventImpl evt;
-
-
-        };
-
-        std::list<SocketEvent> _sockets;
-
-    public:
-
-    };
 
 
     /*template <typename MY_HWND>

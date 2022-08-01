@@ -4,10 +4,53 @@
 #include "network_win.h"
 
 namespace NATBuster::Common::Network {
-    NetworkAddressImpl::NetworkAddressImpl() {
-        ZeroMemory(&_address, sizeof(SOCKADDR_STORAGE));
+    //WSA wrapper
+
+    namespace WSA {
+        //Class to hold the WSA instance
+        class WSAWrapper : Utils::NonCopyable {
+            WSADATA _wsa_data;
+
+            WSAWrapper(uint8_t major = 2, uint8_t minor = 2) {
+                std::cout << "WSA INIT" << std::endl;
+                //Create an instance of winsock
+                int iResult = WSAStartup(MAKEWORD(major, minor), &_wsa_data);
+                if (iResult != 0) {
+                    throw 1;
+                }
+            }
+
+            ~WSAWrapper() {
+                std::cout << "WSA CLEAN" << std::endl;
+                WSACleanup();
+            }
+
+            static std::shared_ptr<WSAWrapper> wsa_instance;
+
+            static std::shared_ptr<WSAWrapper> get_instance() {
+                if (!wsa_instance) {
+                    wsa_instance = std::shared_ptr<WSAWrapper>(new WSAWrapper());
+                }
+                return wsa_instance;
+            }
+
+        public:
+            WSADATA get() const {
+                return _wsa_data;
+            }
+        };
     }
-    ErrorCode NetworkAddressImpl::resolve(const std::string& name, uint16_t port) {
+
+    //NetworkAddressImpl specific
+
+    NetworkAddressOSData::NetworkAddressOSData() {
+        _address_length = sizeof(SOCKADDR_STORAGE);
+        ZeroMemory(&_address, _address_length);
+    }
+
+    //NetworkAddress functions implemented
+
+    ErrorCode NetworkAddress::resolve(const std::string& name, uint16_t port) {
         ZeroMemory(&_address, sizeof(SOCKADDR_STORAGE));
 
         if (name.length()) {
@@ -37,113 +80,98 @@ namespace NATBuster::Common::Network {
         return ErrorCode::OK;
     }
 
-    std::ostream& operator<<(std::ostream& os, const NetworkAddressImpl& addr)
+    std::string NetworkAddress::get_addr() const {
+        if (_impl->_address.ss_family == AF_INET) {
+            std::array<char, 16> res;
+            inet_ntop(AF_INET, &((sockaddr_in*)(&_impl->_address))->sin_addr, res.data(), res.size());
+            std::string res_str(res.data());
+            return res_str;
+        }
+        if (_impl->_address.ss_family == AF_INET6) {
+            std::array<char, 46> res;
+            inet_ntop(AF_INET6, &((sockaddr_in6*)(&_impl->_address))->sin6_addr, res.data(), res.size());
+            std::string res_str(res.data());
+            return res_str;
+        }
+        return std::string();
+    }
+    uint16_t NetworkAddress::get_port() const {
+        if (_impl->_address.ss_family == AF_INET) {
+            return ntohs(((sockaddr_in*)(&_impl->_address))->sin_port);
+        }
+        if (_impl->_address.ss_family == AF_INET6) {
+            return ntohs(((sockaddr_in6*)(&_impl->_address))->sin6_port);
+        }
+        return 0;
+    }
+
+    bool NetworkAddress::operator==(const NetworkAddress& rhs) const {
+        if (_impl->_address_length != rhs._impl->_address_length) return false;
+        return memcmp(&_impl->_address, &rhs._impl->_address, _impl->_address_length) == 0;
+    }
+    bool NetworkAddress::operator!=(const NetworkAddress& rhs) const {
+        return !(this->operator==(rhs));
+    }
+
+    std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr)
     {
         os << addr.get_addr() << ":" << addr.get_port() << std::endl;
         return os;
     }
 
+    //SocketImpl
 
-    SocketImpl::SocketImpl(SOCKET socket) : _socket(socket) {
+    SocketOSData::SocketOSData(SOCKET socket) : _socket(socket) {
 
     }
-    SocketImpl::SocketImpl(SocketImpl&& other) noexcept {
+    SocketOSData::SocketOSData(SocketOSData&& other) noexcept {
         _socket = other._socket;
         other._socket = INVALID_SOCKET;
     }
-    SocketImpl& SocketImpl::operator=(SocketImpl&& other) noexcept {
+    SocketOSData& SocketOSData::operator=(SocketOSData&& other) noexcept {
         close();
         _socket = other._socket;
         other._socket = INVALID_SOCKET;
     }
-    inline void SocketImpl::set(SOCKET socket) {
+    inline void SocketOSData::set(SOCKET socket) {
         close();
         _socket = socket;
     }
 
-    inline SOCKET SocketImpl::get() {
+    inline SOCKET SocketOSData::get() {
         return _socket;
     }
 
-    inline bool SocketImpl::is_valid() const {
+    inline bool SocketOSData::is_valid() const {
         return _socket != INVALID_SOCKET;
     }
-    inline bool SocketImpl::is_invalid() const {
+    inline bool SocketOSData::is_invalid() const {
         return _socket == INVALID_SOCKET;
     }
 
-    inline void SocketImpl::close() {
+    void SocketOSData::set_events(EventOSHandle& hwnd) {
+        WSAEventSelect(
+            _socket,
+            hwnd,
+            FD_READ | FD_ACCEPT | FD_CONNECT | FD_CLOSE);
+    }
+
+    inline void SocketOSData::close() {
         if (is_valid()) {
             //std::cout << "CLOSE SOCKET" << std::endl;
             closesocket(_socket);
             _socket = INVALID_SOCKET;
         }
     }
-    SocketImpl::~SocketImpl() {
+    SocketOSData::~SocketOSData() {
         close();
     }
 
-
-
-    
-
-
-    //Log errors
-    void NetworkError(NetworkErrorCodes internal_id, int os_id) {
-
-        wchar_t* s = NULL;
-        FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL, os_id,
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPWSTR)&s, 0, NULL);
-
-        std::cerr << "Error code: " << internal_id << ", " << os_id << ":";
-        std::wcerr << s;
-        std::cerr << std::endl;
-
-        LocalFree(s);
-
-    }
-
-    namespace WSA {
-        //Class to hold the WSA instance
-        class WSAContainer;
-        class WSAWrapper : Utils::NonCopyable {
-            WSADATA _wsa_data;
-
-            WSAWrapper(uint8_t major = 2, uint8_t minor = 2) {
-                //Create an instance of winsock
-                int iResult = WSAStartup(MAKEWORD(major, minor), &_wsa_data);
-                if (iResult != 0) {
-                    NetworkError(NetworkErrorCodeInitalize, iResult);
-                    return;
-                }
-            }
-
-            ~WSAWrapper() {
-                std::cout << "WSA CLEAN" << std::endl;
-                WSACleanup();
-            }
-
-            friend class WSAContainer;
-
-        public:
-            WSADATA get() const {
-                return _wsa_data;
-            }
-        };
-
-        class WSAContainer {
-        public:
-            static const WSAWrapper wsa;
-        };
-
-        const WSAWrapper WSAContainer::wsa(2, 2);
-    }
     //
     // TCP Server OS implementation
     // 
 
+    /*
     TCPS::TCPS(const std::string& name, uint16_t port) {
         int iResult;
 
@@ -311,7 +339,7 @@ namespace NATBuster::Common::Network {
         if (_socket.invalid()) {
             NetworkError(NetworkErrorCodeConnect, 0);
             return;
-        }*/
+        }**
     }
 
     TCPC::TCPC(SOCKET client, NetworkAddress remote_addr) : SocketBase<TCPCHandle>(client), _remote_addr(remote_addr) {
@@ -463,7 +491,7 @@ namespace NATBuster::Common::Network {
     UDP::~UDP() {
         _socket.close();
     }
-
+    */
 }
 
 #endif

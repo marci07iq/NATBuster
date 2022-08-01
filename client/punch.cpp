@@ -140,7 +140,7 @@ namespace NATBuster::Client {
                 shello_view->content.describe.nat.port_max = 65535;
                 shello_view->content.describe.nat.rate_limit = 25;
                 shello.copy_from(_outbound_magic_content, 8);
-                
+
                 //TODO: Get from IP server
                 Common::Utils::Blob ip = Common::Utils::Blob::factory_string("localhost");
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <memory>
+#include "shared_unique.h"
 
 namespace NATBuster::Common::Utils {
     //Class that cant be copied
@@ -44,8 +44,8 @@ namespace NATBuster::Common::Utils {
         }
     public:
         template<typename ...ARGS>
-        std::shared_ptr<SELF> create(ARGS... args) {
-            std::shared_ptr<SELF> res = std::shared_ptr<SELF>(new SELF(std::forward(args...)));
+        shared_unique_ptr<SELF> create(ARGS... args) {
+            shared_unique_ptr<SELF> res = shared_unique_ptr<SELF>(new SELF(std::forward(args...)));
             res->init();
             return res;
         }

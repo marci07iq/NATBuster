@@ -11,7 +11,7 @@ namespace NATBuster::Client {
     //Class to perform the punch between two symmetric NATs
     //Opens hunders of outbound UDP ports, aimed at random ports on the target
     //By the birthday paradox, this should succeed after ~sqrt(65536) tries
-    class HolepunchSym : public std::enable_shared_from_this<HolepunchSym> {
+    class HolepunchSym : public Common::Utils::SharedOnly<HolepunchSym> {
     public:
         using PunchCallback = Common::Utils::Callback<Common::Network::UDPHandle>;
 

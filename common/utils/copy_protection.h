@@ -40,9 +40,13 @@ namespace NATBuster::Common::Utils {
         SharedOnly() {
 
         }
+
+        virtual void init() {
+
+        }
     public:
         template<typename ...ARGS>
-        shared_unique_ptr<SELF> create(ARGS... args) {
+        static shared_unique_ptr<SELF> create(ARGS... args) {
             shared_unique_ptr<SELF> res = shared_unique_ptr<SELF>(new SELF(std::forward(args...)));
             res->init();
             return res;

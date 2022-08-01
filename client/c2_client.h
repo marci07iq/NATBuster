@@ -11,7 +11,7 @@
 #include "../common/utils/waker.h"
 
 namespace NATBuster::Client {
-    class C2Client : public std::enable_shared_from_this<C2Client> {
+    class C2Client : public Common::Utils::SharedOnly<C2Client> {
         //The underlying comms layer to the C2 server
         std::shared_ptr<Common::Transport::OPTPipes> _underlying;
 

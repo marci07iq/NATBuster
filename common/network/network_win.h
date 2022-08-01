@@ -23,11 +23,7 @@
 #include <stdint.h>
 #include <string>
 
-#include "network_common.h"
 #include "network.h"
-#include "../utils/copy_protection.h"
-#include "../utils/blob.h"
-#include "../error/codes.h"
 
 namespace NATBuster::Common::Network {
 
@@ -37,7 +33,7 @@ namespace NATBuster::Common::Network {
     public:
         SOCKADDR_STORAGE _address;
 
-        DWORD _address_length = sizeof(_address);
+        INT _address_length = sizeof(_address);
 
         NetworkAddressOSData();
         NetworkAddressOSData(NetworkAddressOSData& other);
@@ -50,10 +46,10 @@ namespace NATBuster::Common::Network {
             return (SOCKADDR_STORAGE*)&_address;
         }
 
-        inline const DWORD size() const {
+        inline const INT size() const {
             return _address_length;
         }
-        inline DWORD* sizew() {
+        inline INT* sizew() {
             return &_address_length;
         }
     };
@@ -68,8 +64,8 @@ namespace NATBuster::Common::Network {
         SOCKET _socket = INVALID_SOCKET;
     public:
         SocketOSData(SOCKET socket = INVALID_SOCKET);
-        SocketOSData(SocketOSData&& other);
-        SocketOSData& operator=(SocketOSData&& other);
+        SocketOSData(SocketOSData&& other) noexcept;
+        SocketOSData& operator=(SocketOSData&& other) noexcept;
         inline void set(SOCKET socket);
 
         inline SOCKET get();
@@ -83,7 +79,7 @@ namespace NATBuster::Common::Network {
         ~SocketOSData();
     };
 
-    class SocketEventEmitterImpl : Utils::NonCopyable {
+    class SocketEventEmitterProviderImpl : Utils::NonCopyable {
         //Only access from thread
 
         std::vector<EventOSHandle> _socket_events;
@@ -109,7 +105,7 @@ namespace NATBuster::Common::Network {
 
         void interrupt();
 
-        void add_socket(std::shared_ptr<SocketEventHandle> socket);
+        void start_socket(std::shared_ptr<SocketEventHandle> socket);
 
         void close_socket(std::shared_ptr<SocketEventHandle> socket);
     };

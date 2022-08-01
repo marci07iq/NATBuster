@@ -1,7 +1,7 @@
 #ifdef WIN32
 
-#include "network.h"
 #include "network_win.h"
+#include "network.h"
 
 namespace NATBuster::Common::Network {
     //WSA wrapper
@@ -29,7 +29,7 @@ namespace NATBuster::Common::Network {
 
             static std::shared_ptr<WSAWrapper> get_instance() {
                 if (!wsa_instance) {
-                    wsa_instance = std::shared_ptr<WSAWrapper>(new WSAWrapper());
+                    wsa_instance.reset(new WSAWrapper());
                 }
                 return wsa_instance;
             }
@@ -63,12 +63,12 @@ namespace NATBuster::Common::Network {
     }
     NetworkAddress::NetworkAddress(NetworkAddress& other) : _impl(std::make_unique<NetworkAddressOSData>(*other._impl)) {
     }
-    NetworkAddress::NetworkAddress(NetworkAddress&& other) : _impl(std::move(other._impl)) {
+    NetworkAddress::NetworkAddress(NetworkAddress&& other) noexcept : _impl(std::move(other._impl)) {
     }
     NetworkAddress& NetworkAddress::operator=(NetworkAddress& other) {
         _impl->operator=(*other._impl);
     }
-    NetworkAddress& NetworkAddress::operator=(NetworkAddress&& other) {
+    NetworkAddress& NetworkAddress::operator=(NetworkAddress&& other) noexcept {
         _impl = std::move(other._impl);
     }
 
@@ -216,9 +216,11 @@ namespace NATBuster::Common::Network {
         return _socket->close();
     }
 
+    //SocketEventHandle
+
     //TCPS
 
-    TCPS::TCPS() {
+    TCPS::TCPS() : SocketEventHandle(Type::TCPS) {
 
     }
 
@@ -268,15 +270,18 @@ namespace NATBuster::Common::Network {
         return ErrorCode::OK;
     }
 
-    void TCPS::drop() {
-        _base->drop_socket(shared_from_this());
+    void TCPS::start() {
+        _base->start_socket(shared_from_this());
+    }
+    bool TCPS::close() {
+        return _base->close_socket(shared_from_this());
     }
 
-    TCPC::TCPC() {
+    TCPC::TCPC() : SocketEventHandle(Type::TCPC) {
 
     }
-    TCPC::TCPC(SocketOSHandle&& socket) : SocketEventHandle(std::move(socket)) {
-
+    TCPC::TCPC(SocketOSHandle&& socket, NetworkAddress&& remote_address) : SocketEventHandle(Type::TCPC, std::move(socket)) {
+        _remote_address = std::move(remote_address);
     }
 
     ErrorCode TCPC::connect(const std::string& name, uint16_t port) {
@@ -329,25 +334,39 @@ namespace NATBuster::Common::Network {
         ::send(_socket->get(), (const char*)data.getr(), data.size(), 0);
     }
 
-    void TCPC::drop() {
-        _base->drop_socket(shared_from_this());
+    void TCPC::start() {
+        _base->start_socket(shared_from_this());
     }
-    
+    bool TCPC::close() {
+        return _base->close_socket(shared_from_this());
+    }
+
+    UDP::UDP() : SocketEventHandle(Type::UDP) {
+
+    }
+
     void UDP::send(Utils::ConstBlobView& data) {
         ::send(_socket->get(), (const char*)data.getr(), data.size(), 0);
     }
 
+    void UDP::start() {
+        _base->start_socket(shared_from_this());
+    }
+    bool UDP::close() {
+        return _base->close_socket(shared_from_this());
+    }
+
     //SocketEventEmitterImpl
 
-    void SocketEventEmitterImpl::close(int idx) {
+    void SocketEventEmitterProviderImpl::close(int idx) {
 
     }
 
-    void __stdcall SocketEventEmitterImpl::apc_fun(ULONG_PTR data) {
+    void __stdcall SocketEventEmitterProviderImpl::apc_fun(ULONG_PTR data) {
 
     }
 
-    void SocketEventEmitterImpl::bind() {
+    void SocketEventEmitterProviderImpl::bind() {
         std::lock_guard _lg(_system_lock);
         DuplicateHandle(
             GetCurrentProcess(),
@@ -358,8 +377,7 @@ namespace NATBuster::Common::Network {
             TRUE,
             DUPLICATE_SAME_ACCESS);
     }
-
-    void SocketEventEmitterImpl::wait(Time::time_delta_type_us delay) {
+    void SocketEventEmitterProviderImpl::wait(Time::time_delta_type_us delay) {
         int64_t delay_ms = (delay + 999) / 1000;
         DWORD timeout = (delay_ms < std::numeric_limits<DWORD>::max()) ? delay_ms : INFINITE;
         if (delay < 0) timeout = INFINITE;
@@ -397,29 +415,68 @@ namespace NATBuster::Common::Network {
             }
 
             if (set_events.lNetworkEvents & FD_READ) {
-                Utils::Blob data = Utils::Blob::factory_empty(4000);
-                WSABUF buffer;
-                buffer.buf = (CHAR*)data.getw();
-                buffer.len = data.size();
-                DWORD received;
-                DWORD flags = 0;
-                int res3 = WSARecv(
-                    socket,
-                    &buffer,
-                    1,
-                    &received,
-                    &flags,
-                    NULL,
-                    NULL);
+                if (socket_hwnd->_type == SocketEventHandle::Type::TCPC) {
+                    Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
+                    WSABUF buffer;
+                    buffer.buf = (CHAR*)data.getw();
+                    buffer.len = data.size();
+                    DWORD received;
+                    DWORD flags = 0;
+                    int res3 = WSARecv(
+                        socket,
+                        &buffer,
+                        1,
+                        &received,
+                        &flags,
+                        NULL,
+                        NULL);
 
-                //Closed
-                if (received == 0) {
-                    std::lock_guard _lg(_system_lock);
-                    _closed_socket_objects.push_back(socket_hwnd);
+                    //Closed
+                    if (received == 0) {
+                        std::lock_guard _lg(_system_lock);
+                        _closed_socket_objects.push_back(socket_hwnd);
+                    }
+                    else {
+                        data.resize(received);
+                        _socket_objects[index]->_callback_packet(data);
+                    }
+                }
+                else if (socket_hwnd->_type == SocketEventHandle::Type::UDP) {
+                    Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
+                    NetworkAddress source;
+
+                    WSABUF buffer;
+                    buffer.buf = (CHAR*)data.getw();
+                    buffer.len = data.size();
+                    DWORD received;
+                    DWORD flags = 0;
+                    int res3 = WSARecvFrom(
+                        socket,
+                        &buffer,
+                        1,
+                        &received,
+                        &flags,
+                        (sockaddr*)source.get_impl()->get_dataw(),
+                        source.get_impl()->sizew(),
+                        NULL,
+                        NULL
+                    );
+
+                    //Closed
+                    if (received == 0) {
+                        std::lock_guard _lg(_system_lock);
+                        _closed_socket_objects.push_back(socket_hwnd);
+                    }
+                    else {
+                        data.resize(received);
+                        if (source == socket_hwnd->_remote_address) {
+                            socket_hwnd->_callback_packet(data);
+                        }
+                        socket_hwnd->_callback_unfiltered_packet(data, source);
+                    }
                 }
                 else {
-                    data.resize(received);
-                    _socket_objects[index]->_callback_packet(data);
+
                 }
             }
 
@@ -443,7 +500,7 @@ namespace NATBuster::Common::Network {
                 }
                 else {
                     SocketOSHandle accepted = std::make_unique<SocketOSData>(client);
-                    TCPCHandleU new_client(new TCPC(std::move(accepted)));
+                    TCPCHandleU new_client(new TCPC(std::move(accepted), std::move(remote_address)));
 
                     _socket_objects[index]->_callback_accept(std::move(hwnd));
                 }
@@ -457,11 +514,13 @@ namespace NATBuster::Common::Network {
 
         //Execute updates
         {
-            std::lock_guard _lg(_system_lock);
-            
+            std::unique_lock _lg(_system_lock);
+
             while (_closed_socket_objects.size()) {
                 std::shared_ptr<SocketEventHandle> close_socket = _closed_socket_objects.front();
                 _closed_socket_objects.pop_front();
+
+                _system_lock.unlock();
 
                 for (int i = 0; i < _socket_objects.size(); i++) {
                     if (_socket_objects[i] == close_socket) {
@@ -480,11 +539,15 @@ namespace NATBuster::Common::Network {
                         break;
                     }
                 }
+
+                _system_lock.lock();
             }
 
             while (_added_socket_objects.size()) {
                 std::shared_ptr<SocketEventHandle> add_socket = _added_socket_objects.front();
                 _added_socket_objects.pop_front();
+
+                _system_lock.unlock();
 
                 //Create events objects
                 HANDLE new_event = WSACreateEvent();
@@ -494,91 +557,106 @@ namespace NATBuster::Common::Network {
                 _socket_events.push_back(new_event);
                 _socket_objects.push_back(add_socket);
                 assert(_socket_events.size() == _socket_objects.size());
+
+                add_socket->_callback_start();
+
+                _system_lock.lock();
             }
         }
     }
 
-    void SocketEventEmitterImpl::run_now(Common::Utils::Callback<>::raw_type fn) {
+    void SocketEventEmitterProviderImpl::run_now(Common::Utils::Callback<>::raw_type fn) {
         std::lock_guard _lg(_system_lock);
         _tasks.push_back(fn);
-        QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+        QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
-
-    void SocketEventEmitterImpl::interrupt() {
+    void SocketEventEmitterProviderImpl::interrupt() {
         std::lock_guard _lg(_system_lock);
-        QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+        QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
 
-    void SocketEventEmitterImpl::add_socket(std::shared_ptr<SocketEventHandle> socket) {
+    void SocketEventEmitterProviderImpl::start_socket(std::shared_ptr<SocketEventHandle> socket) {
         std::lock_guard _lg(_system_lock);
         _added_socket_objects.push_back(socket);
-        QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+        QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
-
-    void SocketEventEmitterImpl::close_socket(std::shared_ptr<SocketEventHandle> socket) {
+    void SocketEventEmitterProviderImpl::close_socket(std::shared_ptr<SocketEventHandle> socket) {
         std::lock_guard _lg(_system_lock);
         _closed_socket_objects.push_back(socket);
-        QueueUserAPC(SocketEventEmitterImpl::apc_fun, _this_thread, 0);
+        QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
 
-    //SocketEventEmitter
+    //SocketEventEmitterProvider
 
-    void SocketEventEmitter::bind() {
+    void SocketEventEmitterProvider::bind() {
         _impl->bind();
     }
-
-    void SocketEventEmitter::wait(Time::time_delta_type_us delay) {
+    void SocketEventEmitterProvider::wait(Time::time_delta_type_us delay) {
         _impl->wait(delay);
     }
 
-    void SocketEventEmitter::run_now(Common::Utils::Callback<>::raw_type fn) {
+    void SocketEventEmitterProvider::run_now(Common::Utils::Callback<>::raw_type fn) {
         _impl->run_now(fn);
     }
-
-    void SocketEventEmitter::interrupt() {
+    void SocketEventEmitterProvider::interrupt() {
         _impl->interrupt();
     }
 
-    void SocketEventEmitter::add_socket(TCPSHandleU hwnd) {
+    void SocketEventEmitterProvider::associate_socket(TCPSHandleU&& hwnd) {
         std::lock_guard _lg(_sockets_lock);
 
         TCPSHandleS hwnds = hwnd;
         hwnds->_self = _sockets_tcps.emplace(_sockets_tcps.end(), std::move(hwnd));
-        _impl->add_socket(hwnds);
+        hwnds->_base = shared_from_this();
     }
-    void SocketEventEmitter::add_socket(TCPCHandleU hwnd) {
+    void SocketEventEmitterProvider::associate_socket(TCPCHandleU&& hwnd) {
         std::lock_guard _lg(_sockets_lock);
 
         TCPCHandleS hwnds = hwnd;
         hwnds->_self = _sockets_tcpc.emplace(_sockets_tcpc.end(), std::move(hwnd));
-        _impl->add_socket(hwnds);
+        hwnds->_base = shared_from_this();
     }
-    void SocketEventEmitter::add_socket(UDPHandleU hwnd) {
+    void SocketEventEmitterProvider::associate_socket(UDPHandleU&& hwnd) {
         std::lock_guard _lg(_sockets_lock);
 
         UDPHandleS hwnds = hwnd;
         hwnds->_self = _sockets_udp.emplace(_sockets_udp.end(), std::move(hwnd));
-        _impl->add_socket(hwnds);
+        hwnds->_base = shared_from_this();
     }
 
-    void SocketEventEmitter::close_socket(TCPSHandleS hwnd) {
+    bool SocketEventEmitterProvider::start_socket(std::shared_ptr<SocketEventHandle> hwnd) {
         std::lock_guard _lg(_sockets_lock);
 
+        _impl->start_socket(hwnd);
+    }
+
+    bool SocketEventEmitterProvider::close_socket(TCPSHandleS hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        if (hwnd->_self == _sockets_tcps.end()) return false;
         _sockets_tcps.erase(hwnd->_self);
+        hwnd->_self = _sockets_tcps.end();
         _impl->close_socket(hwnd);
+        return true;
 
     }
-    void SocketEventEmitter::close_socket(TCPCHandleS hwnd) {
+    bool SocketEventEmitterProvider::close_socket(TCPCHandleS hwnd) {
         std::lock_guard _lg(_sockets_lock);
 
+        if (hwnd->_self == _sockets_tcpc.end()) return false;
         _sockets_tcpc.erase(hwnd->_self);
+        hwnd->_self = _sockets_tcpc.end();
         _impl->close_socket(hwnd);
+        return true;
     }
-    void SocketEventEmitter::close_socket(UDPHandleS hwnd) {
+    bool SocketEventEmitterProvider::close_socket(UDPHandleS hwnd) {
         std::lock_guard _lg(_sockets_lock);
 
+        if (hwnd->_self == _sockets_udp.end()) return false;
         _sockets_udp.erase(hwnd->_self);
+        hwnd->_self = _sockets_udp.end();
         _impl->close_socket(hwnd);
+        return true;
     }
 
     /*

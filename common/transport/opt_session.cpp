@@ -29,7 +29,7 @@ namespace NATBuster::Common::Transport {
         {
         case NATBuster::Common::Transport::OPTSession::DATA:
             if (_flags._first_kex_ok) {
-                _result_callback(content);
+                _callback_packet(content);
             }
             else {
                 //Error;
@@ -46,7 +46,7 @@ namespace NATBuster::Common::Transport {
             case NATBuster::Common::Proto::KEX::KEX_Event::OK_Done:
                 if (!_flags._first_kex_ok) {
                     //Let upper levels know that the tunnle is ready
-                    _open_callback();
+                    _callback_open();
                 }
                 _flags._first_kex_ok = true;
                 break;
@@ -79,16 +79,16 @@ namespace NATBuster::Common::Transport {
     //Called when a packet can be read
     void OPTSession::on_raw(const Utils::ConstBlobView& data) {
         if (_flags._first_kex_ok) {
-            _raw_callback(data);
+            _callback_raw(data);
         }
     }
     //Called when a socket error occurs
-    void OPTSession::on_error() {
-        _error_callback();
+    void OPTSession::on_error(ErrorCode code) {
+        _callback_error(code);
     }
     //Socket was closed
     void OPTSession::on_close() {
-        _close_callback();
+        _callback_close();
     }
 
     void OPTSession::send_internal(PacketType type, const Utils::ConstBlobView& packet) {
@@ -142,31 +142,13 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTSession::start() {
-        _underlying->set_open_callback(new Utils::MemberWCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_open));
-        _underlying->set_packet_callback(new Utils::MemberWCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_packet));
-        _underlying->set_raw_callback(new Utils::MemberWCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_raw));
-        _underlying->set_error_callback(new Utils::MemberWCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_error));
-        _underlying->set_close_callback(new Utils::MemberWCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_close));
+        _underlying->set_callback_open(new Utils::MemberWCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_open));
+        _underlying->set_callback_packet(new Utils::MemberWCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_packet));
+        _underlying->set_callback_raw(new Utils::MemberWCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_raw));
+        _underlying->set_callback_error(new Utils::MemberWCallback<OPTSession, void, ErrorCode>(weak_from_this(), &OPTSession::on_error));
+        _underlying->set_callback_close(new Utils::MemberWCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_close));
 
         _underlying->start();
-    }
-
-    //Add a callback that will be called in `delta` time, if the emitter is still running
-    //There is no way to cancel this call
-    //Only call from callbacks, or before start
-    inline void OPTSession::addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
-        _underlying->addDelay(cb, delta);
-    }
-
-    //Add a callback that will be called at time `end`, if the emitter is still running
-    //There is no way to cancel this call
-    //Only call from callbacks, or before start
-    inline void OPTSession::addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _underlying->addTimer(cb, end);
-    }
-
-    void OPTSession::updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _underlying->updateFloatingNext(cb, end);
     }
 
     //Send ordered packet

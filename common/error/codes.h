@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 
 namespace NATBuster::Common {
@@ -26,6 +28,10 @@ namespace NATBuster::Common {
         NETWORK_ERROR_SERVER_BIND = TYPE_ERROR | SYSTEM_NETWORK | 0x0004,
         //Can't listen to server socket
         NETWORK_ERROR_SERVER_LISTEN = TYPE_ERROR | SYSTEM_NETWORK | 0x0005,
+        
+        SYSTEM_OPT_UDP = 0x00020000,
+        //Invalid ping packet received
+        OPT_UDP_INVALID_PING = TYPE_ERROR | SYSTEM_OPT_UDP | 0x0001,
     };
 
     void ThrowError(ErrorCode code) {

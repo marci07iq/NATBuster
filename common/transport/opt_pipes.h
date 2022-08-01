@@ -9,12 +9,9 @@
 namespace NATBuster::Common::Transport {
     class OPTPipes;
 
-    class OPTPipe : public OPTBase, public std::enable_shared_from_this<OPTPipe> {
+    class OPTPipe : public OPTBase, public Utils::SharedOnly<OPTPipe> {
         std::shared_ptr<OPTPipes> _underlying;
         uint32_t _id;
-
-        //Floating timer set by upstream
-        Utils::Timers::timer _floating;
 
         friend class OPTPipes;
 
@@ -57,20 +54,15 @@ namespace NATBuster::Common::Transport {
         //Send UDP-like packet (no order / arrival guarantee, likely faster)
         void sendRaw(const Utils::ConstBlobView& packet);
 
-        //Add a callback that will be called in `delta` time, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta);
-
-        //Add a callback that will be called at time `end`, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
-
-        //Overwrite the next time the floating timer is fired
-        //There is only one floating timer
-        //Only call from callbacks, or before start
-        void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
+        inline timer_hwnd add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry) {
+            return _underlying->add_timer(cb, expiry);
+        }
+        inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
+            return _underlying->add_delay(cb, delay);
+        }
+        inline bool cancel_timer(timer_hwnd hwnd) {
+            return _underlying->cancel_timer(hwnd);
+        }
 
         //Close connection gracefully
         //If you dont want to accept a pipe, simple drop the pointer
@@ -92,7 +84,7 @@ namespace NATBuster::Common::Transport {
         const Utils::_ConstBlobView& content;
     };
 
-    class OPTPipes : public OPTBase, public std::enable_shared_from_this<OPTPipes> {
+    class OPTPipes : public OPTBase, public Utils::SharedOnly<OPTPipes> {
     public:
         using PipeCallback = Utils::Callback<OPTPipeOpenData>;
     private:
@@ -154,8 +146,6 @@ namespace NATBuster::Common::Transport {
 
         std::mutex _tx_lock;
 
-        Utils::Timers::timer _floating;
-
         friend class OPTPipe;
     private:
 
@@ -166,54 +156,9 @@ namespace NATBuster::Common::Transport {
         //Called when a packet can be read
         void on_raw(const Utils::ConstBlobView& data);
         //Called when a socket error occurs
-        void on_error();
-        //Timer
-        void on_floating();
+        void on_error(ErrorCode code);
         //Socket was closed
         void on_close();
-
-        void updateFloatingNext() {
-            std::shared_lock _lg(_pipe_lock);
-
-            int cnt = 0;
-            Time::time_type_us earliest = 0;
-
-            //Find earliest amound pipes
-            for (auto&& it : _pipes) {
-                std::shared_ptr<OPTPipe> pipe = it.second.lock();
-                if (pipe) {
-                    if (pipe->_floating.cb.has_function()) {
-                        if (cnt == 0) {
-                            earliest = pipe->_floating.dst;
-                        }
-                        else {
-                            earliest = Time::earlier(earliest, pipe->_floating.dst);
-                        }
-                        ++cnt;
-                    }
-                }
-            }
-
-            //Add own
-            if (_floating.cb.has_function()) {
-                if (cnt == 0) {
-                    earliest = _floating.dst;
-                }
-                else {
-                    earliest = Time::earlier(earliest, _floating.dst);
-                }
-                ++cnt;
-            }
-
-            //Set underlying callback
-            if (cnt > 0) {
-                _underlying->updateFloatingNext(
-                    new Utils::MemberWCallback<OPTPipes, void>(
-                        weak_from_this(),
-                        &OPTPipes::on_floating
-                        ), earliest);
-            }
-        };
 
         OPTPipes(
             bool is_client,
@@ -236,20 +181,15 @@ namespace NATBuster::Common::Transport {
             _pipe_callback = pipe_callback;
         }
 
-        //Add a callback that will be called in `delta` time, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta);
-
-        //Add a callback that will be called at time `end`, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
-
-        //Overwrite the next time the floating timer is fired
-        //There is only one floating timer
-        //Only call from callbacks, or before start
-        void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
+        inline timer_hwnd add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry) {
+            return _underlying->add_timer(cb, expiry);
+        }
+        inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
+            return _underlying->add_delay(cb, delay);
+        }
+        inline bool cancel_timer(timer_hwnd hwnd) {
+            return _underlying->cancel_timer(hwnd);
+        }
 
         //Send ordered packet
         void send(const Utils::ConstBlobView& packet) {

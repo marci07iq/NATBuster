@@ -25,5 +25,9 @@ namespace NATBuster::Common::Utils {
             std::shared_ptr<T>::reset(other.get());
             other.reset();
         }
+
+        std::shared_ptr<T> get_shared() {
+            return *this;
+        }
     };
 }

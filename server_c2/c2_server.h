@@ -16,7 +16,7 @@ namespace NATBuster::Server {
 
 
 
-    class C2Server : public std::enable_shared_from_this<C2Server> {
+    class C2Server : public Common::Utils::SharedOnly<C2Server> {
     public:
         std::list<std::shared_ptr<C2ServerRoute>> _routes;
         std::mutex _route_lock;
@@ -54,7 +54,7 @@ namespace NATBuster::Server {
     };
 
 
-    class C2ServerEndpoint : public std::enable_shared_from_this<C2ServerEndpoint> {
+    class C2ServerEndpoint : public Common::Utils::SharedOnly<C2ServerEndpoint> {
         //The socket (probably not needed)
         Common::Network::TCPCHandle _socket;
         //Underlying pipes
@@ -103,7 +103,7 @@ namespace NATBuster::Server {
 
 
     
-    class C2ServerRoute : public std::enable_shared_from_this<C2ServerRoute> {
+    class C2ServerRoute : public Common::Utils::SharedOnly<C2ServerRoute> {
         //The main server pool, for registering identity
         std::shared_ptr<C2Server> _server;
 

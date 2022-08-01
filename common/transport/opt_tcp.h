@@ -17,7 +17,7 @@ namespace NATBuster::Common::Transport {
 
     typedef std::shared_ptr<OPTTCP> OPTTCPHandle;
 
-    class OPTTCP : public OPTBase, public std::enable_shared_from_this<OPTTCP> {
+    class OPTTCP : public OPTBase, public Utils::SharedOnly<OPTTCP> {
 #pragma pack(push, 1)
         struct packet_decoder : Utils::NonStack {
             enum PacketType : uint8_t {
@@ -45,10 +45,9 @@ namespace NATBuster::Common::Transport {
 #pragma pack(pop)
         
         //Socket
-        Network::TCPCHandle _socket;
-        //PollEventEmitter wrapping the socket
-        std::shared_ptr<Utils::PollEventEmitter<Network::TCPCHandle, Utils::Void>> _source;
-
+        std::shared_ptr<Utils::EventEmitter> _emitter;
+        Network::TCPCHandleS _socket;
+        
         static const uint32_t max_packet_size = 1 << 24;
 
         uint32_t _reassamble_total_len = 0;
@@ -151,36 +150,31 @@ namespace NATBuster::Common::Transport {
 
         //Called when the emitter starts
         void on_open();
-        //Called when a packet can be read
-        void on_receive(Utils::Void data);
+        //Called when a packet arrives
+        void on_receive(const Utils::ConstBlobView&);
         //Called when a socket error occurs
-        void on_error();
+        void on_error(ErrorCode code);
         //Socket was closed
         void on_close();
 
         OPTTCP(
             bool is_client,
-            Network::TCPCHandle socket
+            std::shared_ptr<Utils::EventEmitter> emitter,
+            Network::TCPCHandleS socket
         );
 
     public:
-        static OPTTCPHandle create(
-            bool is_client,
-            Network::TCPCHandle socket);
-
         void start();
 
-        //Add a callback that will be called in `delta` time, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta);
-
-        //Add a callback that will be called at time `end`, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
-
-        void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override;
+        inline timer_hwnd add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry) {
+            return _emitter->add_timer(cb, expiry);
+        }
+        inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
+            return _emitter->add_delay(cb, delay);
+        }
+        inline bool cancel_timer(timer_hwnd hwnd) {
+            return _emitter->cancel_timer(hwnd);
+        }
 
         void send(const Utils::ConstBlobView& data);
         void sendRaw(const Utils::ConstBlobView& data);

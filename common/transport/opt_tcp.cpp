@@ -9,20 +9,14 @@
 
 namespace NATBuster::Common::Transport {
     void OPTTCP::on_open() {
-        _open_callback();
+        _callback_open();
     }
 
-    void OPTTCP::on_receive(Utils::Void data) {
-        Utils::Blob packet;
-        //Packet not neccessarily really available
-        bool res = _socket->read(packet, 1, 8000);
-
-        if (!res) {
-            close();
-            return;
-        }
-        _reassamble_total_len += packet.size();
-        _reassamble_list.push_back(std::move(packet));
+    void OPTTCP::on_receive(const Utils::ConstBlobView& data_ref) {
+        Utils::Blob data = Utils::Blob::factory_empty(data_ref.size());
+        data.copy_from(data_ref);
+        _reassamble_total_len += data.size();
+        _reassamble_list.push_back(std::move(data));
 
         while (_reassamble_list.size() > 0) {
             //Now try to reassamble
@@ -45,7 +39,7 @@ namespace NATBuster::Common::Transport {
                     //Read out 5 byte header and content
                     if (read_from_reassamble_list(content, 5 + decode->len, false)) {
                         //Cut off the header, and send to user
-                        _result_callback(content.cslice_right(5));
+                        _callback_packet(content.cslice_right(5));
                     }
                     else {
                         goto exit_loop;
@@ -55,7 +49,7 @@ namespace NATBuster::Common::Transport {
                     //Read out 5 byte header and content
                     if (read_from_reassamble_list(content, 5 + decode->len, false)) {
                         //Cut off the header, and send to user
-                        _raw_callback(content.cslice_right(5));
+                        _callback_raw(content.cslice_right(5));
                     }
                     else {
                         goto exit_loop;
@@ -78,56 +72,38 @@ namespace NATBuster::Common::Transport {
 
     }
 
-    void OPTTCP::on_error() {
-        _error_callback();
+    void OPTTCP::on_error(ErrorCode code) {
+        _callback_error(code);
     }
 
     void OPTTCP::on_close() {
-        _close_callback();
+        _callback_close();
     }
 
     OPTTCP::OPTTCP(
         bool is_client,
-        Network::TCPCHandle socket
+        std::shared_ptr<Utils::EventEmitter> emitter,
+        Network::TCPCHandleS socket
     ) : OPTBase(is_client),
-        _socket(socket),
-        _source(std::make_shared<Utils::PollEventEmitter<Network::TCPCHandle, Utils::Void>>(socket))
+        _emitter(emitter),
+        _socket(socket)
     {
 
     }
 
-    OPTTCPHandle OPTTCP::create(
-        bool is_client,
-        Network::TCPCHandle socket) {
-        return std::shared_ptr<OPTTCP>(new OPTTCP(is_client, socket));
-    }
-
     void OPTTCP::start() {
         //Set callbacks
-        _source->set_open_callback(new Utils::MemberWCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_open));
-        _source->set_result_callback(new Utils::MemberWCallback<OPTTCP, void, Utils::Void>(weak_from_this(), &OPTTCP::on_receive));
-        _source->set_error_callback(new Utils::MemberWCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_error));
-        _source->set_close_callback(new Utils::MemberWCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_close));
+        if (_is_client) {
+            _socket->set_callback_connect(new Utils::MemberWCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_open));
+        }
+        else {
+            _socket->set_callback_start(new Utils::MemberWCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_open));
+        }
+        _socket->set_callback_packet(new Utils::MemberWCallback<OPTTCP, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTTCP::on_receive));
+        _socket->set_callback_error(new Utils::MemberWCallback<OPTTCP, void, ErrorCode>(weak_from_this(), &OPTTCP::on_error));
+        _socket->set_callback_close(new Utils::MemberWCallback<OPTTCP, void>(weak_from_this(), &OPTTCP::on_close));
 
-        _source->start();
-    }
-
-    //Add a callback that will be called in `delta` time, if the emitter is still running
-    //There is no way to cancel this call
-    //Only call from callbacks, or before start
-    inline void OPTTCP::addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
-        _source->addDelay(cb, delta);
-    }
-
-    //Add a callback that will be called at time `end`, if the emitter is still running
-    //There is no way to cancel this call
-    //Only call from callbacks, or before start
-    inline void OPTTCP::addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _source->addTimer(cb, end);
-    }
-
-    void OPTTCP::updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _source->updateFloatingNext(cb, end);
+        _socket->start();
     }
 
     void OPTTCP::send(const Utils::ConstBlobView& data) {
@@ -158,6 +134,6 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTTCP::close() {
-        _source->close();
+        _socket->close();
     }
 };

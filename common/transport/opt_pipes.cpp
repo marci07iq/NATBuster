@@ -73,7 +73,7 @@ namespace NATBuster::Common::Transport {
             _underlying->_underlying->send(req_packet);
 
             //Add a callback to close the connection if the open still hasnt been accepted
-            addDelay(
+            add_delay(
                 new Utils::MemberSCallback<OPTPipe, void>(
                     shared_from_this(), &OPTPipe::on_open_expired),
                 10000000
@@ -110,30 +110,6 @@ namespace NATBuster::Common::Transport {
         _underlying->_underlying->sendRaw(full_packet);
     }
 
-    //Add a callback that will be called in `delta` time, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-    void OPTPipe::addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
-        _underlying->addDelay(cb, delta);
-    };
-
-    //Add a callback that will be called at time `end`, if the emitter is still running
-    //There is no way to cancel this call
-    //Only call from callbacks, or before start
-    void OPTPipe::addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _underlying->addTimer(cb, end);
-    };
-
-    //Overwrite the next time the floating timer is fired
-    //There is only one floating timer
-    //Only call from callbacks, or before start
-    void OPTPipe::updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _floating.cb = cb;
-        _floating.dst = end;
-
-        _underlying->updateFloatingNext();
-    };
-
     //Request closing the connection (gracefully if possible)
     //Close callback will be issued when that succeeded
     void OPTPipe::close() {
@@ -150,7 +126,7 @@ namespace NATBuster::Common::Transport {
 
             _underlying->_underlying->send(req_packet);
 
-            _close_callback();
+            _callback_close();
         }
     }
 
@@ -175,7 +151,7 @@ namespace NATBuster::Common::Transport {
 
     //Called when the underlying opens
     void OPTPipes::on_open() {
-        _open_callback();
+        _callback_open();
     }
     //Called when a packet can be read
     void OPTPipes::on_packet(const Utils::ConstBlobView& data) {
@@ -222,7 +198,7 @@ namespace NATBuster::Common::Transport {
 
                         if (pipe->_open_state == OPTPipe::OpenRequstSent) {
                             pipe->_open_state = OPTPipe::Opened;
-                            pipe->_open_callback();
+                            pipe->_callback_open();
                         }
                     }
                 }
@@ -244,7 +220,7 @@ namespace NATBuster::Common::Transport {
                     if (pipe->_open_state != OPTPipe::Closed) {
                         pipe->_open_state = OPTPipe::Closed;
                         //Issue close callback
-                        pipe->_close_callback();
+                        pipe->_callback_close();
                     }
                 }
             }
@@ -261,14 +237,14 @@ namespace NATBuster::Common::Transport {
 
                 if (pipe) {
                     if (pipe->_open_state == OPTPipe::Opened) {
-                        pipe->_result_callback(content);
+                        pipe->_callback_packet(content);
                     }
                 }
             }
         }
         break;
         case packet_decoder::SELF_DATA:
-            _result_callback(content);
+            _callback_packet(content);
             break;
         default:
             close();
@@ -293,14 +269,14 @@ namespace NATBuster::Common::Transport {
                 _lg.unlock();
                 if (pipe) {
                     if (pipe->_open_state == OPTPipe::Opened) {
-                        pipe->_raw_callback(content);
+                        pipe->_callback_raw(content);
                     }
                 }
             }
         }
         break;
         case packet_decoder::SELF_DATA:
-            _raw_callback(content);
+            _callback_raw(content);
             break;
         case packet_decoder::PIPE_OPEN_REQ:
         case packet_decoder::PIPE_OPEN_RESP:
@@ -311,36 +287,15 @@ namespace NATBuster::Common::Transport {
         }
     }
     //Called when a socket error occurs
-    void OPTPipes::on_error() {
+    void OPTPipes::on_error(ErrorCode code) {
         std::shared_lock _lg(_pipe_lock);
 
         for (auto& it : _pipes) {
             std::shared_ptr<OPTPipe> pipe = it.second.lock();
             if (pipe) {
-                pipe->_error_callback();
+                pipe->_callback_error(code);
             }
         }
-    }
-    //Timer
-    void OPTPipes::on_floating() {
-        std::shared_lock _lg(_pipe_lock);
-
-        //Find earliest
-        for (auto& it : _pipes) {
-            std::shared_ptr<OPTPipe> pipe = it.second.lock();
-            if (pipe) {
-                if (pipe->_floating.dst < Time::now()) {
-                    pipe->_floating.cb.call_and_clear();
-                }
-            }
-        }
-
-        if (_floating.dst < Time::now()) {
-            _floating.cb.call_and_clear();
-        }
-
-
-        updateFloatingNext();
     }
     //Socket was closed
     void OPTPipes::on_close() {
@@ -349,7 +304,7 @@ namespace NATBuster::Common::Transport {
         for (auto& it : _pipes) {
             std::shared_ptr<OPTPipe> pipe = it.second.lock();
             if (pipe) {
-                pipe->_close_callback();
+                pipe->_callback_close();
             }
         }
     }
@@ -367,11 +322,11 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTPipes::start() {
-        _underlying->set_open_callback(new Utils::MemberWCallback<OPTPipes, void>(weak_from_this(), &OPTPipes::on_open));
-        _underlying->set_packet_callback(new Utils::MemberWCallback<OPTPipes, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTPipes::on_packet));
-        _underlying->set_raw_callback(new Utils::MemberWCallback<OPTPipes, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTPipes::on_raw));
-        _underlying->set_error_callback(new Utils::MemberWCallback<OPTPipes, void>(weak_from_this(), &OPTPipes::on_error));
-        _underlying->set_close_callback(new Utils::MemberWCallback<OPTPipes, void>(weak_from_this(), &OPTPipes::on_close));
+        _underlying->set_callback_open(new Utils::MemberWCallback<OPTPipes, void>(weak_from_this(), &OPTPipes::on_open));
+        _underlying->set_callback_packet(new Utils::MemberWCallback<OPTPipes, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTPipes::on_packet));
+        _underlying->set_callback_raw(new Utils::MemberWCallback<OPTPipes, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTPipes::on_raw));
+        _underlying->set_callback_error(new Utils::MemberWCallback<OPTPipes, void, ErrorCode>(weak_from_this(), &OPTPipes::on_error));
+        _underlying->set_callback_close(new Utils::MemberWCallback<OPTPipes, void>(weak_from_this(), &OPTPipes::on_close));
 
         _underlying->start();
     }
@@ -391,30 +346,6 @@ namespace NATBuster::Common::Transport {
         }
 
         return pipe;
-    }
-
-    //Add a callback that will be called in `delta` time, if the emitter is still running
-    //There is no way to cancel this call
-    //Only call from callbacks, or before start
-    inline void OPTPipes::addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
-        _underlying->addDelay(cb, delta);
-    }
-
-    //Add a callback that will be called at time `end`, if the emitter is still running
-    //There is no way to cancel this call
-    //Only call from callbacks, or before start
-    inline void OPTPipes::addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _underlying->addTimer(cb, end);
-    }
-
-    //Overwrite the next time the floating timer is fired
-    //There is only one floating timer
-    //Only call from callbacks, or before start
-    inline void OPTPipes::updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _floating.cb = cb;
-        _floating.dst = end;
-
-        updateFloatingNext();
     }
 
     std::shared_ptr<Identity::User> OPTPipes::getUser() {

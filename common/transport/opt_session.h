@@ -30,7 +30,7 @@ namespace NATBuster::Common::Transport {
     // A<-B: M2: Version and capabilities
     // Selected version is min(Va, Vb)
 
-    class OPTSession : public OPTBase, public std::enable_shared_from_this<OPTSession> {
+    class OPTSession : public OPTBase, public Utils::SharedOnly<OPTSession> {
         enum PacketType : uint8_t {
             //Encrypted data packet
             DATA = 0,
@@ -81,7 +81,7 @@ namespace NATBuster::Common::Transport {
         //Called when a packet can be read
         void on_raw(const Utils::ConstBlobView& data);
         //Called when a socket error occurs
-        void on_error();
+        void on_error(ErrorCode code);
         //Socket was closed
         void on_close();
 
@@ -111,17 +111,15 @@ namespace NATBuster::Common::Transport {
         //Send raw fasttrack packet, passed stright to the underlying inderface
         void sendRaw(const Utils::ConstBlobView& packet);
 
-        //Add a callback that will be called in `delta` time, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) override;
-
-        //Add a callback that will be called at time `end`, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override;
-
-        void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override;
+        inline timer_hwnd add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry) {
+            return _underlying->add_timer(cb, expiry);
+        }
+        inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
+            return _underlying->add_delay(cb, delay);
+        }
+        inline bool cancel_timer(timer_hwnd hwnd) {
+            return _underlying->cancel_timer(hwnd);
+        }
 
         void close();
 

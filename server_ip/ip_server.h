@@ -9,9 +9,9 @@ namespace NATBuster::Server {
 
     class IPServer;
 
-    class IPServerEndpoint : public std::enable_shared_from_this<IPServerEndpoint> {
+    class IPServerEndpoint : public Common::Utils::SharedOnly<IPServerEndpoint> {
         //The socket, to get address from
-        Common::Network::TCPCHandle _socket;
+        Common::Network::TCPCHandleS _socket;
         //Underliyng OPT
         std::shared_ptr<Common::Transport::OPTBase> _underlying;
         //The main server pool
@@ -19,54 +19,44 @@ namespace NATBuster::Server {
 
         //Called when a packet can be read
         void on_open();
-        //Called when a packet can be read
-        /*void on_packet(const Common::Utils::ConstBlobView& data) {
-
-        }
-        //Called when a packet can be read
-        void on_raw(const Common::Utils::ConstBlobView& data) {
-
-        }
-        //Called when a socket error occurs
-        void on_error() {
-
-        }*/
         //Timer
         void on_timeout();
         //Socket was closed
         void on_close();
 
         IPServerEndpoint(
-            Common::Network::TCPCHandle socket,
+            Common::Network::TCPCHandleS socket,
             std::shared_ptr<Common::Transport::OPTBase> underlying,
             std::shared_ptr<IPServer> server);
 
         void start();
+
+        void init() override;
     public:
-        static std::shared_ptr<IPServerEndpoint> create(
-            Common::Network::TCPCHandle socket,
-            std::shared_ptr<Common::Transport::OPTBase> underlying,
-            std::shared_ptr<IPServer> server);
     };
 
-    class IPServer : public std::enable_shared_from_this<IPServer> {
+    class IPServer : public Common::Utils::SharedOnly<IPServer> {
     public:
         //The currently open connections
         std::set<std::shared_ptr<IPServerEndpoint>> _connections;
         std::mutex _connection_lock;
         
         //Handle to the underlying socket
-        Common::Network::TCPSHandle _hwnd;
+        Common::Network::TCPCHandleS _socket;
         //Handle to the underlying event emitter, to better control the thread
-        std::shared_ptr<Common::Network::TCPSEmitter> _emitter;
+        std::shared_ptr<Common::Utils::EventEmitter> _emitter;
         //List of users authorised to use the server
         std::shared_ptr<Common::Identity::UserGroup> _authorised_users;
         //Identity of this server
         Common::Crypto::PKey _self;
 
-        void connect_callback(Common::Utils::Void data);
+        //Client emitter pool
+        std::shared_ptr<Common::Network::SocketEventEmitterProvider> _client_emitter_provider;
+        Common::Utils::shared_unique_ptr<Common::Utils::EventEmitter> _client_emitter;
 
-        void error_callback();
+        void accept_callback(Common::Network::TCPCHandleU&& socket);
+
+        void error_callback(Common::ErrorCode code);
 
         void close_callback();
 

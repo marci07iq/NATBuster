@@ -19,7 +19,7 @@ namespace NATBuster::Client {
 
     class C2Client;
 
-    class Router : public std::enable_shared_from_this<Router> {
+    class Router : public Common::Utils::SharedOnly<Router> {
 #pragma pack(push, 1)
         //To decode the TCP forward requests
         struct request_decoder : Common::Utils::NonStack {
@@ -103,7 +103,7 @@ namespace NATBuster::Client {
         }*/
     };
 
-    class RouterTCPS : public std::enable_shared_from_this<RouterTCPS> {
+    class RouterTCPS : public Common::Utils::SharedOnly<RouterTCPS> {
         std::shared_ptr<Router> _router;
 
         //The iterator to self registration
@@ -133,7 +133,7 @@ namespace NATBuster::Client {
     };
 
 
-    class RouterTCPRoute : public std::enable_shared_from_this<RouterTCPRoute> {
+    class RouterTCPRoute : public Common::Utils::SharedOnly<RouterTCPRoute> {
         //The main router, for registering identity
         std::shared_ptr<Router> _router;
 

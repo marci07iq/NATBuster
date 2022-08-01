@@ -7,7 +7,7 @@
 #include "../common/utils/waker.h"
 
 namespace NATBuster::Client {
-    class IPClient : public std::enable_shared_from_this<IPClient> {
+    class IPClient : public Common::Utils::SharedOnly<IPClient> {
         //The underlying comms layer
         std::shared_ptr<Common::Transport::OPTBase> _underlying;
         //The raw socket

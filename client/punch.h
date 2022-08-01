@@ -8,7 +8,7 @@ namespace NATBuster::Client {
     class C2Client;
 
     //Class to negotiate punching
-    class Puncher : public std::enable_shared_from_this<Puncher> {
+    class Puncher : public Common::Utils::SharedOnly<Puncher> {
     public:
         using PunchCallback = Common::Utils::Callback<std::shared_ptr<Common::Transport::OPTSession>>;
     private:

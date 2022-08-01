@@ -1,7 +1,7 @@
 #include "../utils/event.h"
 
 namespace NATBuster::Common::Network {
-    class TCPS;
+    /*class TCPS;
     class TCPC;
     class UDP;
 
@@ -40,5 +40,5 @@ namespace NATBuster::Common::Network {
         //Select readable socket
         NetworkErrorCodeSelectRead,
 
-    };
+    };*/
 };

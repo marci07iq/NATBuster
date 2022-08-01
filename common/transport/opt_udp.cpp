@@ -63,7 +63,7 @@ namespace NATBuster::Common::Transport {
 
                 Utils::Blob assembled = Utils::Blob::factory_consume(buffer, new_len);
 
-                _result_callback(assembled);
+                _callback_packet(assembled);
                 _reassemble_list.clear();
             }
 
@@ -72,90 +72,88 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTUDP::on_open() {
-        _open_callback();
+        _callback_open();
     }
 
-    void OPTUDP::on_receive(Utils::Void data) {
-        Utils::Blob packet;
-        //Packet not neccessarily really available
-        bool res = _socket->readFilter(packet, _settings._max_mtu * 2);
+    void OPTUDP::on_receive(const Utils::ConstBlobView& data_ref) {
 
-        if (res) {
-            Time::time_type_us now = Time::now();
-            packet_decoder* pkt = packet_decoder::view(packet);
+        Time::time_type_us now = Time::now();
+        const packet_decoder* pkt = packet_decoder::cview(data_ref);
 
-            switch ((pkt->type)) {
-                //Shouldnt get hello once connection up, but a few may still be in pipe
-                //Ignore
-            case packet_decoder::PacketType::MGMT_HELLO:
-                break;
-                //Ping: reply with pong
-            case packet_decoder::PacketType::MGMT_PING:
-                if (packet.size() == 65) {
-                    send_pong(packet);
-                }
-                else {
-                    _error_callback();
-                }
-                break;
-                //Pong: update pong timer
-            case packet_decoder::PacketType::MGMT_PONG:
-                _last_pong_in = now;
-                break;
-                //ACK: remove from re-transmit queue, update ping time estiamte
-            case packet_decoder::PacketType::PKT_ACK:
-            {
-                std::lock_guard _lg(_tx_lock);
-                uint32_t seq = pkt->content.packet.seq;
-                auto it = _transmit_queue.begin();
-                while (it != _transmit_queue.end()) {
-                    if (
-                        //Check correct SEQ number
-                        (packet_decoder::view(it->packet)->content.packet.seq & packet_decoder::seq_num_mask) ==
-                        (seq & packet_decoder::seq_num_mask) &&
-                        //Actually existing re-transmit attempt
-                        ((seq & packet_decoder::seq_rt_mask) < it->transmits.size())
-                        ) {
-                        //Time of flight
-                        Time::time_delta_type_us tof = now - it->transmits[seq & packet_decoder::seq_rt_mask];
-                        //Update ping
-                        _ping += _settings.ping_average_weight * (tof / 1000000.f - _ping);
-                        _ping2 += _settings.ping_average_weight * ((tof / 1000000.f) * (tof / 1000000.f) - _ping2);
-                        //Remove from re-transmit system
-                        auto it2 = it++;
-                        _transmit_queue.erase(it2);
-                    }
-                    else {
-                        ++it;
-                    }
-                }
+        switch ((pkt->type)) {
+            //Shouldnt get hello once connection up, but a few may still be in pipe
+            //Ignore
+        case packet_decoder::PacketType::MGMT_HELLO:
+            break;
+            //Ping: reply with pong
+        case packet_decoder::PacketType::MGMT_PING:
+            if (data_ref.size() == 65) {
+                send_pong(data_ref);
             }
-            //Data packet
-            case packet_decoder::PacketType::PKT_MID:
-            case packet_decoder::PacketType::PKT_START:
-            case packet_decoder::PacketType::PKT_END:
-            case packet_decoder::PacketType::PKT_SINGLE:
-                //Safe even at roll-around
-            {
-                int32_t advance = pkt->content.packet.seq - _rx_seq;
-                if (advance >= 0) {
-                    _receive_map.insert({ pkt->content.packet.seq, std::move(packet) });
-                    try_reassemble();
-                }
+            else {
+                _callback_error(ErrorCode::OPT_UDP_INVALID_PING);
             }
             break;
-
-            case packet_decoder::PacketType::UDP_PIPE:
-                _raw_callback(packet);
-                break;
+            //Pong: update pong timer
+        case packet_decoder::PacketType::MGMT_PONG:
+            _last_pong_in = now;
+            break;
+            //ACK: remove from re-transmit queue, update ping time estiamte
+        case packet_decoder::PacketType::PKT_ACK:
+        {
+            std::lock_guard _lg(_tx_lock);
+            uint32_t seq = pkt->content.packet.seq;
+            auto it = _transmit_queue.begin();
+            while (it != _transmit_queue.end()) {
+                if (
+                    //Check correct SEQ number
+                    (packet_decoder::view(it->packet)->content.packet.seq & packet_decoder::seq_num_mask) ==
+                    (seq & packet_decoder::seq_num_mask) &&
+                    //Actually existing re-transmit attempt
+                    ((seq & packet_decoder::seq_rt_mask) < it->transmits.size())
+                    ) {
+                    //Time of flight
+                    Time::time_delta_type_us tof = now - it->transmits[seq & packet_decoder::seq_rt_mask];
+                    //Update ping
+                    _ping += _settings.ping_average_weight * (tof / 1000000.f - _ping);
+                    _ping2 += _settings.ping_average_weight * ((tof / 1000000.f) * (tof / 1000000.f) - _ping2);
+                    //Remove from re-transmit system
+                    auto it2 = it++;
+                    _transmit_queue.erase(it2);
+                }
+                else {
+                    ++it;
+                }
             }
+        }
+        //Data packet
+        case packet_decoder::PacketType::PKT_MID:
+        case packet_decoder::PacketType::PKT_START:
+        case packet_decoder::PacketType::PKT_END:
+        case packet_decoder::PacketType::PKT_SINGLE:
+            //Safe even at roll-around
+        {
+            int32_t advance = pkt->content.packet.seq - _rx_seq;
+            if (advance >= 0) {
+                Utils::Blob data = Utils::Blob::factory_empty(data_ref.size());
+                data.copy_from(data_ref);
+
+                _receive_map.insert({ pkt->content.packet.seq, std::move(data) });
+                try_reassemble();
+            }
+        }
+        break;
+
+        case packet_decoder::PacketType::UDP_PIPE:
+            _callback_raw(data_ref);
+            break;
         }
 
         on_housekeeping();
     }
 
-    void OPTUDP::on_error() {
-        _error_callback();
+    void OPTUDP::on_error(ErrorCode code) {
+        _callback_error(code);
     }
 
     void OPTUDP::on_ping_timer() {
@@ -163,21 +161,11 @@ namespace NATBuster::Common::Transport {
         //Send a ping
         send_ping();
         //Set next delay
-        _source->addDelay(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_ping_timer), _settings.ping_interval);
-    }
-
-    void OPTUDP::on_floating_timer() {
-        if (_internal_floating <= Time::now()) {
-            on_housekeeping();
-        }
-
-        if (_external_floating.cb.has_function() && _external_floating.dst <= Time::now()) {
-            _external_floating.cb.call_and_clear();
-        }
+        _emitter->add_delay(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_ping_timer), _settings.ping_interval);
     }
 
     void OPTUDP::on_close() {
-        _close_callback();
+        _callback_close();
     }
 
     void OPTUDP::on_housekeeping() {
@@ -219,65 +207,35 @@ namespace NATBuster::Common::Transport {
         //Pong expired
         if (_last_pong_in + _settings.max_pong < Time::now()) {
             //Time to shut down
-            _source->close();
+            _socket->close();
         }
-
-        _source->updateFloatingNext(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_floating_timer), next_floating_time());
     }
 
     OPTUDP::OPTUDP(
         bool is_client,
-        Network::UDPHandle socket,
+        std::shared_ptr<Utils::EventEmitter> emitter,
+        Network::TCPCHandleS socket,
         OPTUDPSettings settings
     ) : OPTBase(is_client),
+        _emitter(emitter),
         _socket(socket),
-        _source(std::make_shared<Utils::PollEventEmitter<Network::UDPHandle, Utils::Void>>(socket)),
         _settings(settings) {
 
-    }
-
-    OPTUDPHandle OPTUDP::create(
-        bool is_client,
-        Network::UDPHandle socket,
-        OPTUDPSettings settings
-    ) {
-        return std::shared_ptr<OPTUDP>(new OPTUDP(is_client, socket, settings));
     }
 
     void OPTUDP::start() {
         std::cout << "OPT UDP Starting" << std::endl;
 
         //Set callbacks
-        _source->set_open_callback(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_open));
-        _source->set_result_callback(new Utils::MemberWCallback<OPTUDP, void, Utils::Void>(weak_from_this(), &OPTUDP::on_receive));
-        _source->set_error_callback(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_error));
-        _source->set_close_callback(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_close));
+        _socket->set_callback_start(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_open));
+        _socket->set_callback_packet(new Utils::MemberWCallback<OPTUDP, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTUDP::on_receive));
+        _socket->set_callback_error(new Utils::MemberWCallback<OPTUDP, void, ErrorCode>(weak_from_this(), &OPTUDP::on_error));
+        _socket->set_callback_close(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_close));
 
         //Start pinging
-        _source->addDelay(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_ping_timer), _settings.ping_interval);
+        _emitter->add_delay(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_ping_timer), _settings.ping_interval);
 
-        _source->start();
-    }
-
-    //Add a callback that will be called in `delta` time, if the emitter is still running
-    //There is no way to cancel this call
-    //Only call from callbacks, or before start
-    inline void OPTUDP::addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta) {
-        _source->addDelay(cb, delta);
-    }
-
-    //Add a callback that will be called at time `end`, if the emitter is still running
-    //There is no way to cancel this call
-    //Only call from callbacks, or before start
-    inline void OPTUDP::addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _source->addTimer(cb, end);
-    }
-
-    void OPTUDP::updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) {
-        _external_floating.cb = cb;
-        _external_floating.dst = end;
-
-        _source->updateFloatingNext(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_floating_timer), next_floating_time());
+        _socket->start();
     }
 
     void OPTUDP::send(const Utils::ConstBlobView& data) {
@@ -338,6 +296,6 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTUDP::close() {
-        _source->close();
+        _socket->close();
     }
 };

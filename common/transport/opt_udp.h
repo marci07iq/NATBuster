@@ -30,7 +30,7 @@ namespace NATBuster::Common::Transport {
 
     typedef std::shared_ptr<OPTUDP> OPTUDPHandle;
 
-    class OPTUDP : public OPTBase, public std::enable_shared_from_this<OPTUDP> {
+    class OPTUDP : public OPTBase, public Utils::SharedOnly<OPTUDP> {
 #pragma pack(push, 1)
         struct packet_decoder : Utils::NonStack {
             static const uint32_t seq_rt_mask = 0x3f;
@@ -117,9 +117,8 @@ namespace NATBuster::Common::Transport {
         std::mutex _tx_lock;
 
         //Socket
-        Network::UDPHandle _socket;
-        //PollEventEmitter wrapping the socket
-        std::shared_ptr<Utils::PollEventEmitter<Network::UDPHandle, Utils::Void>> _source;
+        std::shared_ptr<Utils::EventEmitter> _emitter;
+        Network::TCPCHandleS _socket;
 
         //Running average of ACK pings
         float _ping = 0.1f;
@@ -191,15 +190,11 @@ namespace NATBuster::Common::Transport {
         //Called when the emitter starts
         void on_open();
         //Called when a packet can be read
-        void on_receive(Utils::Void data);
+        void on_receive(const Utils::ConstBlobView& data);
         //Called when a socket error occurs
-        void on_error();
+        void on_error(ErrorCode code);
         //Called for the ping timer
         void on_ping_timer();
-        //The variable timer, used for checking the pong dying, and the retransmit
-        void on_floating_timer();
-        Time::time_type_us _internal_floating;
-        Utils::Timers::timer _external_floating;
         //Socket was closed
         void on_close();
 
@@ -208,7 +203,8 @@ namespace NATBuster::Common::Transport {
 
         OPTUDP(
             bool is_client,
-            Network::UDPHandle socket,
+            std::shared_ptr<Utils::EventEmitter> emitter,
+            Network::TCPCHandleS socket,
             OPTUDPSettings settings
         );
 
@@ -216,25 +212,17 @@ namespace NATBuster::Common::Transport {
         //Expose as public, for the puncher
         static const uint8_t MGMT_HELLO = packet_decoder::PacketType::MGMT_HELLO;
 
-        static OPTUDPHandle create(
-            bool is_client,
-            Network::UDPHandle socket,
-            OPTUDPSettings settings = OPTUDPSettings()
-        );
-
         void start();
 
-        //Add a callback that will be called in `delta` time, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addDelay(Utils::Timers::TimerCallback::raw_type cb, Time::time_delta_type_us delta);
-
-        //Add a callback that will be called at time `end`, if the emitter is still running
-        //There is no way to cancel this call
-        //Only call from callbacks, or before start
-        void addTimer(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end);
-
-        void updateFloatingNext(Utils::Timers::TimerCallback::raw_type cb, Time::time_type_us end) override;
+        inline timer_hwnd add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry) {
+            return _emitter->add_timer(cb, expiry);
+        }
+        inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
+            return _emitter->add_delay(cb, delay);
+        }
+        inline bool cancel_timer(timer_hwnd hwnd) {
+            return _emitter->cancel_timer(hwnd);
+        }
 
         void send(const Utils::ConstBlobView& data);
         void sendRaw(const Utils::ConstBlobView& data);

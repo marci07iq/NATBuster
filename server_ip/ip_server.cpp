@@ -45,7 +45,7 @@ namespace NATBuster::Server {
     }
 
     IPServerEndpoint::IPServerEndpoint(
-        Common::Network::TCPCHandle socket,
+        Common::Network::TCPCHandleS socket,
         std::shared_ptr<Common::Transport::OPTBase> underlying,
         std::shared_ptr<IPServer> server) :
         _socket(socket), _underlying(underlying), _server(server) {
@@ -70,36 +70,30 @@ namespace NATBuster::Server {
         _underlying->start();
     }
 
-    std::shared_ptr<IPServerEndpoint> IPServerEndpoint::create(
-        Common::Network::TCPCHandle socket,
-        std::shared_ptr<Common::Transport::OPTBase> underlying,
-        std::shared_ptr<IPServer> server) {
-        std::shared_ptr<IPServerEndpoint> res = std::shared_ptr<IPServerEndpoint>(new IPServerEndpoint(socket, underlying, server));
-        res->start();
-        return res;
+    void IPServerEndpoint::init() {
+        start();
     }
 
 
-    void IPServer::connect_callback(Common::Utils::Void data) {
-        std::cout << "CONNECT AVAIL" << std::endl;
-        Common::Network::TCPCHandle client = _hwnd->accept();
-        if (client) {
-            std::cout << "ACCEPTED FROM " << client->get_remote_addr().get_addr() << ":" << client->get_remote_addr().get_port() << std::endl;
+    void IPServer::accept_callback(Common::Network::TCPCHandleU&& socket) {
 
-            //Create OPT TCP
-            Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(false, client);
-            //Create OPT Session
-            Common::Crypto::PKey self_copy;
-            self_copy.copy_private_from(_self);
-            std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, std::move(self_copy), _authorised_users);
+        std::cout << "ACCEPTED FROM " << socket->get_remote() << std::endl;
 
-            std::shared_ptr<IPServerEndpoint> endpoint = IPServerEndpoint::create(client, session, shared_from_this());
-        }
+        Common::Network::TCPCHandleS socket_s = socket;
+        _client_emitter_provider->associate_socket(std::move(socket));
+        //Create OPT TCP
+        Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(false, _client_emitter.get_shared(), socket_s);
+        //Create OPT Session
+        Common::Crypto::PKey self_copy;
+        self_copy.copy_private_from(_self);
+        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, std::move(self_copy), _authorised_users);
+
+        std::shared_ptr<IPServerEndpoint> endpoint = IPServerEndpoint::create(socket_s, session, shared_from_this());
 
     }
 
-    void IPServer::error_callback() {
-        std::cout << "ERR" << std::endl;
+    void IPServer::error_callback(Common::ErrorCode code) {
+        std::cout << "ERR " << (uint32_t)code << std::endl;
     }
 
     void IPServer::close_callback() {

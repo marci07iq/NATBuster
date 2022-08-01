@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "../error/codes.h"
 #include "../utils/blob.h"
 #include "../utils/callbacks.h"
 #include "../utils/copy_protection.h"
@@ -11,32 +12,54 @@
 
 namespace NATBuster::Common::Transport {
     //Ordered packet transport
-    class OPTBase : public Utils::EventEmitter<const Utils::ConstBlobView&> {
+    class OPTBase : Utils::NonCopyable {
     public:
-        
+        using OpenCallback = Utils::Callback<>;
+        using PacketCallback = Utils::Callback<const Utils::ConstBlobView&>;
+        using ErrorCallback = Utils::Callback<ErrorCode>;
+        using CloseCallback = Utils::Callback<>;
+
+        using timer_hwnd = Utils::EventEmitter::timer_hwnd;
+        using TimerCallback = Utils::EventEmitter::TimerCallback;
     protected:
-        ResultCallback _raw_callback;
+        OpenCallback _callback_open;
+        PacketCallback _callback_packet;
+        PacketCallback _callback_raw;
+        ErrorCallback _callback_error;
+        CloseCallback _callback_close;
         
         bool _is_client;
 
+        //Abstact base class
         OPTBase(bool is_client);
-    private:
-        using Utils::EventEmitter<const Utils::ConstBlobView&>::set_result_callback;
-    public:
-        //Called when a TCP type packet is available
-        //All callbacks are issued from the same thread
-        //Safe to call from any thread, even during a callback
-        inline void set_packet_callback(
-            ResultCallback::raw_type packet_callback) {
-            set_result_callback(packet_callback);
-        }
 
-        //Called when a UDP type packet is available
-        //All callbacks are issued from the same thread
-        //Safe to call from any thread, even during a callback
-        inline void set_raw_callback(
-            ResultCallback::raw_type raw_callback) {
-            _raw_callback = raw_callback;
+    public:
+        //Called when the event amitter is ready, and can accept send
+        //Thread safe
+        inline void set_callback_open(
+            OpenCallback::raw_type callback_open) {
+            _callback_open = callback_open;
+        }
+        //Called when ordered packet arrives
+        //Thread safe
+        inline void set_callback_packet(
+            PacketCallback::raw_type callback_packet) {
+            _callback_packet = callback_packet;
+        }
+        //Called when raw packet arrives
+        inline void set_callback_raw(
+            PacketCallback::raw_type callback_raw) {
+            _callback_raw = callback_raw;
+        }
+        //Called when error occurs
+        inline void set_callback_error(
+            ErrorCallback::raw_type callback_error) {
+            _callback_error = callback_error;
+        }
+        //Called when system closes
+        inline void set_callback_close(
+            CloseCallback::raw_type callback_close) {
+            _callback_close = callback_close;
         }
 
         //Send ordered packet
@@ -45,19 +68,32 @@ namespace NATBuster::Common::Transport {
         //Send UDP-like packet (no order / arrival guarantee, likely faster)
         //Safe to call from any thread, even during a callback
         virtual void sendRaw(const Utils::ConstBlobView& packet) = 0;
-        //Close connection (gracefully) if possible
-        //Will issue a close callback unless one has already been issued
-        //Safe to call from any thread, even during a callback
-        virtual void close() = 0;
 
-        //Only call from a callback
+        //Can call from any thread
+        virtual timer_hwnd add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry) = 0;
+
+        //Can call from any thread
+        virtual timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) = 0;
+
+        //Can call from any thread
+        virtual bool cancel_timer(timer_hwnd hwnd) = 0;
+
+        //Can call from any thread
         virtual std::shared_ptr<Identity::User> getUser() {
             return Identity::User::Anonymous;
         }
 
+        //Can call from any thread
         inline bool is_client() const {
             return _is_client;
         }
+
+        virtual void start() = 0;
+
+        //Close connection (gracefully) if possible
+        //Will issue a close callback unless one has already been issued
+        //Safe to call from any thread, even during a callback
+        virtual void close() = 0;
 
         virtual ~OPTBase() {
 

@@ -238,7 +238,7 @@ namespace NATBuster::Common::Transport {
     OPTUDP::OPTUDP(
         bool is_client,
         std::shared_ptr<Utils::EventEmitter> emitter,
-        Network::TCPCHandleS socket,
+        Network::UDPHandleS socket,
         OPTUDPSettings settings
     ) : OPTBase(is_client),
         _emitter(emitter),

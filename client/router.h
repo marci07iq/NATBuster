@@ -7,7 +7,6 @@
 #include "../common/utils/event.h"
 #include "../common/utils/blob.h"
 #include "../common/network/network.h"
-#include "../common/network/socket_pool.h"
 
 //Terminology used in this part of the project
 //Packet: Logical blocks of data
@@ -20,6 +19,7 @@ namespace NATBuster::Client {
     class C2Client;
 
     class Router : public Common::Utils::SharedOnly<Router> {
+        friend class Common::Utils::SharedOnly<Router>;
 #pragma pack(push, 1)
         //To decode the TCP forward requests
         struct request_decoder : Common::Utils::NonStack {
@@ -49,6 +49,8 @@ namespace NATBuster::Client {
         //The underlying comms layer
         std::shared_ptr<Common::Transport::OPTPipes> _underlying;
 
+        std::shared_ptr<Common::Utils::EventEmitter> _emitter;
+
         //The opened TCPS sockets to send to the remote side
         std::list<std::shared_ptr<RouterTCPS>> _open_tcps;
         friend class RouterTCPS;
@@ -77,7 +79,7 @@ namespace NATBuster::Client {
         void on_open();
         void on_pipe(Common::Transport::OPTPipeOpenData pipe_req);
         void on_packet(const Common::Utils::ConstBlobView& data);
-        void on_error();
+        void on_error(Common::ErrorCode code);
         void on_close();
 
 
@@ -104,18 +106,19 @@ namespace NATBuster::Client {
     };
 
     class RouterTCPS : public Common::Utils::SharedOnly<RouterTCPS> {
+        friend class Common::Utils::SharedOnly<RouterTCPS>;
         std::shared_ptr<Router> _router;
 
         //The iterator to self registration
         std::list<std::shared_ptr<RouterTCPS>>::iterator _self;
 
-        Common::Network::TCPSHandle _tcp_server_socket;
+        Common::Network::TCPSHandleS _tcp_server_socket;
+
         uint16_t _remote_port;
-        Common::Network::TCPSEmitter _tcp_server_emitter;
 
         void on_open();
-        void on_accept(Common::Utils::Void);
-        void on_error();
+        void on_accept(Common::Network::TCPCHandleU&& socket);
+        void on_error(Common::ErrorCode code);
         void on_close();
 
         RouterTCPS(
@@ -134,6 +137,7 @@ namespace NATBuster::Client {
 
 
     class RouterTCPRoute : public Common::Utils::SharedOnly<RouterTCPRoute> {
+        friend class Common::Utils::SharedOnly<RouterTCPRoute>;
         //The main router, for registering identity
         std::shared_ptr<Router> _router;
 
@@ -147,13 +151,12 @@ namespace NATBuster::Client {
         //Server side: Receives the pipe, forwards it to a new tcp client socket
         bool _is_client;
 
-        Common::Network::TCPCHandle _socket;
-        Common::Network::TCPCEmitter _emitter;
+        Common::Network::TCPCHandleS _socket;
 
         void on_socket_open();
         void on_pipe_packet(const Common::Utils::ConstBlobView& data);
-        void on_socket_packet(Common::Utils::Void);
-        void on_error();
+        void on_socket_packet(const Common::Utils::ConstBlobView& data);
+        void on_error(Common::ErrorCode code);
         void on_pipe_close();
         void on_socket_close();
 
@@ -165,7 +168,7 @@ namespace NATBuster::Client {
 
         RouterTCPRoute(
             std::shared_ptr<Router> router,
-            Common::Network::TCPCHandle socket,
+            Common::Network::TCPCHandleU&& socket,
             uint16_t remote_port
             );
 
@@ -173,13 +176,15 @@ namespace NATBuster::Client {
     public:
         static std::shared_ptr<RouterTCPRoute> create_server(
             std::shared_ptr<Router> router,
+            std::shared_ptr<Common::Utils::EventEmitter> emitter,
             std::shared_ptr<Common::Transport::OPTPipe> pipe,
             uint16_t local_port
         );
 
         static std::shared_ptr<RouterTCPRoute> create_client(
             std::shared_ptr<Router> router,
-            Common::Network::TCPCHandle socket,
+            Common::Network::TCPCHandleU&& socket,
+            std::shared_ptr<Common::Utils::EventEmitter> emitter,
             uint16_t remote_port
             );
 

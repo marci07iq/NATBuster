@@ -20,14 +20,14 @@ namespace NATBuster::Common::Network {
                 }
             }
 
-            static std::shared_ptr<WSAWrapper> wsa_instance;
-
             static std::shared_ptr<WSAWrapper> get_instance() {
                 if (!wsa_instance) {
                     wsa_instance.reset(new WSAWrapper());
                 }
                 return wsa_instance;
             }
+
+            static std::shared_ptr<WSAWrapper> wsa_instance;
 
         public:
             ~WSAWrapper() {
@@ -39,6 +39,8 @@ namespace NATBuster::Common::Network {
                 return _wsa_data;
             }
         };
+
+        std::shared_ptr<WSAWrapper> WSAWrapper::wsa_instance = WSAWrapper::get_instance();
     }
 
     //NetworkAddressImpl specific
@@ -229,7 +231,7 @@ namespace NATBuster::Common::Network {
         return *this;
     }
 
-    
+
     inline bool SocketBase::is_valid() {
         return _socket->is_valid();
     }
@@ -315,47 +317,105 @@ namespace NATBuster::Common::Network {
     }
 
     ErrorCode TCPC::connect(const std::string& name, uint16_t port) {
+        /*NetworkAddress local_addr;
+
+        _socket.set(::socket(AF_INET6, SOCK_STREAM, 0));
+        if (_socket.is_invalid()) {
+            NetworkError(NetworkErrorCodeCreateClientSocket, WSAGetLastError());
+            return;
+        }
+
+        int ipv6only = 0;
+        int iResult = setsockopt(_socket.get(), IPPROTO_IPV6,
+            IPV6_V6ONLY, (char*)&ipv6only, sizeof(ipv6only));
+        if (iResult == SOCKET_ERROR) {
+            NetworkError(NetworkErrorCodeCreateClientSocket, WSAGetLastError());
+            _socket.close();
+            return;
+        }
+
+        std::string port_s = std::to_string(port);
+        BOOL bSuccess = WSAConnectByName(
+            _socket.get(),
+            name.c_str(),
+            port_s.c_str(),
+            local_addr.sizew(),
+            (SOCKADDR*)local_addr.getw(),
+            _remote_addr.sizew(),
+            (SOCKADDR*)_remote_addr.getw(),
+            NULL,
+            NULL);
+        if (!bSuccess) {
+            NetworkError(NetworkErrorCodeConnect, WSAGetLastError());
+            _socket.close();
+            return;
+        }
+
+        iResult = setsockopt(_socket.get(), SOL_SOCKET,
+            SO_UPDATE_CONNECT_CONTEXT, NULL, 0);
+        if (iResult == SOCKET_ERROR) {
+            wprintf(L"setsockopt for SO_UPDATE_CONNECT_CONTEXT failed with error: %d\n",
+                WSAGetLastError());
+            _socket.close();
+            return;
+        }*/
+
+
         int iResult;
 
         // Protocol
         struct addrinfo hints;
         ZeroMemory(&hints, sizeof(hints));
-        hints.ai_family = AF_INET;
+        hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_protocol = IPPROTO_TCP;
-        hints.ai_flags = AI_PASSIVE;
 
         // Resolve the server address and port
         std::string port_s = std::to_string(port);
         addrinfo* result = nullptr;
-        iResult = ::getaddrinfo(nullptr, port_s.c_str(), &hints, &result);
+        iResult = ::getaddrinfo(name.c_str(), port_s.c_str(), &hints, &result);
         if (iResult != 0) {
             return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
         }
 
-        // Create the server listen socket
-        _socket->set(::socket(result->ai_family, result->ai_socktype, result->ai_protocol));
-        if (is_invalid()) {
+
+        addrinfo* ptr = result;
+        _socket->set(::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol));
+        if (_socket->is_invalid()) {
             freeaddrinfo(result);
             return ErrorCode::NETWORK_ERROR_CREATE_SOCKET;
         }
 
-        // Bind the listen socket
-        iResult = ::bind(_socket->get(), result->ai_addr, (int)result->ai_addrlen);
-        if (iResult == SOCKET_ERROR) {
-            freeaddrinfo(result);
-            _socket->close();
-            return ErrorCode::NETWORK_ERROR_SERVER_BIND;
-        }
-
+        // Connect to server.
+        iResult = WSAConnect(_socket->get(), ptr->ai_addr, (int)ptr->ai_addrlen, NULL, NULL, NULL, NULL);
         freeaddrinfo(result);
-
-        // Set socket to listening mode
-        iResult = ::listen(_socket->get(), SOMAXCONN);
-        if (iResult == SOCKET_ERROR) {
-            _socket->close();
-            return ErrorCode::NETWORK_ERROR_SERVER_LISTEN;
+        if (iResult != ERROR_SUCCESS) {
+            if (iResult == WSAEWOULDBLOCK) {
+                return ErrorCode::NETWORK_WARN_CONNECTING;
+            }
+            else {
+                _socket->close();
+                return ErrorCode::NETWORK_ERROR_CONNECT;
+            }
         }
+        /*
+    for (addrinfo* ptr = result; ptr != nullptr; ptr = ptr->ai_next) {
+        // Create socket
+        _socket.set(::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol));
+        if (_socket.invalid()) {
+            NetworkError(NetworkErrorCodeCreateClientSocket, WSAGetLastError());
+            return;
+        }
+
+        // Connect to server.
+        iResult = ::connect(_socket.get(), ptr->ai_addr, (int)ptr->ai_addrlen);
+        if (iResult == SOCKET_ERROR) {
+            _socket.close();
+            continue;
+        }
+        break;
+    }
+    */
 
         return ErrorCode::OK;
     }
@@ -405,10 +465,6 @@ namespace NATBuster::Common::Network {
 
     //SocketEventEmitterImpl
 
-    void SocketEventEmitterProviderImpl::close(int idx) {
-
-    }
-
     void __stdcall SocketEventEmitterProviderImpl::apc_fun(ULONG_PTR data) {
 
     }
@@ -425,6 +481,8 @@ namespace NATBuster::Common::Network {
             DUPLICATE_SAME_ACCESS);
     }
     void SocketEventEmitterProviderImpl::wait(Time::time_delta_type_us delay) {
+        std::lock_guard _lg(_sockets_lock);
+
         int64_t delay_ms = (delay + 999) / 1000;
         DWORD timeout = (delay_ms < std::numeric_limits<DWORD>::max()) ? delay_ms : INFINITE;
         if (delay < 0) timeout = INFINITE;
@@ -632,8 +690,37 @@ namespace NATBuster::Common::Network {
         _closed_socket_objects.push_back(socket);
         QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
+    bool SocketEventEmitterProviderImpl::extract_socket(std::shared_ptr<SocketEventHandle> socket) {
+        std::lock_guard _lg(_sockets_lock);
+
+        bool success = false;
+
+        for (int i = 0; i < _socket_objects.size(); i++) {
+            if (_socket_objects[i] == socket) {
+                //Close socket and event
+                _socket_objects[i]->close();
+                WSACloseEvent(_socket_events[i]);
+                _socket_objects[i]->_callback_close();
+
+                //Move to front
+                _socket_objects[i] = _socket_objects[_socket_objects.size() - 1];
+                _socket_objects.resize(_socket_objects.size() - 1);
+                _socket_events[i] = _socket_events[_socket_events.size() - 1];
+                _socket_events.resize(_socket_events.size() - 1);
+
+                assert(_socket_events.size() == _socket_objects.size());
+                //Should only delete once
+                assert(success == false);
+                success = true;
+            }
+        }
+
+        return success;
+    }
 
     //SocketEventEmitterProvider
+
+    const int SocketEventEmitterProvider::MAX_SOCKETS = MAXIMUM_WAIT_OBJECTS;
 
     SocketEventEmitterProvider::SocketEventEmitterProvider() : _impl(new SocketEventEmitterProviderImpl()) {
 
@@ -716,6 +803,39 @@ namespace NATBuster::Common::Network {
         hwnd->_self = _sockets_udp.end();
         _impl->close_socket(hwnd);
         return true;
+    }
+
+    TCPSHandleU SocketEventEmitterProvider::extract_socket(TCPSHandleS hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        if (hwnd->_self == _sockets_tcps.end()) return false;
+        TCPSHandleU socket = std::move(*hwnd->_self);
+        _sockets_tcps.erase(hwnd->_self);
+        hwnd->_self = _sockets_tcps.end();
+        return socket;
+    }
+    TCPCHandleU SocketEventEmitterProvider::extract_socket(TCPCHandleS hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        if (hwnd->_self == _sockets_tcpc.end()) return false;
+        TCPCHandleU socket = std::move(*hwnd->_self);
+        _sockets_tcpc.erase(hwnd->_self);
+        hwnd->_self = _sockets_tcpc.end();
+        return socket;
+    }
+    UDPHandleU SocketEventEmitterProvider::extract_socket(UDPHandleS hwnd) {
+        std::lock_guard _lg(_sockets_lock);
+
+        if (hwnd->_self == _sockets_udp.end()) return false;
+        UDPHandleU socket = std::move(*hwnd->_self);
+        _sockets_udp.erase(hwnd->_self);
+        hwnd->_self = _sockets_udp.end();
+        return socket;
+    }
+
+    int SocketEventEmitterProvider::count() {
+        std::lock_guard _lg(_sockets_lock);
+        return _sockets_tcps.size() + _sockets_tcpc.size() + _sockets_udp.size();
     }
 
     /*

@@ -85,7 +85,7 @@ namespace NATBuster::Common::Transport {
         using PipeCallback = Utils::Callback<OPTPipeOpenData>;
     private:
 
-        PipeCallback _pipe_callback;
+        PipeCallback _callback_pipe;
 
 #pragma pack(push, 1)
         struct packet_decoder : Utils::NonStack {
@@ -172,9 +172,9 @@ namespace NATBuster::Common::Transport {
         //Called when a UDP type packet is available
         //All callbacks are issued from the same thread
         //Safe to call from any thread, even during a callback
-        inline void set_pipe_callback(
-            PipeCallback::raw_type pipe_callback) {
-            _pipe_callback = pipe_callback;
+        inline void set_callback_pipe(
+            PipeCallback::raw_type callback_pipe) {
+            _callback_pipe = callback_pipe;
         }
 
         inline timer_hwnd add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry) {

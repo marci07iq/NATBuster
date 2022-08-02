@@ -9,6 +9,7 @@ namespace NATBuster::Client {
 
     //Class to negotiate punching
     class Puncher : public Common::Utils::SharedOnly<Puncher> {
+        friend class Common::Utils::SharedOnly<Puncher>;
     public:
         using PunchCallback = Common::Utils::Callback<std::shared_ptr<Common::Transport::OPTSession>>;
     private:
@@ -102,10 +103,10 @@ namespace NATBuster::Client {
 
         void on_open();
         void on_packet(const Common::Utils::ConstBlobView& data);
-        void on_error();
+        void on_error(Common::ErrorCode code);
         void on_close();
 
-        void on_punch(Common::Network::UDPHandle punched);
+        void on_punch(Common::Network::UDPHandleU punched);
 
         Puncher(
             std::shared_ptr<C2Client> c2_client,

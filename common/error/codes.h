@@ -29,6 +29,10 @@ namespace NATBuster::Common {
         NETWORK_ERROR_SERVER_BIND = TYPE_ERROR | SYSTEM_NETWORK | 0x0004,
         //Can't listen to server socket
         NETWORK_ERROR_SERVER_LISTEN = TYPE_ERROR | SYSTEM_NETWORK | 0x0005,
+        //Can't connect
+        NETWORK_ERROR_CONNECT = TYPE_ERROR | SYSTEM_NETWORK | 0x0006,
+        //Can't connect
+        NETWORK_WARN_CONNECTING = TYPE_WARNING | SYSTEM_NETWORK | 0x0007,
         
         SYSTEM_OPT_UDP = 0x00020000,
         //Invalid ping packet received

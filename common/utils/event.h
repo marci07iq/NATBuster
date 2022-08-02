@@ -91,7 +91,7 @@ namespace NATBuster::Common::Utils
         std::mutex _timer_lock;
 
         //External flag to keep running
-        bool _running;
+        bool _running = false;
         //Thread if running in async mode
         std::thread _thread;
         std::mutex _system_lock;
@@ -186,7 +186,7 @@ namespace NATBuster::Common::Utils
             shutdown_cb_backup();
         }
 
-        EventEmitter() {
+        EventEmitter() : _running(false) {
 
         }
     public:

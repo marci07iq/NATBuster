@@ -22,15 +22,14 @@ namespace NATBuster::Client {
             std::cout << "Pipe request to port " << port << (authorised ? " allowed" : " denied") << std::endl;
 
             if (authorised) {
-                RouterTCPRoute::create_server(shared_from_this(), pipe_req.pipe, port);
+                RouterTCPRoute::create_server(shared_from_this(), _emitter, pipe_req.pipe, port);
             }
         }
     }
     void Router::on_packet(const Common::Utils::ConstBlobView& data) {
 
     }
-
-    void Router::on_error() {
+    void Router::on_error(Common::ErrorCode code) {
 
     }
     void Router::on_close() {
@@ -81,12 +80,10 @@ namespace NATBuster::Client {
     void RouterTCPS::on_open() {
         //
     }
-    void RouterTCPS::on_accept(Common::Utils::Void) {
-        Common::Network::TCPCHandle client = _tcp_server_socket->accept();
-
-        RouterTCPRoute::create_client(_router, client, _remote_port);
+    void RouterTCPS::on_accept(Common::Network::TCPCHandleU&& socket) {
+        RouterTCPRoute::create_client(_router, std::move(socket), _router->_emitter, _remote_port);
     }
-    void RouterTCPS::on_error() {
+    void RouterTCPS::on_error(Common::ErrorCode code) {
 
     }
     void RouterTCPS::on_close() {
@@ -104,7 +101,6 @@ namespace NATBuster::Client {
         uint16_t local_port,
         uint16_t remote_port) : 
         _tcp_server_socket(std::make_shared<Common::Network::TCPS>("", local_port)),
-        _tcp_server_emitter(_tcp_server_socket),
         _remote_port(remote_port)
         {
 
@@ -116,12 +112,12 @@ namespace NATBuster::Client {
             _self = _router->_open_tcps.insert(_router->_open_tcps.end(), shared_from_this());
         }
 
-        _tcp_server_emitter.set_open_callback(new Common::Utils::MemberWCallback<RouterTCPS, void>(weak_from_this(), &RouterTCPS::on_open));
-        _tcp_server_emitter.set_result_callback(new Common::Utils::MemberWCallback<RouterTCPS, void, Common::Utils::Void>(weak_from_this(), &RouterTCPS::on_accept));
-        _tcp_server_emitter.set_error_callback(new Common::Utils::MemberWCallback<RouterTCPS, void>(weak_from_this(), &RouterTCPS::on_error));
-        _tcp_server_emitter.set_close_callback(new Common::Utils::MemberWCallback<RouterTCPS, void>(weak_from_this(), &RouterTCPS::on_close));
+        _tcp_server_socket->set_callback_start(new Common::Utils::MemberWCallback<RouterTCPS, void>(weak_from_this(), &RouterTCPS::on_open));
+        _tcp_server_socket->set_callback_accept(new Common::Utils::MemberWCallback<RouterTCPS, void, Common::Network::TCPCHandleU&&>(weak_from_this(), &RouterTCPS::on_accept));
+        _tcp_server_socket->set_callback_error(new Common::Utils::MemberWCallback<RouterTCPS, void, Common::ErrorCode>(weak_from_this(), &RouterTCPS::on_error));
+        _tcp_server_socket->set_callback_close(new Common::Utils::MemberWCallback<RouterTCPS, void>(weak_from_this(), &RouterTCPS::on_close));
 
-        _tcp_server_emitter.start();
+        _tcp_server_socket->start();
     }
 
     std::shared_ptr<RouterTCPS> RouterTCPS::create(
@@ -145,19 +141,10 @@ namespace NATBuster::Client {
     void RouterTCPRoute::on_pipe_packet(const Common::Utils::ConstBlobView& data) {
         _socket->send(data);
     }
-    void RouterTCPRoute::on_socket_packet(Common::Utils::Void) {
-        Common::Utils::Blob packet;
-        //Packet not neccessarily really available
-        bool res = _socket->read(packet, 1, 8000);
-
-        if (!res) {
-            close();
-            return;
-        }
-
-        _pipe->send(packet);
+    void RouterTCPRoute::on_socket_packet(const Common::Utils::ConstBlobView& data) {
+        _pipe->send(data);
     }
-    void RouterTCPRoute::on_error() {
+    void RouterTCPRoute::on_error(Common::ErrorCode code) {
 
     }
     void RouterTCPRoute::on_pipe_close() {
@@ -169,7 +156,7 @@ namespace NATBuster::Client {
             }
         }
 
-        _emitter.close();
+        _socket->close();
     }
     void RouterTCPRoute::on_socket_close() {
         {
@@ -190,16 +177,18 @@ namespace NATBuster::Client {
     ) :
         _is_client(false),
         _pipe(pipe),
-        _router(router),
-        _socket(std::make_shared<Common::Network::TCPC>("localhost", local_port)),
-        _emitter(_socket)
+        _router(router)
     {
-
+        std::pair<
+            Common::Network::TCPCHandleU,
+            Common::ErrorCode
+        > socket = Common::Network::TCPC::create_connect("localhost", local_port);
+        _socket = socket.first;
     }
 
     RouterTCPRoute::RouterTCPRoute(
         std::shared_ptr<Router> router,
-        Common::Network::TCPCHandle socket,
+        Common::Network::TCPCHandleU&& socket,
         uint16_t remote_port
     ) :
         _is_client(true),
@@ -217,18 +206,18 @@ namespace NATBuster::Client {
             _self = _router->_open_routes.insert(_router->_open_routes.end(), shared_from_this());
         }
 
-        _emitter.set_open_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_socket_open));
+        _socket->set_callback_start(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_socket_open));
 
-        _pipe->set_packet_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &RouterTCPRoute::on_pipe_packet));
-        _emitter.set_result_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void, Common::Utils::Void>(weak_from_this(), &RouterTCPRoute::on_socket_packet));
+        _pipe->set_callback_packet(new Common::Utils::MemberWCallback<RouterTCPRoute, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &RouterTCPRoute::on_pipe_packet));
+        _socket->set_callback_packet(new Common::Utils::MemberWCallback<RouterTCPRoute, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &RouterTCPRoute::on_socket_packet));
 
-        _pipe->set_error_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_error));
-        _emitter.set_error_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_error));
+        _pipe->set_callback_error(new Common::Utils::MemberWCallback<RouterTCPRoute, void, Common::ErrorCode>(weak_from_this(), &RouterTCPRoute::on_error));
+        _socket->set_callback_error(new Common::Utils::MemberWCallback<RouterTCPRoute, void, Common::ErrorCode>(weak_from_this(), &RouterTCPRoute::on_error));
 
-        _pipe->set_close_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_pipe_close));
-        _emitter.set_close_callback(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_socket_close));
+        _pipe->set_callback_close(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_pipe_close));
+        _socket->set_callback_close(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_socket_close));
 
-        _emitter.start();
+        _socket->start();
     }
 
     std::shared_ptr<RouterTCPRoute> RouterTCPRoute::create_server(
@@ -243,7 +232,7 @@ namespace NATBuster::Client {
 
     std::shared_ptr<RouterTCPRoute> RouterTCPRoute::create_client(
         std::shared_ptr<Router> router,
-        Common::Network::TCPCHandle socket,
+        Common::Network::TCPCHandleU&& socket,
         uint16_t remote_port
     ) {
         std::shared_ptr< RouterTCPRoute> res = std::shared_ptr< RouterTCPRoute>(new RouterTCPRoute(router, socket, remote_port));

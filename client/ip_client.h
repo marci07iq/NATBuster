@@ -8,6 +8,7 @@
 
 namespace NATBuster::Client {
     class IPClient : public Common::Utils::SharedOnly<IPClient> {
+        friend class Common::Utils::SharedOnly<IPClient>;
         //The underlying comms layer
         std::shared_ptr<Common::Transport::OPTBase> _underlying;
         //The raw socket
@@ -22,7 +23,7 @@ namespace NATBuster::Client {
 
         void on_open();
         void on_packet(const Common::Utils::ConstBlobView& data);
-        void on_error();
+        void on_error(Common::ErrorCode code);
         void on_timeout();
         void on_close();
 
@@ -30,17 +31,15 @@ namespace NATBuster::Client {
         IPClient(
             std::string server_name,
             uint16_t ip,
+            std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
+            std::shared_ptr<Common::Utils::EventEmitter> emitter,
             std::shared_ptr<Common::Identity::UserGroup> authorised_server,
             Common::Crypto::PKey&& self);
 
         void start();
-    public:
-        static std::shared_ptr< IPClient> create(
-            std::string server_name,
-            uint16_t ip,
-            std::shared_ptr<Common::Identity::UserGroup> authorised_server,
-            Common::Crypto::PKey&& self);
 
+        void init();
+    public:
         bool done();
 
         void wait();

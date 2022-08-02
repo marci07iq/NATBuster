@@ -73,14 +73,14 @@ namespace NATBuster::Common::Utils {
 
     template <typename T>
     shared_unique_ptr<T>& shared_unique_ptr<T>::operator=(shared_unique_ptr<T>&& other) noexcept {
-        this->reset(other.get());
+        this->swap(other);
         other.reset();
         return *this;
     }
     template <typename T>
     template <typename CH>
     shared_unique_ptr<T>& shared_unique_ptr<T>::operator=(shared_unique_ptr<CH>&& other) noexcept {
-        this->reset(other.get());
+        this->swap(other);
         other.reset();
         return *this;
     }

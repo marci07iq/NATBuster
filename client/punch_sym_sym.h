@@ -12,8 +12,9 @@ namespace NATBuster::Client {
     //Opens hunders of outbound UDP ports, aimed at random ports on the target
     //By the birthday paradox, this should succeed after ~sqrt(65536) tries
     class HolepunchSym : public Common::Utils::SharedOnly<HolepunchSym> {
+        friend class Common::Utils::SharedOnly<HolepunchSym>;
     public:
-        using PunchCallback = Common::Utils::Callback<Common::Network::UDPHandle>;
+        using PunchCallback = Common::Utils::Callback<Common::Network::UDPHandleU>;
 
         struct HolepunchSymSettings {
             //The ephemeral range of the other router, to try and attack
@@ -33,9 +34,7 @@ namespace NATBuster::Client {
             Common::Time::time_delta_type_us timeout = 40000000; //40 sec: 30 for opening + 10 for waiting for remote
         };
     private:
-        Common::Network::UDPHandle _socket;
-        std::mutex _data_lock;
-
+        
         std::thread _thread;
         Common::Utils::OnetimeWaker _waker;
 
@@ -70,8 +69,6 @@ namespace NATBuster::Client {
         bool done();
 
         void wait();
-
-        Common::Network::UDPHandle get_socket();
 
         inline void set_punch_callback(
             PunchCallback::raw_type punch_callback) {

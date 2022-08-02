@@ -59,11 +59,11 @@ namespace NATBuster::Server {
         Common::Crypto::PKey _self;
 
 
-        void accept_callback(Common::Network::TCPCHandleU&& socket);
+        void on_accept(Common::Network::TCPCHandleU&& socket);
 
-        void error_callback(Common::ErrorCode code);
+        void on_error(Common::ErrorCode code);
 
-        void close_callback();
+        void on_close();
 
         IPServer(
             uint16_t port,

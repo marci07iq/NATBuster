@@ -80,20 +80,19 @@ namespace NATBuster::Common::Network {
     };
 
     class SocketEventEmitterProviderImpl : Utils::NonCopyable {
-        //Only access from thread
+        //Variables consumed by the thread
 
         std::vector<EventOSHandle> _socket_events;
         std::vector<std::shared_ptr<SocketEventHandle>> _socket_objects;
+        std::mutex _sockets_lock;
 
-        //Access from any thread
+        //Fast to access variables to send data to thread
 
         HANDLE _this_thread;
         std::list<Common::Utils::Callback<>> _tasks;
         std::list<std::shared_ptr<SocketEventHandle>> _added_socket_objects;
         std::list<std::shared_ptr<SocketEventHandle>> _closed_socket_objects;
         std::mutex _system_lock;
-
-        void close(int idx);
 
         static void __stdcall apc_fun(ULONG_PTR data);
     public:
@@ -108,6 +107,8 @@ namespace NATBuster::Common::Network {
         void start_socket(std::shared_ptr<SocketEventHandle> socket);
 
         void close_socket(std::shared_ptr<SocketEventHandle> socket);
+
+        bool extract_socket(std::shared_ptr<SocketEventHandle> socket);
     };
 
 

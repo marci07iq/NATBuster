@@ -121,7 +121,7 @@ namespace NATBuster::Common::Transport {
 
         //Socket
         std::shared_ptr<Utils::EventEmitter> _emitter;
-        Network::TCPCHandleS _socket;
+        Network::UDPHandleS _socket;
 
         //Running average of ACK pings
         float _ping = 0.1f;
@@ -184,8 +184,8 @@ namespace NATBuster::Common::Transport {
         OPTUDP(
             bool is_client,
             std::shared_ptr<Utils::EventEmitter> emitter,
-            Network::TCPCHandleS socket,
-            OPTUDPSettings settings
+            Network::UDPHandleS socket,
+            OPTUDPSettings settings = OPTUDPSettings()
         );
 
     public:

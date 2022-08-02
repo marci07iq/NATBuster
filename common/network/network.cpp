@@ -32,7 +32,7 @@ namespace NATBuster::Common::Network {
     std::pair<Utils::shared_unique_ptr<TCPS>, ErrorCode>
         TCPS::create_bind(const std::string& name, uint16_t port) {
 
-        Utils::shared_unique_ptr<TCPS> res = Utils::shared_unique_ptr<TCPS>();
+        Utils::shared_unique_ptr<TCPS> res = TCPS::create();
         ErrorCode code = res->bind(name, port);
 
         return std::pair<Utils::shared_unique_ptr<TCPS>, ErrorCode>
@@ -44,7 +44,7 @@ namespace NATBuster::Common::Network {
     std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
         TCPC::create_connect(const std::string& name, uint16_t port) {
 
-        Utils::shared_unique_ptr<TCPC> res = Utils::shared_unique_ptr<TCPC>();
+        Utils::shared_unique_ptr<TCPC> res = TCPC::create();
         ErrorCode code = res->connect(name, port);
 
         return std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
@@ -62,7 +62,7 @@ namespace NATBuster::Common::Network {
     std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
         UDP::create_bind(NetworkAddress&& local) {
 
-        Utils::shared_unique_ptr<UDP> res = Utils::shared_unique_ptr<UDP>();
+        Utils::shared_unique_ptr<UDP> res = UDP::create();
         ErrorCode code = res->bind(std::move(local));
 
         return std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
@@ -71,7 +71,7 @@ namespace NATBuster::Common::Network {
     std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
         UDP::create_bind(const std::string& local_name, uint16_t local_port) {
 
-        Utils::shared_unique_ptr<UDP> res = Utils::shared_unique_ptr<UDP>();
+        Utils::shared_unique_ptr<UDP> res = UDP::create();
         ErrorCode code = res->bind(local_name, local_port);
 
         return std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>

@@ -12,6 +12,7 @@
 
 namespace NATBuster::Client {
     class C2Client : public Common::Utils::SharedOnly<C2Client> {
+        friend class Common::Utils::SharedOnly<C2Client>;
         //The underlying comms layer to the C2 server
         std::shared_ptr<Common::Transport::OPTPipes> _underlying;
 
@@ -37,7 +38,7 @@ namespace NATBuster::Client {
         //On incoming pipe from the C2 connection
         void on_pipe(Common::Transport::OPTPipeOpenData pipe_req);
         void on_packet(const Common::Utils::ConstBlobView& data);
-        void on_error();
+        void on_error(Common::ErrorCode code);
         void on_close();
         //On a successful punch
         void on_punch(std::shared_ptr<Common::Transport::OPTSession> punched_session);
@@ -45,18 +46,17 @@ namespace NATBuster::Client {
         C2Client(
             std::string server_name,
             uint16_t ip,
+            std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
+            std::shared_ptr<Common::Utils::EventEmitter> emitter,
             std::shared_ptr<Common::Identity::UserGroup> authorised_server,
             std::shared_ptr<Common::Identity::UserGroup> authorised_clients,
             Common::Crypto::PKey&& self);
 
         void start();
+
+        void init();
     public:
-        static std::shared_ptr<C2Client> create(
-            std::string server_name,
-            uint16_t ip,
-            std::shared_ptr<Common::Identity::UserGroup> authorised_server,
-            std::shared_ptr<Common::Identity::UserGroup> authorised_clients,
-            Common::Crypto::PKey&& self);
+        
 
         std::shared_ptr<Common::Transport::OPTPipe> openPipe(const Common::Utils::ConstBlobView& fingerprint) {
             Common::Utils::Blob data = Common::Utils::Blob::factory_empty(1 + fingerprint.size());

@@ -72,7 +72,7 @@ namespace NATBuster::Server {
     }
 
 
-    void IPServer::accept_callback(Common::Network::TCPCHandleU&& socket) {
+    void IPServer::on_accept(Common::Network::TCPCHandleU&& socket) {
 
         std::cout << "ACCEPTED FROM " << socket->get_remote() << std::endl;
 
@@ -89,11 +89,11 @@ namespace NATBuster::Server {
 
     }
 
-    void IPServer::error_callback(Common::ErrorCode code) {
+    void IPServer::on_error(Common::ErrorCode code) {
         std::cout << "ERR " << (uint32_t)code << std::endl;
     }
 
-    void IPServer::close_callback() {
+    void IPServer::on_close() {
         std::cout << "CLOSE" << std::endl;
     }
 
@@ -132,9 +132,9 @@ namespace NATBuster::Server {
             Common::Network::SocketEventEmitterProvider::create();
         _client_emitter_provider = client_provider;
 
-        _socket->set_callback_accept(new Common::Utils::MemberWCallback<IPServer, void, Common::Network::TCPCHandleU&&>(weak_from_this(), &IPServer::accept_callback));
-        _socket->set_callback_error(new Common::Utils::MemberWCallback<IPServer, void, Common::ErrorCode>(weak_from_this(), &IPServer::error_callback));
-        _socket->set_callback_close(new Common::Utils::MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::close_callback));
+        _socket->set_callback_accept(new Common::Utils::MemberWCallback<IPServer, void, Common::Network::TCPCHandleU&&>(weak_from_this(), &IPServer::on_accept));
+        _socket->set_callback_error(new Common::Utils::MemberWCallback<IPServer, void, Common::ErrorCode>(weak_from_this(), &IPServer::on_error));
+        _socket->set_callback_close(new Common::Utils::MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::on_close));
 
         _socket->start();
 

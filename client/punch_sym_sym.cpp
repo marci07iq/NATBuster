@@ -47,7 +47,8 @@ namespace NATBuster::Client {
 
         Common::Time::time_type_us next_socket = Common::Time::now();
 
-        std::list<std::list<Common::Network::UDPHandle>> socket_buckets;
+        std::list<std::shared_ptr<Common::Network::SocketEventEmitterProvider>> socket_buckets;
+        Common::Network::UDPHandleU found_socket;
 
         uint16_t port_range_len = _settings.port_max - _settings.port_min + (uint16_t)1;
         uint16_t port_count = std::min(_settings.num_ports, port_range_len);
@@ -69,78 +70,57 @@ namespace NATBuster::Client {
 
         size_t used_ports = 0;
 
+        auto on_packet = [&](
+            Common::Network::UDPHandleS socket,
+            const Common::Utils::ConstBlobView& data,
+            Common::Network::NetworkAddress& src) -> void {
+                if (data == _magic_ib) {
+                    Common::Network::NetworkAddress src_cpy(src);
+                    socket->set_remote(std::move(src_cpy));
+                    std::cout << "Holepunch successful from remote "
+                        << socket->get_remote() << std::endl;
+
+                    {
+                        found_socket = socket->get_base()->extract_socket(socket);
+                        //If we received the remote magic, it is likely that their socket was opened later
+                        //So they never got our magic. Send it again
+                        socket->send(_magic_ob);
+                    }
+                }
+        };
+
         while (Common::Time::now() < lifetime) {
             //Check all existing socket buckets
             for (auto& sockets : socket_buckets) {
-                //Check every socket in there, till there is nothimg more to find
-                while (true) {
-                    {
-                        auto it = sockets.begin();
+                //Check every socket in there, till there is nothimg more to find                
+                sockets->wait(0);
 
-                        while (it != sockets.end()) {
-                            if ((*it)->is_valid()) {
-                                ++it;
-                            }
-                            else {
-                                auto it2 = it++;
-                                sockets.erase(it2);
-                            }
-                        }
-                    }
-
-                    Common::Utils::PollResponse<Common::Network::UDPHandle> select = Common::Network::UDP::find(sockets, 0);
-
-                    if (select.ok()) {
-                        Common::Network::UDPHandle socket = select.get();
-                        Common::Utils::Blob data;
-                        Common::Network::NetworkAddress src;
-                        bool read_status = socket->read(data, src, _magic_ib.size() + 1, false);
-                        if (read_status) {
-                            //Got the magic value, this is the correct socket
-                            if (data == _magic_ib) {
-                                socket->replaceRemote(src);
-                                std::cout << "Holepunch successful from "
-                                    << socket->getRemote().get_addr() << ":" << socket->getRemote().get_port() << " to "
-                                    << socket->getLocal().get_addr() << ":" << socket->getLocal().get_port() << std::endl;
-
-                                {
-                                    std::lock_guard _lg(_data_lock);
-                                    _socket = socket;
-                                    //If we received the remote magic, it is likely that their socket was opened later
-                                    //So they never got our magic. Send it again
-                                    _socket->send(_magic_ob);
-                                }
-                                goto done;
-                            }
-                        }
-                        else {
-                            break;
-                        }
-                    }
-                    //Nothing left in this bucket, proceed to next
-                    else {
-                        break;
-                    }
-                }
+                if (found_socket) goto done;
             }
 
             //Spawn a new socket, if any ports left
             if (used_ports < port_count) {
                 //Must have at least one bucket
                 if (socket_buckets.size() == 0) {
-                    socket_buckets.push_back(std::list<Common::Network::UDPHandle>());
+                    socket_buckets.push_back(Common::Network::SocketEventEmitterProvider::create());
                 }
                 //Make sure bucket isn't full
-                if (Common::Network::SELECT_MAX <= (socket_buckets.back().size() + 2)) {
-                    socket_buckets.push_back(std::list<Common::Network::UDPHandle>());
+                if (Common::Network::SocketEventEmitterProvider::MAX_SOCKETS <= (socket_buckets.back()->count() + 2)) {
+                    socket_buckets.push_back(Common::Network::SocketEventEmitterProvider::create());
                 }
 
                 //Create new socket
-                Common::Network::UDPHandle new_socket = std::make_shared<Common::Network::UDP>(_remote, ports[used_ports]);
-                if (new_socket->is_valid()) {
-                    ++used_ports;
-                    socket_buckets.back().push_back(new_socket);
-                    new_socket->send(_magic_ob);
+                std::pair<
+                    Common::Network::UDPHandleU,
+                    Common::ErrorCode
+                > new_socket = Common::Network::UDP::create_bind(_remote, ports[used_ports]);
+                if (new_socket.second == Common::ErrorCode::OK) {
+                    if (new_socket.first->is_valid()) {
+                        Common::Network::UDPHandleS new_socket_s = new_socket.first;
+                        ++used_ports;
+                        socket_buckets.back()->associate_socket(std::move(new_socket.first));
+                        new_socket_s->send(_magic_ob);
+                    }
                 }
             }
 
@@ -153,9 +133,10 @@ namespace NATBuster::Client {
         }
 
     done:
-        _waker.wake();
 
-        _punch_callback(get_socket());
+        _punch_callback(std::move(found_socket));
+
+        _waker.wake();
     }
 
     void HolepunchSym::async_launch() {
@@ -168,10 +149,5 @@ namespace NATBuster::Client {
 
     void HolepunchSym::wait() {
         _waker.wait();
-    }
-
-    Common::Network::UDPHandle HolepunchSym::get_socket() {
-        std::lock_guard _lg(_data_lock);
-        return _socket;
     }
 }

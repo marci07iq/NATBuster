@@ -38,7 +38,7 @@ namespace NATBuster::Client {
 
         _underlying->close();
     }
-    void IPClient::on_error() {
+    void IPClient::on_error(Common::ErrorCode code) {
 
     }
     void IPClient::on_timeout() {
@@ -52,41 +52,43 @@ namespace NATBuster::Client {
     IPClient::IPClient(
         std::string server_name,
         uint16_t ip,
+        std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
+        std::shared_ptr<Common::Utils::EventEmitter> emitter,
         std::shared_ptr<Common::Identity::UserGroup> authorised_server,
         Common::Crypto::PKey&& self) {
 
-        Common::Network::TCPCHandle socket = std::make_shared<Common::Network::TCPC>(server_name, ip);
+        //Create client socket
+        Common::Network::TCPCHandleU socket = Common::Network::TCPC::create();
+        Common::Network::TCPCHandleS socket_s = socket;
+
+        //Callback once socket added to thread
+        auto connect_fuction = [socket_s, server_name, ip]() {
+            Common::ErrorCode res = socket_s->connect(server_name, ip);
+        };
+        socket->set_callback_start(new Common::Utils::FunctionalCallback<void>(std::bind(connect_fuction)));
+        
+        //Associate socket
+        provider->associate_socket(std::move(socket));
 
         //Create OPT TCP
-        Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(true, socket);
+        Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(true, emitter, socket_s);
         //Create OPT Session
         _underlying = Common::Transport::OPTSession::create(true, opt, std::move(self), authorised_server);
+
     }
 
     void IPClient::start() {
-        _underlying->set_open_callback(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_open));
-        _underlying->set_packet_callback(new Common::Utils::MemberWCallback<IPClient, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPClient::on_packet));
-        //_underlying->set_raw_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPServerEndpoint::on_raw));
-        _underlying->set_error_callback(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_error));
-        _underlying->set_close_callback(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_close));
+        _underlying->set_callback_open(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_open));
+        _underlying->set_callback_packet(new Common::Utils::MemberWCallback<IPClient, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPClient::on_packet));
+        _underlying->set_callback_error(new Common::Utils::MemberWCallback<IPClient, void, Common::ErrorCode>(weak_from_this(), &IPClient::on_error));
+        _underlying->set_callback_close(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_close));
 
         //Set the timeout delay
-        _underlying->addDelay(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_timeout), 100000000000);
+        _underlying->add_delay(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_timeout), 10000000);
 
         _underlying->start();
     }
 
-    std::shared_ptr< IPClient> IPClient::create(
-        std::string server_name,
-        uint16_t ip,
-        std::shared_ptr<Common::Identity::UserGroup> authorised_server,
-        Common::Crypto::PKey&& self) {
-
-        std::shared_ptr< IPClient> res = std::shared_ptr<IPClient>(new IPClient(server_name, ip, authorised_server, std::move(self)));
-        res->start();
-
-        return res;
-    }
 
     bool IPClient::done() {
         return _waker.done();

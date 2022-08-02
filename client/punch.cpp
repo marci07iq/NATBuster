@@ -70,7 +70,7 @@ namespace NATBuster::Client {
                 ob_magic.copy_from(_outbound_magic_content, 1);
 
                 _puncher = HolepunchSym::create(ip_s, std::move(ob_magic), std::move(ib_magic), puncher_settings);
-                _puncher->set_punch_callback(new Common::Utils::MemberWCallback<Puncher, void, Common::Network::UDPHandle>(weak_from_this(), &Puncher::on_punch));
+                _puncher->set_punch_callback(new Common::Utils::MemberWCallback<Puncher, void, Common::Network::UDPHandleU>(weak_from_this(), &Puncher::on_punch));
 
                 _state = S2_SHello;
             }
@@ -127,7 +127,7 @@ namespace NATBuster::Client {
                 ob_magic.copy_from(_outbound_magic_content, 1);
 
                 _puncher = HolepunchSym::create(ip_s, std::move(ob_magic), std::move(ib_magic), puncher_settings);
-                _puncher->set_punch_callback(new Common::Utils::MemberWCallback<Puncher, void, Common::Network::UDPHandle>(weak_from_this(), &Puncher::on_punch));
+                _puncher->set_punch_callback(new Common::Utils::MemberWCallback<Puncher, void, Common::Network::UDPHandleU>(weak_from_this(), &Puncher::on_punch));
 
                 _state = S1_CHello;
             }
@@ -171,7 +171,7 @@ namespace NATBuster::Client {
             }
         }
     }
-    void Puncher::on_error() {
+    void Puncher::on_error(Common::ErrorCode code) {
 
     }
     void Puncher::on_close() {
@@ -184,7 +184,7 @@ namespace NATBuster::Client {
         }
     }
 
-    void Puncher::on_punch(Common::Network::UDPHandle punched) {
+    void Puncher::on_punch(Common::Network::UDPHandleU punched) {
         std::cout << "Punch successful" << std::endl;
 
         //Create the OPT
@@ -215,10 +215,10 @@ namespace NATBuster::Client {
             std::cout << "Puncher self registering" << std::endl;
         }
 
-        _underlying->set_open_callback(new Common::Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_open));
-        _underlying->set_packet_callback(new Common::Utils::MemberWCallback<Puncher, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &Puncher::on_packet));
-        _underlying->set_error_callback(new Common::Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_error));
-        _underlying->set_close_callback(new Common::Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_close));
+        _underlying->set_callback_open(new Common::Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_open));
+        _underlying->set_callback_packet(new Common::Utils::MemberWCallback<Puncher, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &Puncher::on_packet));
+        _underlying->set_callback_error(new Common::Utils::MemberWCallback<Puncher, void, Common::ErrorCode>(weak_from_this(), &Puncher::on_error));
+        _underlying->set_callback_close(new Common::Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_close));
 
         _underlying->start();
     }

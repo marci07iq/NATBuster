@@ -153,6 +153,10 @@ namespace NATBuster::Common::Network {
         using SocketBase::is_valid;
         using SocketBase::is_invalid;
 
+        inline std::shared_ptr<SocketEventEmitterProvider> get_base() {
+            return _base;
+        }
+
         NetworkAddress& get_remote();
 
         inline void set_recvbuf_len(uint16_t recvbuf_len) {
@@ -179,6 +183,7 @@ namespace NATBuster::Common::Network {
 
 
     class TCPS : public SocketEventHandle, public Utils::SharedOnly<TCPS> {
+        friend class Utils::SharedOnly<TCPS>;
         std::list<TCPSHandleU>::iterator _self;
 
         TCPS();
@@ -198,19 +203,21 @@ namespace NATBuster::Common::Network {
     };
 
     class TCPC : public SocketEventHandle, public Utils::SharedOnly<TCPC> {
+        friend class Utils::SharedOnly<TCPC>;
         std::list<TCPCHandleU>::iterator _self;
 
         TCPC();
 
         TCPC(SocketOSData* socket, NetworkAddress&& remote_address);
 
-        ErrorCode connect(const std::string& name, uint16_t port);
 
         friend class SocketEventEmitterProvider;
         friend class SocketEventEmitterProviderImpl;
     public:
         using SocketEventHandle::set_callback_connect;
         using SocketEventHandle::set_callback_packet;
+
+        ErrorCode connect(const std::string& name, uint16_t port);
 
         static std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
             create_connect(const std::string& name, uint16_t port);
@@ -222,6 +229,7 @@ namespace NATBuster::Common::Network {
     };
 
     class UDP : public SocketEventHandle, public Utils::SharedOnly<UDP> {
+        friend class Utils::SharedOnly<UDP>;
         std::list<UDPHandleU>::iterator _self;
 
         NetworkAddress _local_address;
@@ -266,6 +274,8 @@ namespace NATBuster::Common::Network {
 
         std::mutex _sockets_lock;
     public:
+        static const int MAX_SOCKETS;
+
         SocketEventEmitterProvider();
 
         void bind();
@@ -290,6 +300,14 @@ namespace NATBuster::Common::Network {
         //Returns false if socket wasn't assocaited
 
         virtual ~SocketEventEmitterProvider();
+
+        //Only call when not waiting.
+
+        TCPSHandleU extract_socket(TCPSHandleS hwnd);
+        TCPCHandleU extract_socket(TCPCHandleS hwnd);
+        UDPHandleU extract_socket(UDPHandleS hwnd);
+
+        int count();
 
     private:
         bool close_socket(TCPSHandleS hwnd);

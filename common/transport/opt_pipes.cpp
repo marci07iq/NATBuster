@@ -187,7 +187,7 @@ namespace NATBuster::Common::Transport {
                     std::cout << "Pipe request " << header->content.pipe.id << std::endl;
 
                     //Issue callback about new incoming pipe
-                    _pipe_callback(OPTPipeOpenData{
+                    _callback_pipe(OPTPipeOpenData{
                         .pipe = pipe,
                         .content = content
                         });

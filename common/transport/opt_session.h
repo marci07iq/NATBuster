@@ -31,6 +31,7 @@ namespace NATBuster::Common::Transport {
     // Selected version is min(Va, Vb)
 
     class OPTSession : public OPTBase, public Utils::SharedOnly<OPTSession> {
+        friend Utils::SharedOnly<OPTSession>;
         enum PacketType : uint8_t {
             //Encrypted data packet
             DATA = 0,
@@ -117,7 +118,7 @@ namespace NATBuster::Common::Transport {
         inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
             return _underlying->add_delay(cb, delay);
         }
-        inline bool cancel_timer(timer_hwnd hwnd) {
+        inline void cancel_timer(timer_hwnd hwnd) {
             return _underlying->cancel_timer(hwnd);
         }
 

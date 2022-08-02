@@ -76,7 +76,7 @@ namespace NATBuster::Common::Transport {
         virtual timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) = 0;
 
         //Can call from any thread
-        virtual bool cancel_timer(timer_hwnd hwnd) = 0;
+        virtual void cancel_timer(timer_hwnd hwnd) = 0;
 
         //Can call from any thread
         virtual std::shared_ptr<Identity::User> getUser() {

@@ -110,6 +110,16 @@ namespace NATBuster::Common::Transport {
         _underlying->_underlying->sendRaw(full_packet);
     }
 
+    inline OPTPipe::timer_hwnd OPTPipe::add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry) {
+        return _underlying->add_timer(cb, expiry);
+    }
+    inline OPTPipe::timer_hwnd OPTPipe::add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
+        return _underlying->add_delay(cb, delay);
+    }
+    inline void OPTPipe::cancel_timer(timer_hwnd hwnd) {
+        return _underlying->cancel_timer(hwnd);
+    }
+
     //Request closing the connection (gracefully if possible)
     //Close callback will be issued when that succeeded
     void OPTPipe::close() {

@@ -20,11 +20,6 @@ namespace NATBuster::Common::Network {
                 }
             }
 
-            ~WSAWrapper() {
-                std::cout << "WSA CLEAN" << std::endl;
-                WSACleanup();
-            }
-
             static std::shared_ptr<WSAWrapper> wsa_instance;
 
             static std::shared_ptr<WSAWrapper> get_instance() {
@@ -35,6 +30,11 @@ namespace NATBuster::Common::Network {
             }
 
         public:
+            ~WSAWrapper() {
+                std::cout << "WSA CLEAN" << std::endl;
+                WSACleanup();
+            }
+
             WSADATA get() const {
                 return _wsa_data;
             }
@@ -55,21 +55,25 @@ namespace NATBuster::Common::Network {
     NetworkAddressOSData& NetworkAddressOSData::operator=(NetworkAddressOSData& other) {
         _address = other._address;
         _address_length = other._address_length;
+        return *this;
     }
 
     //NetworkAddress functions implemented
 
-    NetworkAddress::NetworkAddress() : _impl(std::make_unique<NetworkAddressOSData>()) {
+    NetworkAddress::NetworkAddress() : _impl(new NetworkAddressOSData()) {
     }
-    NetworkAddress::NetworkAddress(NetworkAddress& other) : _impl(std::make_unique<NetworkAddressOSData>(*other._impl)) {
+    NetworkAddress::NetworkAddress(NetworkAddress& other) : _impl(new NetworkAddressOSData(*other._impl)) {
     }
-    NetworkAddress::NetworkAddress(NetworkAddress&& other) noexcept : _impl(std::move(other._impl)) {
+    NetworkAddress::NetworkAddress(NetworkAddress&& other) noexcept : _impl(other._impl) {
+        other._impl = new NetworkAddressOSData();
     }
     NetworkAddress& NetworkAddress::operator=(NetworkAddress& other) {
         _impl->operator=(*other._impl);
+        return *this;
     }
     NetworkAddress& NetworkAddress::operator=(NetworkAddress&& other) noexcept {
         _impl = std::move(other._impl);
+        return *this;
     }
 
     ErrorCode NetworkAddress::resolve(const std::string& name, uint16_t port) {
@@ -138,7 +142,7 @@ namespace NATBuster::Common::Network {
         return 0;
     }
     inline NetworkAddressOSData* NetworkAddress::get_impl() const {
-        return _impl.get();
+        return _impl;
     }
 
     bool NetworkAddress::operator==(const NetworkAddress& rhs) const {
@@ -147,6 +151,11 @@ namespace NATBuster::Common::Network {
     }
     bool NetworkAddress::operator!=(const NetworkAddress& rhs) const {
         return !(this->operator==(rhs));
+    }
+
+    NetworkAddress::~NetworkAddress() {
+        delete _impl;
+        _impl = nullptr;
     }
 
     std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr)
@@ -168,6 +177,7 @@ namespace NATBuster::Common::Network {
         close();
         _socket = other._socket;
         other._socket = INVALID_SOCKET;
+        return *this;
     }
     inline void SocketOSData::set(SOCKET socket) {
         close();
@@ -205,6 +215,21 @@ namespace NATBuster::Common::Network {
 
     //SocketBase
 
+    SocketBase::SocketBase() : _socket(new SocketOSData()) {
+
+    }
+    SocketBase::SocketBase(SocketBase&& other) noexcept : _socket(other._socket) {
+        other._socket = new SocketOSData();
+
+    }
+    SocketBase& SocketBase::operator=(SocketBase&& other) noexcept {
+        delete _socket;
+        _socket = other._socket;
+        other._socket = new SocketOSData();
+        return *this;
+    }
+
+    
     inline bool SocketBase::is_valid() {
         return _socket->is_valid();
     }
@@ -214,6 +239,11 @@ namespace NATBuster::Common::Network {
 
     inline void SocketBase::close() {
         return _socket->close();
+    }
+
+    SocketBase::~SocketBase() {
+        delete _socket;
+        _socket = nullptr;
     }
 
     //SocketEventHandle
@@ -280,7 +310,7 @@ namespace NATBuster::Common::Network {
     TCPC::TCPC() : SocketEventHandle(Type::TCPC) {
 
     }
-    TCPC::TCPC(SocketOSHandle&& socket, NetworkAddress&& remote_address) : SocketEventHandle(Type::TCPC, std::move(socket)) {
+    TCPC::TCPC(SocketOSData* socket, NetworkAddress&& remote_address) : SocketEventHandle(Type::TCPC, socket) {
         _remote_address = std::move(remote_address);
     }
 
@@ -343,6 +373,23 @@ namespace NATBuster::Common::Network {
 
     UDP::UDP() : SocketEventHandle(Type::UDP) {
 
+    }
+
+    ErrorCode UDP::bind(NetworkAddress&& local) {
+        int iResult;
+
+        // Create the UDP socket
+        _socket->set(::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+        if (_socket->is_invalid()) {
+            return ErrorCode::NETWORK_ERROR_CREATE_SOCKET;
+        }
+
+        // Receive on its own outbound address
+        iResult = ::bind(_socket->get(), (const sockaddr*)_local_address.get_impl()->get_data(), _local_address.get_impl()->size());
+        if (iResult == SOCKET_ERROR) {
+            _socket->close();
+            return ErrorCode::NETWORK_ERROR_SERVER_BIND;
+        }
     }
 
     void UDP::send(Utils::ConstBlobView& data) {
@@ -499,8 +546,8 @@ namespace NATBuster::Common::Network {
                     }
                 }
                 else {
-                    SocketOSHandle accepted = std::make_unique<SocketOSData>(client);
-                    TCPCHandleU new_client(new TCPC(std::move(accepted), std::move(remote_address)));
+                    SocketOSData* accepted = new SocketOSData(client);
+                    TCPCHandleU new_client(new TCPC(accepted, std::move(remote_address)));
 
                     _socket_objects[index]->_callback_accept(std::move(hwnd));
                 }
@@ -567,7 +614,7 @@ namespace NATBuster::Common::Network {
 
     void SocketEventEmitterProviderImpl::run_now(Common::Utils::Callback<>::raw_type fn) {
         std::lock_guard _lg(_system_lock);
-        _tasks.push_back(fn);
+        _tasks.emplace_back(fn);
         QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
     void SocketEventEmitterProviderImpl::interrupt() {
@@ -587,6 +634,15 @@ namespace NATBuster::Common::Network {
     }
 
     //SocketEventEmitterProvider
+
+    SocketEventEmitterProvider::SocketEventEmitterProvider() : _impl(new SocketEventEmitterProviderImpl()) {
+
+    }
+
+    SocketEventEmitterProvider::~SocketEventEmitterProvider() {
+        delete _impl;
+        _impl = nullptr;
+    }
 
     void SocketEventEmitterProvider::bind() {
         _impl->bind();
@@ -628,6 +684,9 @@ namespace NATBuster::Common::Network {
         std::lock_guard _lg(_sockets_lock);
 
         _impl->start_socket(hwnd);
+
+        //Todo: make sure socket is assocaited with this
+        return true;
     }
 
     bool SocketEventEmitterProvider::close_socket(TCPSHandleS hwnd) {

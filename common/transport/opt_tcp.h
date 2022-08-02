@@ -18,6 +18,7 @@ namespace NATBuster::Common::Transport {
     typedef std::shared_ptr<OPTTCP> OPTTCPHandle;
 
     class OPTTCP : public OPTBase, public Utils::SharedOnly<OPTTCP> {
+        friend Utils::SharedOnly<OPTTCP>;
 #pragma pack(push, 1)
         struct packet_decoder : Utils::NonStack {
             enum PacketType : uint8_t {
@@ -172,7 +173,7 @@ namespace NATBuster::Common::Transport {
         inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
             return _emitter->add_delay(cb, delay);
         }
-        inline bool cancel_timer(timer_hwnd hwnd) {
+        inline void cancel_timer(timer_hwnd hwnd) {
             return _emitter->cancel_timer(hwnd);
         }
 

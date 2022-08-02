@@ -10,6 +10,7 @@ namespace NATBuster::Server {
     class IPServer;
 
     class IPServerEndpoint : public Common::Utils::SharedOnly<IPServerEndpoint> {
+        friend Common::Utils::SharedOnly<IPServerEndpoint>;
         //The socket, to get address from
         Common::Network::TCPCHandleS _socket;
         //Underliyng OPT
@@ -36,23 +37,27 @@ namespace NATBuster::Server {
     };
 
     class IPServer : public Common::Utils::SharedOnly<IPServer> {
+        friend Common::Utils::SharedOnly<IPServer>;
     public:
         //The currently open connections
         std::set<std::shared_ptr<IPServerEndpoint>> _connections;
         std::mutex _connection_lock;
         
+        uint16_t _port;
         //Handle to the underlying socket
-        Common::Network::TCPCHandleS _socket;
-        //Handle to the underlying event emitter, to better control the thread
-        std::shared_ptr<Common::Utils::EventEmitter> _emitter;
+        Common::Network::TCPSHandleS _socket;
+        //Server event emitter
+        std::shared_ptr<Common::Network::SocketEventEmitterProvider> _server_emitter_provider;
+        std::shared_ptr<Common::Utils::EventEmitter> _server_emitter;
+        //Client event emitter
+        std::shared_ptr<Common::Network::SocketEventEmitterProvider> _client_emitter_provider;
+        Common::Utils::shared_unique_ptr<Common::Utils::EventEmitter> _client_emitter;
+
         //List of users authorised to use the server
         std::shared_ptr<Common::Identity::UserGroup> _authorised_users;
         //Identity of this server
         Common::Crypto::PKey _self;
 
-        //Client emitter pool
-        std::shared_ptr<Common::Network::SocketEventEmitterProvider> _client_emitter_provider;
-        Common::Utils::shared_unique_ptr<Common::Utils::EventEmitter> _client_emitter;
 
         void accept_callback(Common::Network::TCPCHandleU&& socket);
 

@@ -65,9 +65,9 @@ int main() {
         std::cin >> x;
     } while (x != 0);
 
-    server->_emitter->close();
+    server->_server_emitter->stop();
 
-    server->_emitter->join();
+    server->_server_emitter->join();
 
     return 0;
 }

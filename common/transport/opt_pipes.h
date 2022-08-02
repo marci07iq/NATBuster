@@ -10,6 +10,7 @@ namespace NATBuster::Common::Transport {
     class OPTPipes;
 
     class OPTPipe : public OPTBase, public Utils::SharedOnly<OPTPipe> {
+        friend Utils::SharedOnly<OPTPipe>;
         std::shared_ptr<OPTPipes> _underlying;
         uint32_t _id;
 
@@ -54,15 +55,9 @@ namespace NATBuster::Common::Transport {
         //Send UDP-like packet (no order / arrival guarantee, likely faster)
         void sendRaw(const Utils::ConstBlobView& packet);
 
-        inline timer_hwnd add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry) {
-            return _underlying->add_timer(cb, expiry);
-        }
-        inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
-            return _underlying->add_delay(cb, delay);
-        }
-        inline bool cancel_timer(timer_hwnd hwnd) {
-            return _underlying->cancel_timer(hwnd);
-        }
+        inline timer_hwnd add_timer(TimerCallback::raw_type cb, Time::time_type_us expiry);
+        inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay);
+        inline void cancel_timer(timer_hwnd hwnd);
 
         //Close connection gracefully
         //If you dont want to accept a pipe, simple drop the pointer
@@ -85,6 +80,7 @@ namespace NATBuster::Common::Transport {
     };
 
     class OPTPipes : public OPTBase, public Utils::SharedOnly<OPTPipes> {
+        friend Utils::SharedOnly<OPTPipes>;
     public:
         using PipeCallback = Utils::Callback<OPTPipeOpenData>;
     private:
@@ -187,7 +183,7 @@ namespace NATBuster::Common::Transport {
         inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
             return _underlying->add_delay(cb, delay);
         }
-        inline bool cancel_timer(timer_hwnd hwnd) {
+        inline void cancel_timer(timer_hwnd hwnd) {
             return _underlying->cancel_timer(hwnd);
         }
 

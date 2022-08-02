@@ -97,6 +97,7 @@ namespace NATBuster::Common::Transport {
             //Pong: update pong timer
         case packet_decoder::PacketType::MGMT_PONG:
             _last_pong_in = now;
+            reset_pong_timeout_timer();
             break;
             //ACK: remove from re-transmit queue, update ping time estiamte
         case packet_decoder::PacketType::PKT_ACK:
@@ -125,6 +126,7 @@ namespace NATBuster::Common::Transport {
                     ++it;
                 }
             }
+            reset_retransmit_timer();
         }
         //Data packet
         case packet_decoder::PacketType::PKT_MID:
@@ -148,8 +150,6 @@ namespace NATBuster::Common::Transport {
             _callback_raw(data_ref);
             break;
         }
-
-        on_housekeeping();
     }
 
     void OPTUDP::on_error(ErrorCode code) {
@@ -168,7 +168,26 @@ namespace NATBuster::Common::Transport {
         _callback_close();
     }
 
-    void OPTUDP::on_housekeeping() {
+    void OPTUDP::reset_retransmit_timer() {
+        //Time for the next scheduled re-transmit
+        std::lock_guard _lg(_tx_lock);
+        _emitter->cancel_timer(_retransmit_timer);
+
+        if (_transmit_queue.size()) {
+            packet_decoder* pkt = packet_decoder::view(_transmit_queue.front().packet);
+            uint32_t old_rt = (pkt->content.packet.seq & packet_decoder::seq_rt_mask);
+            Time::time_type_us next_transmit = _transmit_queue.front().transmits[old_rt] + next_retransmit_delta();
+            _retransmit_timer = _emitter->add_timer(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_retransmit_timer), next_transmit);
+        }
+        
+    }
+    void OPTUDP::reset_pong_timeout_timer() {
+        std::lock_guard _lg(_tx_lock);
+        _emitter->cancel_timer(_pong_timeout_timer);
+        _pong_timeout_timer = _emitter->add_timer(new Utils::MemberWCallback<OPTUDP, void>(weak_from_this(), &OPTUDP::on_pong_timeout_timer), _last_pong_in + _settings.max_pong);
+    }
+
+    void OPTUDP::on_retransmit_timer() {
         //Retransmits
         {
             std::lock_guard _lg(_tx_lock);
@@ -204,11 +223,16 @@ namespace NATBuster::Common::Transport {
             }
         }
 
+        reset_retransmit_timer();
+    }
+    void OPTUDP::on_pong_timeout_timer() {
         //Pong expired
         if (_last_pong_in + _settings.max_pong < Time::now()) {
             //Time to shut down
             _socket->close();
         }
+
+        reset_pong_timeout_timer();
     }
 
     OPTUDP::OPTUDP(
@@ -278,7 +302,7 @@ namespace NATBuster::Common::Transport {
                 _socket->send(_transmit_queue.back().packet);
             }
         }
-
+        reset_retransmit_timer();
     }
     void OPTUDP::sendRaw(const Utils::ConstBlobView& data) {
         //1 byte header

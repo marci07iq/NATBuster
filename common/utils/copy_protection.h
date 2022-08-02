@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility>
+
 #include "shared_unique.h"
 
 namespace NATBuster::Common::Utils {
@@ -47,7 +49,7 @@ namespace NATBuster::Common::Utils {
     public:
         template<typename ...ARGS>
         static shared_unique_ptr<SELF> create(ARGS... args) {
-            shared_unique_ptr<SELF> res = shared_unique_ptr<SELF>(new SELF(std::forward(args...)));
+            shared_unique_ptr<SELF> res = shared_unique_ptr<SELF>(new SELF(std::forward<ARGS>(args)...));
             res->init();
             return res;
         }

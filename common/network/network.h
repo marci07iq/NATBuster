@@ -14,7 +14,6 @@ namespace NATBuster::Common::Network {
     class NetworkAddressOSData;
     //OS RAII socket implementation
     class SocketOSData;
-    typedef std::unique_ptr<SocketOSData> SocketOSHandle;
 
     class SocketEventEmitterProviderImpl;
     class SocketEventEmitterProvider;
@@ -33,7 +32,7 @@ namespace NATBuster::Common::Network {
 
 
     class NetworkAddress {
-        std::unique_ptr<NetworkAddressOSData> _impl;
+        NetworkAddressOSData* _impl = nullptr;
     public:
         enum Type {
             Unknown,
@@ -57,6 +56,7 @@ namespace NATBuster::Common::Network {
         inline bool operator==(const NetworkAddress& rhs) const;
         inline bool operator!=(const NetworkAddress& rhs) const;
 
+        ~NetworkAddress();
     };
     std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr);
 
@@ -65,32 +65,26 @@ namespace NATBuster::Common::Network {
 
     class SocketBase : Utils::NonCopyable {
     protected:
-        SocketOSHandle _socket;
+        SocketOSData* _socket;
 
         friend class SocketEventEmitterProvider;
         friend class SocketEventEmitterProviderImpl;
 
         inline void close();
     public:
-        SocketBase() {
-
-        }
-        SocketBase(SocketOSHandle&& socket) noexcept : _socket(std::move(socket)) {
-
-        }
-        void set(SocketOSHandle&& socket) {
-            _socket = std::move(socket);
-        }
+        SocketBase();
+        SocketBase(SocketOSData* socket) noexcept;
+        SocketBase(SocketBase&& other) noexcept;
+        SocketBase& operator=(SocketBase&& other) noexcept;
 
         //Extract the underlying socket
-        SocketOSHandle extract() {
-            return std::move(_socket);
-        }
+        SocketOSData* extract();
 
         inline bool is_valid();
 
         inline bool is_invalid();
 
+        ~SocketBase();
     };
 
 
@@ -137,7 +131,7 @@ namespace NATBuster::Common::Network {
         using SocketBase::_socket;
 
         SocketEventHandle(Type type);
-        SocketEventHandle(Type type, SocketOSHandle&& socket);
+        SocketEventHandle(Type type, SocketOSData* socket);
 
         std::shared_ptr<SocketEventEmitterProvider> _base;
 
@@ -196,15 +190,8 @@ namespace NATBuster::Common::Network {
     public:
         using SocketEventHandle::set_callback_accept;
 
-        std::pair<Utils::shared_unique_ptr<TCPS>, ErrorCode>
-            create(const std::string& name, uint16_t port) {
-
-            Utils::shared_unique_ptr<TCPS> res = Utils::shared_unique_ptr<TCPS>();
-            ErrorCode code = res->bind(name, port);
-
-            return std::pair<Utils::shared_unique_ptr<TCPS>, ErrorCode>
-                (std::move(res), code);
-        }
+        static std::pair<Utils::shared_unique_ptr<TCPS>, ErrorCode>
+            create_bind(const std::string& name, uint16_t port);
 
         void start() override;
         bool close() override;
@@ -215,7 +202,7 @@ namespace NATBuster::Common::Network {
 
         TCPC();
 
-        TCPC(SocketOSHandle&& socket, NetworkAddress&& remote_address);
+        TCPC(SocketOSData* socket, NetworkAddress&& remote_address);
 
         ErrorCode connect(const std::string& name, uint16_t port);
 
@@ -225,15 +212,8 @@ namespace NATBuster::Common::Network {
         using SocketEventHandle::set_callback_connect;
         using SocketEventHandle::set_callback_packet;
 
-        std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
-            create(const std::string& name, uint16_t port) {
-
-            Utils::shared_unique_ptr<TCPC> res = Utils::shared_unique_ptr<TCPC>();
-            ErrorCode code = res->connect(name, port);
-
-            return std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
-                (std::move(res), code);
-        }
+        static std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
+            create_connect(const std::string& name, uint16_t port);
 
         void send(Utils::ConstBlobView& data);
 
@@ -248,12 +228,7 @@ namespace NATBuster::Common::Network {
 
         //Bind local socket
         ErrorCode bind(NetworkAddress&& local);
-        ErrorCode bind(const std::string& name, uint16_t port) {
-            NetworkAddress address;
-            ErrorCode code = address.resolve(name, port);
-            if (code != ErrorCode::OK) return code;
-            return bind(std::move(address));
-        }
+        ErrorCode bind(const std::string& name, uint16_t port);
 
         UDP();
 
@@ -264,35 +239,14 @@ namespace NATBuster::Common::Network {
         using SocketEventHandle::set_callback_unfiltered_packet;
 
 
-        std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
-            create(NetworkAddress&& local) {
-
-            Utils::shared_unique_ptr<UDP> res = Utils::shared_unique_ptr<UDP>();
-            ErrorCode code = res->bind(std::move(local));
-
-            return std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
-                (std::move(res), code);
-        }
-        std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
-            create(const std::string& local_name, uint16_t local_port) {
-
-            Utils::shared_unique_ptr<UDP> res = Utils::shared_unique_ptr<UDP>();
-            ErrorCode code = res->bind(local_name, local_port);
-
-            return std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
-                (std::move(res), code);
-        }
+        static std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
+            create_bind(NetworkAddress&& local);
+        static std::pair<Utils::shared_unique_ptr<UDP>, ErrorCode>
+            create_bind(const std::string& local_name, uint16_t local_port);
 
         //Set remote socket
-        ErrorCode set_remote(NetworkAddress&& remote) {
-            _remote_address = std::move(remote);
-        }
-        ErrorCode set_remote(const std::string& name, uint16_t port) {
-            NetworkAddress address;
-            ErrorCode code = address.resolve(name, port);
-            if (code != ErrorCode::OK) return code;
-            return set_remote(std::move(address));
-        }
+        ErrorCode set_remote(NetworkAddress&& remote);
+        ErrorCode set_remote(const std::string& name, uint16_t port);
 
         void send(Utils::ConstBlobView& data);
 
@@ -302,17 +256,18 @@ namespace NATBuster::Common::Network {
 
     //EventEmitterProvider with socket watching capability
     class SocketEventEmitterProvider : public Utils::EventEmitterProvider, public Utils::SharedOnly<SocketEventEmitterProvider> {
+        friend class Utils::SharedOnly<SocketEventEmitterProvider>;
     private:
-        std::unique_ptr<SocketEventEmitterProviderImpl> _impl;
+        SocketEventEmitterProviderImpl* _impl = nullptr;
 
         std::list<TCPSHandleU> _sockets_tcps;
         std::list<TCPCHandleU> _sockets_tcpc;
         std::list<UDPHandleU> _sockets_udp;
 
         std::mutex _sockets_lock;
-
-        virtual ~SocketEventEmitterProvider();
     public:
+        SocketEventEmitterProvider();
+
         void bind();
 
         void wait(Time::time_delta_type_us delay);
@@ -333,6 +288,8 @@ namespace NATBuster::Common::Network {
 
         //Close socket
         //Returns false if socket wasn't assocaited
+
+        virtual ~SocketEventEmitterProvider();
 
     private:
         bool close_socket(TCPSHandleS hwnd);

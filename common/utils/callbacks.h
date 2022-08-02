@@ -141,10 +141,10 @@ namespace NATBuster::Common::Utils {
     public:
         using raw_type = CallbackBase<ARGS...>*;
     private:
-        static const NoCallback<ARGS...> checkout_cb;
+        static NoCallback<ARGS...> checkout_cb;
         //An other constant like nullptr meaning that the callback is currently running
         //Do not delete this value.
-        static raw_type checkout_ptr;
+        static const raw_type checkout_ptr;
 
         //The currently set callback
         std::atomic<raw_type> _cb = nullptr;
@@ -182,7 +182,7 @@ namespace NATBuster::Common::Utils {
             return old_cb;
         }
 
-        inline raw_type checkback(raw_type back) {
+        inline void checkback(raw_type back) {
             raw_type found = checkout_ptr;
             //Try to swap back
             if (!_cb.compare_exchange_strong(found, back)) {
@@ -256,9 +256,9 @@ namespace NATBuster::Common::Utils {
     };
 
     template <typename... ARGS>
-    const NoCallback<ARGS...> Callback<ARGS...>::checkout_cb = NoCallback<ARGS...>();
+    NoCallback<ARGS...> Callback<ARGS...>::checkout_cb = NoCallback<ARGS...>();
     template <typename... ARGS>
-    static Callback<ARGS...>::raw_type checkout_ptr = &Callback<ARGS...>::checkout_cb;
+    const typename Callback<ARGS...>::raw_type Callback<ARGS...>::checkout_ptr = &Callback<ARGS...>::checkout_cb;
     /*
     template <typename... ARGS>
     class Callback : Utils::NonCopyable {

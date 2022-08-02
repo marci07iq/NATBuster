@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <iostream>
 
 namespace NATBuster::Common {
     enum class ErrorCode : uint32_t {
@@ -34,7 +35,8 @@ namespace NATBuster::Common {
         OPT_UDP_INVALID_PING = TYPE_ERROR | SYSTEM_OPT_UDP | 0x0001,
     };
 
-    void ThrowError(ErrorCode code) {
+    inline void ThrowError(ErrorCode code) {
         std::cerr << "ERROR " << (uint32_t)code << std::endl;
+        throw code;
     }
 }

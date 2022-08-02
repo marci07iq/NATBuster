@@ -4,8 +4,8 @@ namespace NATBuster::Server {
 
     //Called when a packet can be read
     void IPServerEndpoint::on_open() {
-        std::string str_ip = _socket->get_remote_addr().get_addr();
-        uint16_t str_port = _socket->get_remote_addr().get_port();
+        std::string str_ip = _socket->get_remote().get_addr();
+        uint16_t str_port = _socket->get_remote().get_port();
 
         std::cout << "Sending indentity to " << str_ip << ":" << str_port << std::endl;
 
@@ -58,14 +58,11 @@ namespace NATBuster::Server {
             _server->_connections.insert(shared_from_this());
         }
 
-        _underlying->set_open_callback(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_open));
-        //_underlying->set_packet_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPServerEndpoint::on_packet));
-        //_underlying->set_raw_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPServerEndpoint::on_raw));
-        //_underlying->set_error_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_error));
-        _underlying->set_close_callback(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_close));
+        _underlying->set_callback_open(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_open));
+        _underlying->set_callback_close(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_close));
 
         //Set the timeout delay
-        _underlying->addDelay(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_timeout), 100000000000);
+        _underlying->add_delay(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_timeout), 100000000000);
 
         _underlying->start();
     }
@@ -105,19 +102,46 @@ namespace NATBuster::Server {
         std::shared_ptr<Common::Identity::UserGroup> authorised_users,
         Common::Crypto::PKey&& self
     ) :
-        _hwnd(std::make_shared< Common::Network::TCPS>("", port)),
-        _emitter(std::make_shared<Common::Network::TCPSEmitter>(_hwnd)),
+        _port(port),
         _authorised_users(authorised_users),
         _self(std::move(self)) {
-
     }
 
     void IPServer::start() {
-        _emitter->set_result_callback(new Common::Utils::MemberWCallback<IPServer, void, Common::Utils::Void>(weak_from_this(), &IPServer::connect_callback));
-        _emitter->set_error_callback(new Common::Utils::MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::error_callback));
-        _emitter->set_close_callback(new Common::Utils::MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::close_callback));
 
-        _emitter->start();
+        //Create and bind server socket
+        std::pair<
+            Common::Utils::shared_unique_ptr<Common::Network::TCPS>,
+            Common::ErrorCode
+        > create_resp = Common::Network::TCPS::create_bind("", _port);
+        if (create_resp.second != Common::ErrorCode::OK) {
+            std::cout << "Can not create server socket " << (uint32_t)create_resp.second << std::endl;
+            throw 1;
+        }
+        _socket = create_resp.first;
+
+        //Create server emitter provider
+        Common::Utils::shared_unique_ptr<Common::Network::SocketEventEmitterProvider> server_provider =
+            Common::Network::SocketEventEmitterProvider::create();
+        _server_emitter_provider = server_provider;
+
+        server_provider->associate_socket(std::move(create_resp.first));
+
+        //Create client emitter provider
+        Common::Utils::shared_unique_ptr<Common::Network::SocketEventEmitterProvider> client_provider =
+            Common::Network::SocketEventEmitterProvider::create();
+        _client_emitter_provider = client_provider;
+
+        _socket->set_callback_accept(new Common::Utils::MemberWCallback<IPServer, void, Common::Network::TCPCHandleU&&>(weak_from_this(), &IPServer::accept_callback));
+        _socket->set_callback_error(new Common::Utils::MemberWCallback<IPServer, void, Common::ErrorCode>(weak_from_this(), &IPServer::error_callback));
+        _socket->set_callback_close(new Common::Utils::MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::close_callback));
+
+        _socket->start();
+
+        _server_emitter = Common::Utils::EventEmitter::create();
+        _server_emitter->start_async(std::move(server_provider));
+        _client_emitter = Common::Utils::EventEmitter::create();
+        _client_emitter->start_async(std::move(client_provider));
     }
 
     IPServer::~IPServer() {

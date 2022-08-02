@@ -31,6 +31,7 @@ namespace NATBuster::Common::Transport {
     typedef std::shared_ptr<OPTUDP> OPTUDPHandle;
 
     class OPTUDP : public OPTBase, public Utils::SharedOnly<OPTUDP> {
+        friend Utils::SharedOnly<OPTUDP>;
 #pragma pack(push, 1)
         struct packet_decoder : Utils::NonStack {
             static const uint32_t seq_rt_mask = 0x3f;
@@ -88,6 +89,7 @@ namespace NATBuster::Common::Transport {
         uint32_t _rx_seq = 0;
         //Last pong received
         Time::time_type_us _last_pong_in = 0;
+        timer_hwnd _pong_timeout_timer;
 
         //These variables are locked by the tx mutex
 
@@ -114,6 +116,7 @@ namespace NATBuster::Common::Transport {
         //Next packet to send out
         //Use the low 6 bits for a re-transmit counter
         uint32_t _tx_seq = 0;
+        timer_hwnd _retransmit_timer;
         std::mutex _tx_lock;
 
         //Socket
@@ -151,32 +154,6 @@ namespace NATBuster::Common::Transport {
             return (res < _settings.min_retransmit) ? _settings.min_retransmit : res;
         }
 
-        inline Time::time_type_us next_floating_time() {
-            {
-                //Time the pong must be received by, or else the connection is declared dead
-                Time::time_type_us next_pong_treshold = _last_pong_in + _settings.max_pong;
-
-                //Time for the next scheduled re-transmit
-                std::lock_guard _lg(_tx_lock);
-                if (_transmit_queue.size()) {
-                    packet_decoder* pkt = packet_decoder::view(_transmit_queue.front().packet);
-                    uint32_t old_rt = (pkt->content.packet.seq & packet_decoder::seq_rt_mask);
-                    Time::time_type_us next_transmit = _transmit_queue.front().transmits[old_rt] + next_retransmit_delta();
-
-                    _internal_floating = (next_transmit < next_pong_treshold) ? next_transmit : next_pong_treshold;
-                }
-                else {
-                    _internal_floating = next_pong_treshold;
-                }
-            }
-
-            if (_external_floating.cb.has_function() && _external_floating.dst < _internal_floating) {
-                return _external_floating.dst;
-            }
-
-            return _internal_floating;
-        }
-
         //Send a ping packet
         void send_ping();
         //Send a pong packet, in response to a ping
@@ -198,8 +175,11 @@ namespace NATBuster::Common::Transport {
         //Socket was closed
         void on_close();
 
-        //Housekeeping function, to be called after all timer and packet functions
-        void on_housekeeping();
+        void reset_retransmit_timer();
+        void reset_pong_timeout_timer();
+
+        void on_retransmit_timer();
+        void on_pong_timeout_timer();
 
         OPTUDP(
             bool is_client,
@@ -220,7 +200,7 @@ namespace NATBuster::Common::Transport {
         inline timer_hwnd add_delay(TimerCallback::raw_type cb, Time::time_delta_type_us delay) {
             return _emitter->add_delay(cb, delay);
         }
-        inline bool cancel_timer(timer_hwnd hwnd) {
+        inline void cancel_timer(timer_hwnd hwnd) {
             return _emitter->cancel_timer(hwnd);
         }
 

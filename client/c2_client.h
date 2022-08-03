@@ -19,6 +19,13 @@ namespace NATBuster::Client {
         //Clients that can communicate through the C2 server
         std::shared_ptr<Common::Identity::UserGroup> _authorised_clients;
 
+        //Client event emitter (C2Server-C2Client)
+        std::shared_ptr<Common::Network::SocketEventEmitterProvider> _client_emitter_provider;
+        std::shared_ptr<Common::Utils::EventEmitter> _client_emitter;
+        //Router event emitter
+        std::shared_ptr<Common::Network::SocketEventEmitterProvider> _router_emitter_provider;
+        Common::Utils::shared_unique_ptr<Common::Utils::EventEmitter> _router_emitter;
+
         //Open punchers
         //Remove themselves after punching is complete
         std::list<std::shared_ptr<Puncher>> _open_punchers;
@@ -45,7 +52,7 @@ namespace NATBuster::Client {
 
         C2Client(
             std::string server_name,
-            uint16_t ip,
+            uint16_t port,
             std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
             std::shared_ptr<Common::Utils::EventEmitter> emitter,
             std::shared_ptr<Common::Identity::UserGroup> authorised_server,
@@ -54,7 +61,7 @@ namespace NATBuster::Client {
 
         void start();
 
-        void init();
+        void init() override;
     public:
         
 

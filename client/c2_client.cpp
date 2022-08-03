@@ -62,29 +62,37 @@ namespace NATBuster::Client {
 
     C2Client::C2Client(
         std::string server_name,
-        uint16_t ip,
+        uint16_t port,
         std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
         std::shared_ptr<Common::Utils::EventEmitter> emitter,
         std::shared_ptr<Common::Identity::UserGroup> authorised_server,
         std::shared_ptr<Common::Identity::UserGroup> authorised_clients,
-        Common::Crypto::PKey&& self) : _authorised_clients(authorised_clients), _self(std::move(self)) {
+        Common::Crypto::PKey&& self) :
+        _authorised_clients(authorised_clients),
+        _self(std::move(self)),
+        _client_emitter(emitter),
+        _client_emitter_provider(provider) {
 
-        std::pair<
-            Common::Network::TCPCHandleU,
-            Common::ErrorCode
-        > socket = Common::Network::TCPC::create_connect(server_name, ip);
-        Common::Network::TCPCHandleS socket_s = socket.first;
+        //Create client socket
+        Common::Network::TCPCHandleU socket = Common::Network::TCPC::create();
+        Common::Network::TCPCHandleS socket_s = socket;
 
-        if (socket.second == Common::ErrorCode::OK) {
-            //Associate socket
-            provider->associate_socket(std::move(socket.first));
-            //Create OPT TCP
-            Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(true, emitter, socket_s);
-            //Create OPT Session
-            std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(true, opt, std::move(self), authorised_server);
+        //Callback once socket added to thread
+        auto connect_fuction = [socket_s, server_name, port]() {
+            Common::ErrorCode res = socket_s->connect(server_name, port);
+        };
+        socket->set_callback_start(new Common::Utils::FunctionalCallback<void>(std::bind(connect_fuction)));
 
-            _underlying = Common::Transport::OPTPipes::create(true, session);
-        }
+        //Associate socket
+        provider->associate_socket(std::move(socket));
+
+        //Create OPT TCP
+        Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(true, emitter, socket_s);
+        //Create OPT Session
+        Common::Crypto::PKey self_copy;
+        self_copy.copy_private_from(_self);
+        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(true, opt, std::move(self_copy), authorised_server);
+        _underlying = Common::Transport::OPTPipes::create(true, session);
     }
 
     void C2Client::start() {
@@ -96,6 +104,13 @@ namespace NATBuster::Client {
 
         //Set the timeout delay
         //_underlying->addDelay(new Common::Utils::MemberWCallback<C2Client, void>(weak_from_this(), &C2Client::on_timeout), 100000000000);
+
+        Common::Utils::shared_unique_ptr<Common::Network::SocketEventEmitterProvider> router_provider =
+            Common::Network::SocketEventEmitterProvider::create();
+        _router_emitter_provider = router_provider;
+
+        _router_emitter = Common::Utils::EventEmitter::create();
+        _router_emitter->start_async(std::move(router_provider));
 
         _underlying->start();
     }

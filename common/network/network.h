@@ -70,7 +70,7 @@ namespace NATBuster::Common::Network {
         friend class SocketEventEmitterProvider;
         friend class SocketEventEmitterProviderImpl;
 
-        inline void close();
+        void close();
     public:
         SocketBase();
         SocketBase(SocketOSData* socket) noexcept;
@@ -80,9 +80,9 @@ namespace NATBuster::Common::Network {
         //Extract the underlying socket
         SocketOSData* extract();
 
-        inline bool is_valid();
+        bool is_valid();
 
-        inline bool is_invalid();
+        bool is_invalid();
 
         ~SocketBase();
     };

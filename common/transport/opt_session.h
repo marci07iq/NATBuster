@@ -97,13 +97,6 @@ namespace NATBuster::Common::Transport {
         );
 
     public:
-        static std::shared_ptr<OPTSession> create(
-            bool is_client,
-            std::shared_ptr<OPTBase> underlying,
-            Crypto::PKey&& self,
-            std::shared_ptr<Identity::UserGroup> known_remotes
-        );
-
         void start();
 
         //Send ordered packet

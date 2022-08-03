@@ -51,7 +51,7 @@ namespace NATBuster::Client {
 
     IPClient::IPClient(
         std::string server_name,
-        uint16_t ip,
+        uint16_t port,
         std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
         std::shared_ptr<Common::Utils::EventEmitter> emitter,
         std::shared_ptr<Common::Identity::UserGroup> authorised_server,
@@ -62,8 +62,8 @@ namespace NATBuster::Client {
         Common::Network::TCPCHandleS socket_s = socket;
 
         //Callback once socket added to thread
-        auto connect_fuction = [socket_s, server_name, ip]() {
-            Common::ErrorCode res = socket_s->connect(server_name, ip);
+        auto connect_fuction = [socket_s, server_name, port]() {
+            Common::ErrorCode res = socket_s->connect(server_name, port);
         };
         socket->set_callback_start(new Common::Utils::FunctionalCallback<void>(std::bind(connect_fuction)));
         
@@ -86,9 +86,13 @@ namespace NATBuster::Client {
         //Set the timeout delay
         _underlying->add_delay(new Common::Utils::MemberWCallback<IPClient, void>(weak_from_this(), &IPClient::on_timeout), 10000000);
 
+        //Start the socket
         _underlying->start();
     }
 
+    void IPClient::init() {
+        start();
+    }
 
     bool IPClient::done() {
         return _waker.done();

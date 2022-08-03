@@ -131,16 +131,6 @@ namespace NATBuster::Common::Transport {
         }
     }
 
-    std::shared_ptr<OPTSession> OPTSession::create(
-        bool is_client,
-        std::shared_ptr<OPTBase> underlying,
-        Crypto::PKey&& self,
-        std::shared_ptr<Identity::UserGroup> known_remotes
-    ) {
-        return std::shared_ptr<OPTSession>(new OPTSession(
-            is_client, underlying, std::move(self), known_remotes));
-    }
-
     void OPTSession::start() {
         _underlying->set_callback_open(new Utils::MemberWCallback<OPTSession, void>(weak_from_this(), &OPTSession::on_open));
         _underlying->set_callback_packet(new Utils::MemberWCallback<OPTSession, void, const Utils::ConstBlobView&>(weak_from_this(), &OPTSession::on_packet));

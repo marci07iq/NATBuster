@@ -16,6 +16,10 @@ namespace NATBuster::Server {
         _pipe_a->send(data);
     }
 
+    void C2ServerRoute::on_error(Common::ErrorCode code) {
+        std::cout << (uint32_t)code << std::endl;
+    }
+
     void C2ServerRoute::on_close_a() {
         _pipe_b->close();
     }
@@ -37,13 +41,13 @@ namespace NATBuster::Server {
             _self = _server->_routes.insert(_server->_routes.end(), shared_from_this());
         }
 
-        _pipe_b->set_open_callback(new Common::Utils::MemberWCallback<C2ServerRoute, void>(weak_from_this(), &C2ServerRoute::on_open));
-        _pipe_a->set_packet_callback(new Common::Utils::MemberWCallback<C2ServerRoute, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &C2ServerRoute::on_packet_a));
-        _pipe_b->set_packet_callback(new Common::Utils::MemberWCallback<C2ServerRoute, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &C2ServerRoute::on_packet_b));
-        //_underlying->set_raw_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPServerEndpoint::on_raw));
-        //_underlying->set_error_callback(new Common::Utils::MemberCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_error));
-        _pipe_a->set_close_callback(new Common::Utils::MemberWCallback<C2ServerRoute, void>(weak_from_this(), &C2ServerRoute::on_close_a));
-        _pipe_b->set_close_callback(new Common::Utils::MemberWCallback<C2ServerRoute, void>(weak_from_this(), &C2ServerRoute::on_close_b));
+        _pipe_b->set_callback_open(new Common::Utils::MemberWCallback<C2ServerRoute, void>(weak_from_this(), &C2ServerRoute::on_open));
+        _pipe_a->set_callback_packet(new Common::Utils::MemberWCallback<C2ServerRoute, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &C2ServerRoute::on_packet_a));
+        _pipe_b->set_callback_packet(new Common::Utils::MemberWCallback<C2ServerRoute, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &C2ServerRoute::on_packet_b));
+        _pipe_a->set_callback_error(new Common::Utils::MemberWCallback<C2ServerRoute, void, Common::ErrorCode>(weak_from_this(), &C2ServerRoute::on_error));
+        _pipe_b->set_callback_error(new Common::Utils::MemberWCallback<C2ServerRoute, void, Common::ErrorCode>(weak_from_this(), &C2ServerRoute::on_error));
+        _pipe_a->set_callback_close(new Common::Utils::MemberWCallback<C2ServerRoute, void>(weak_from_this(), &C2ServerRoute::on_close_a));
+        _pipe_b->set_callback_close(new Common::Utils::MemberWCallback<C2ServerRoute, void>(weak_from_this(), &C2ServerRoute::on_close_b));
 
         //Set the timeout delay
         //_underlying->addDelay(new Common::Utils::MemberWCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_timeout), 100000000000);
@@ -73,7 +77,7 @@ namespace NATBuster::Server {
     }
 
     C2ServerRoute::~C2ServerRoute() {
-        
+
     }
 
 
@@ -116,7 +120,7 @@ namespace NATBuster::Server {
                 Common::Utils::Blob src_fingerprint;
                 if (pipe_req.pipe->getUser()->key.fingerprint(src_fingerprint)) {
                     std::cout << "Pipe request from " << *pipe_req.pipe->getUser() << std::endl;
-                    
+
                     if (dst_fingerprint.size() == 32) {
                         {
                             std::lock_guard _lg(_server->_connection_lock);
@@ -151,14 +155,10 @@ namespace NATBuster::Server {
     void C2ServerEndpoint::on_packet(const Common::Utils::ConstBlobView& data) {
 
     }
-    //Called when a packet can be read
-    /*void on_raw(const Common::Utils::ConstBlobView& data) {
-
-    }*/
     //Called when a socket error occurs
-    /*void C2ServerEndpoint::on_error() {
+    void C2ServerEndpoint::on_error(Common::ErrorCode code) {
 
-    }*/
+    }
     //Timer
     //Socket was closed
     void C2ServerEndpoint::on_close() {
@@ -170,7 +170,7 @@ namespace NATBuster::Server {
     }
 
     C2ServerEndpoint::C2ServerEndpoint(
-        Common::Network::TCPCHandle socket,
+        Common::Network::TCPCHandleS socket,
         std::shared_ptr<Common::Transport::OPTPipes> underlying,
         std::shared_ptr<C2Server> server) :
         _socket(socket), _underlying(underlying), _server(server) {
@@ -183,12 +183,11 @@ namespace NATBuster::Server {
             _self = _server->_connections.insert(shared_from_this()).first;
         }
 
-        _underlying->set_open_callback(new Common::Utils::MemberWCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_open));
-        _underlying->set_packet_callback(new Common::Utils::MemberWCallback<C2ServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &C2ServerEndpoint::on_packet));
-        _underlying->set_pipe_callback(new Common::Utils::MemberWCallback<C2ServerEndpoint, void, Common::Transport::OPTPipeOpenData>(weak_from_this(), &C2ServerEndpoint::on_pipe));
-        //_underlying->set_raw_callback(new Common::Utils::MemberCallback<IPServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &IPServerEndpoint::on_raw));
-        //_underlying->set_error_callback(new Common::Utils::MemberCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_error));
-        _underlying->set_close_callback(new Common::Utils::MemberWCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_close));
+        _underlying->set_callback_open(new Common::Utils::MemberWCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_open));
+        _underlying->set_callback_packet(new Common::Utils::MemberWCallback<C2ServerEndpoint, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &C2ServerEndpoint::on_packet));
+        _underlying->set_callback_pipe(new Common::Utils::MemberWCallback<C2ServerEndpoint, void, Common::Transport::OPTPipeOpenData>(weak_from_this(), &C2ServerEndpoint::on_pipe));
+        _underlying->set_callback_error(new Common::Utils::MemberWCallback<C2ServerEndpoint, void, Common::ErrorCode>(weak_from_this(), &C2ServerEndpoint::on_error));
+        _underlying->set_callback_close(new Common::Utils::MemberWCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_close));
 
         //Set the timeout delay
         //_underlying->addDelay(new Common::Utils::MemberWCallback<C2ServerEndpoint, void>(weak_from_this(), &C2ServerEndpoint::on_timeout), 100000000000);
@@ -196,42 +195,33 @@ namespace NATBuster::Server {
         _underlying->start();
     }
 
-    std::shared_ptr<C2ServerEndpoint> C2ServerEndpoint::create(
-        Common::Network::TCPCHandle socket,
-        std::shared_ptr<Common::Transport::OPTPipes> underlying,
-        std::shared_ptr<C2Server> server) {
-        std::shared_ptr<C2ServerEndpoint> res = std::shared_ptr<C2ServerEndpoint>(new C2ServerEndpoint(socket, underlying, server));
-        res->start();
-        return res;
+    void C2ServerEndpoint::init() {
+        start();
     }
 
 
+    void C2Server::on_accept(Common::Network::TCPCHandleU&& socket) {
+        std::cout << "ACCEPTED FROM " << socket->get_remote() << std::endl;
 
+        Common::Network::TCPCHandleS socket_s = socket;
+        _client_emitter_provider->associate_socket(std::move(socket));
+        //Create OPT TCP
+        Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(false, _client_emitter.get_shared(), socket_s);
+        //Create OPT Session
+        Common::Crypto::PKey self_copy;
+        self_copy.copy_private_from(_self);
+        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, std::move(self_copy), _authorised_users);
+        std::shared_ptr<Common::Transport::OPTPipes> pipes = Common::Transport::OPTPipes::create(false, session);
 
-    void C2Server::connect_callback(Common::Utils::Void data) {
-        std::cout << "CONNECT AVAIL" << std::endl;
-        Common::Network::TCPCHandle client = _hwnd->accept();
-        if (client) {
-            std::cout << "ACCEPTED FROM " << client->get_remote_addr().get_addr() << ":" << client->get_remote_addr().get_port() << std::endl;
-
-            //Create OPT TCP
-            Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(false, client);
-            //Create OPT Session
-            Common::Crypto::PKey self_copy;
-            self_copy.copy_private_from(_self);
-            std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, std::move(self_copy), _authorised_users);
-            std::shared_ptr<Common::Transport::OPTPipes> pipes = Common::Transport::OPTPipes::create(false, session);
-
-            std::shared_ptr<C2ServerEndpoint> endpoint = C2ServerEndpoint::create(client, pipes, shared_from_this());
-        }
+        std::shared_ptr<C2ServerEndpoint> endpoint = C2ServerEndpoint::create(socket_s, pipes, shared_from_this());
 
     }
 
-    void C2Server::error_callback() {
+    void C2Server::on_error(Common::ErrorCode) {
         std::cout << "ERR" << std::endl;
     }
 
-    void C2Server::close_callback() {
+    void C2Server::on_close() {
         std::cout << "CLOSE" << std::endl;
     }
 
@@ -240,19 +230,47 @@ namespace NATBuster::Server {
         std::shared_ptr<Common::Identity::UserGroup> authorised_users,
         Common::Crypto::PKey&& self
     ) :
-        _hwnd(std::make_shared< Common::Network::TCPS>("", port)),
-        _emitter(std::make_shared<Common::Network::TCPSEmitter>(_hwnd)),
+        _port(port),
         _authorised_users(authorised_users),
         _self(std::move(self)) {
 
     }
 
     void C2Server::start() {
-        _emitter->set_result_callback(new Common::Utils::MemberWCallback<C2Server, void, Common::Utils::Void>(weak_from_this(), &C2Server::connect_callback));
-        _emitter->set_error_callback(new Common::Utils::MemberWCallback<C2Server, void>(weak_from_this(), &C2Server::error_callback));
-        _emitter->set_close_callback(new Common::Utils::MemberWCallback<C2Server, void>(weak_from_this(), &C2Server::close_callback));
+        //Create and bind server socket
+        std::pair<
+            Common::Utils::shared_unique_ptr<Common::Network::TCPS>,
+            Common::ErrorCode
+        > create_resp = Common::Network::TCPS::create_bind("", _port);
+        if (create_resp.second != Common::ErrorCode::OK) {
+            std::cout << "Can not create server socket " << (uint32_t)create_resp.second << std::endl;
+            throw 1;
+        }
+        _socket = create_resp.first;
 
-        _emitter->start();
+        //Create server emitter provider
+        Common::Utils::shared_unique_ptr<Common::Network::SocketEventEmitterProvider> server_provider =
+            Common::Network::SocketEventEmitterProvider::create();
+        _server_emitter_provider = server_provider;
+
+        server_provider->associate_socket(std::move(create_resp.first));
+
+        //Create client emitter provider
+        Common::Utils::shared_unique_ptr<Common::Network::SocketEventEmitterProvider> client_provider =
+            Common::Network::SocketEventEmitterProvider::create();
+        _client_emitter_provider = client_provider;
+
+        _socket->set_callback_accept(new Common::Utils::MemberWCallback<C2Server, void, Common::Network::TCPCHandleU&&>(weak_from_this(), &C2Server::on_accept));
+        _socket->set_callback_error(new Common::Utils::MemberWCallback<C2Server, void, Common::ErrorCode>(weak_from_this(), &C2Server::on_error));
+        _socket->set_callback_close(new Common::Utils::MemberWCallback<C2Server, void>(weak_from_this(), &C2Server::on_close));
+
+        _socket->start();
+
+        _server_emitter = Common::Utils::EventEmitter::create();
+        _server_emitter->start_async(std::move(server_provider));
+        _client_emitter = Common::Utils::EventEmitter::create();
+        _client_emitter->start_async(std::move(client_provider));
+
     }
 
     C2Server::~C2Server() {

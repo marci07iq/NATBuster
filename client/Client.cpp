@@ -11,11 +11,15 @@
 #include "punch_sym_sym.h"
 
 using namespace NATBuster::Client;
+using namespace NATBuster::Common;
 using NATBuster::Common::Crypto::PKey;
 using NATBuster::Common::Utils::Blob;
 using NATBuster::Common::Identity::User;
 using NATBuster::Common::Identity::UserGroup;
 using NATBuster::Client::HolepunchSym;
+
+std::shared_ptr<Network::SocketEventEmitterProvider> main_provider;
+std::shared_ptr<Utils::EventEmitter> main_emitter;
 
 void keygen() {
     using namespace NATBuster::Common::Crypto;
@@ -36,7 +40,10 @@ void keygen() {
 void get_ip(std::shared_ptr<UserGroup> auth_servers, PKey&& self) {
     std::cout << "Querying from 127.0.0.1:5987" << std::endl;
 
-    std::shared_ptr<NATBuster::Client::IPClient> query = NATBuster::Client::IPClient::create("127.0.0.1", 5987, auth_servers, std::move(self));
+    std::shared_ptr<NATBuster::Client::IPClient> query = NATBuster::Client::IPClient::create(
+        "127.0.0.1", 5987,
+        main_provider, main_emitter,
+        auth_servers, std::move(self));
 
     query->wait();
 
@@ -53,7 +60,10 @@ std::shared_ptr<NATBuster::Client::C2Client> c2_instance;
 void login(std::shared_ptr<UserGroup> c2_servers, std::shared_ptr<UserGroup> c2_clients, PKey&& self) {
     std::cout << "Querying from 127.0.0.1:5987" << std::endl;
 
-    c2_instance = NATBuster::Client::C2Client::create("127.0.0.1", 5987, c2_servers, c2_clients, std::move(self));
+    c2_instance = NATBuster::Client::C2Client::create(
+        "127.0.0.1", 5987,
+        main_provider, main_emitter,
+        c2_servers, c2_clients, std::move(self));
 }
 
 //std::shared_ptr<NATBuster::Client::Router> router;
@@ -102,7 +112,8 @@ void forward() {
 
     std::lock_guard _lg(c2_instance->_open_routers_lock);
 
-    NATBuster::Client::RouterTCPS::create(c2_instance->_open_routers.front(), local_port, remote_port);
+    NATBuster::Client::RouterTCPS::create(
+        c2_instance->_open_routers.front(), local_port, remote_port);
 }
 
 
@@ -156,6 +167,16 @@ int main() {
 
     std::shared_ptr<UserGroup> authorised_c2_servers = std::make_shared<UserGroup>();
     authorised_c2_servers->addUser(c2server);
+
+    std::cout << "Starting threads" << std::endl;
+    {
+        Utils::shared_unique_ptr<Network::SocketEventEmitterProvider> provider =
+            Network::SocketEventEmitterProvider::create();
+        main_provider = provider;
+
+        main_emitter = Utils::EventEmitter::create();
+        main_emitter->start_async(std::move(provider));
+    }
 
     std::string command;
     while (true) {

@@ -187,8 +187,11 @@ namespace NATBuster::Client {
     void Puncher::on_punch(Common::Network::UDPHandleU punched) {
         std::cout << "Punch successful" << std::endl;
 
+        Common::Network::UDPHandleS punched_s = punched;
+        _c2_client->_client_emitter_provider->associate_socket(std::move(punched));
+
         //Create the OPT
-        std::shared_ptr<Common::Transport::OPTUDP> opt_udp = Common::Transport::OPTUDP::create(_is_client, punched);
+        std::shared_ptr<Common::Transport::OPTUDP> opt_udp = Common::Transport::OPTUDP::create(_is_client, _c2_client->_client_emitter, punched_s);
         //Create the Session
         Common::Crypto::PKey self_key;
         self_key.copy_public_from(_self_key);

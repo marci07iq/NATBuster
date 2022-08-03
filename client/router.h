@@ -49,6 +49,7 @@ namespace NATBuster::Client {
         //The underlying comms layer
         std::shared_ptr<Common::Transport::OPTPipes> _underlying;
 
+        std::shared_ptr<Common::Network::SocketEventEmitterProvider> _provider;
         std::shared_ptr<Common::Utils::EventEmitter> _emitter;
 
         //The opened TCPS sockets to send to the remote side
@@ -90,11 +91,8 @@ namespace NATBuster::Client {
 
         void start();
 
+        void init() override;
     public:
-        static std::shared_ptr<Router> create(
-            std::shared_ptr<C2Client> c2_client,
-            std::shared_ptr<Common::Transport::OPTPipes> underlying
-        );
 
         void pushPort(uint16_t local_port, uint16_t remote_port);
 
@@ -112,6 +110,7 @@ namespace NATBuster::Client {
         //The iterator to self registration
         std::list<std::shared_ptr<RouterTCPS>>::iterator _self;
 
+        uint16_t _local_port;
         Common::Network::TCPSHandleS _tcp_server_socket;
 
         uint16_t _remote_port;
@@ -128,11 +127,7 @@ namespace NATBuster::Client {
 
         void start();
 
-    public:
-        static std::shared_ptr<RouterTCPS> create(
-            std::shared_ptr<Router> router,
-            uint16_t local_port,
-            uint16_t remote_port);
+        void init() override;
     };
 
 
@@ -176,7 +171,6 @@ namespace NATBuster::Client {
     public:
         static std::shared_ptr<RouterTCPRoute> create_server(
             std::shared_ptr<Router> router,
-            std::shared_ptr<Common::Utils::EventEmitter> emitter,
             std::shared_ptr<Common::Transport::OPTPipe> pipe,
             uint16_t local_port
         );
@@ -184,7 +178,6 @@ namespace NATBuster::Client {
         static std::shared_ptr<RouterTCPRoute> create_client(
             std::shared_ptr<Router> router,
             Common::Network::TCPCHandleU&& socket,
-            std::shared_ptr<Common::Utils::EventEmitter> emitter,
             uint16_t remote_port
             );
 

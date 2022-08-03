@@ -30,7 +30,7 @@ namespace NATBuster::Client {
 
         IPClient(
             std::string server_name,
-            uint16_t ip,
+            uint16_t port,
             std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
             std::shared_ptr<Common::Utils::EventEmitter> emitter,
             std::shared_ptr<Common::Identity::UserGroup> authorised_server,
@@ -38,7 +38,7 @@ namespace NATBuster::Client {
 
         void start();
 
-        void init();
+        void init() override;
     public:
         bool done();
 

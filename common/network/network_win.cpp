@@ -232,10 +232,10 @@ namespace NATBuster::Common::Network {
     }
 
 
-    inline bool SocketBase::is_valid() {
+    bool SocketBase::is_valid() {
         return _socket->is_valid();
     }
-    inline bool SocketBase::is_invalid() {
+    bool SocketBase::is_invalid() {
         return _socket->is_invalid();
     }
 
@@ -491,129 +491,137 @@ namespace NATBuster::Common::Network {
 
         assert(_socket_events.size() == _socket_objects.size());
 
-        DWORD res = WSAWaitForMultipleEvents(
-            ncount,
-            _socket_events.data(),
-            FALSE, 10000, TRUE);
-
-        if (res == WAIT_IO_COMPLETION) {
-            //APC triggered
+        if (ncount == 0) {
+            SleepEx(timeout, TRUE);
         }
-        else if (res == WAIT_TIMEOUT) {
-            //Timeout triggered
-        }
-        else if (WAIT_OBJECT_0 <= res && res < (WAIT_OBJECT_0 + ncount)) {
-            int index = res - WAIT_OBJECT_0;
-
-            std::shared_ptr<SocketEventHandle> socket_hwnd = _socket_objects[index];
-            SOCKET socket = socket_hwnd->_socket->get();
-
-            WSANETWORKEVENTS set_events;
-            //TODO: Handle errors
-            int res2 = WSAEnumNetworkEvents(
-                socket,
-                _socket_events[index],
-                &set_events);
-
-            if (set_events.lNetworkEvents & FD_CONNECT) {
-                _socket_objects[index]->_callback_connect();
+        else {
+            DWORD res = WSAWaitForMultipleEvents(
+                ncount,
+                _socket_events.data(),
+                FALSE, timeout, TRUE);
+            
+            if (res == WSA_WAIT_FAILED) {
+                std::cout << "WSA Wait failed " << WSAGetLastError() << std::endl;
+            } 
+            else if (res == WAIT_IO_COMPLETION) {
+                //APC triggered
             }
+            else if (res == WAIT_TIMEOUT) {
+                //Timeout triggered
+            }
+            else if (WAIT_OBJECT_0 <= res && res < (WAIT_OBJECT_0 + ncount)) {
+                int index = res - WAIT_OBJECT_0;
 
-            if (set_events.lNetworkEvents & FD_READ) {
-                if (socket_hwnd->_type == SocketEventHandle::Type::TCPC) {
-                    Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
-                    WSABUF buffer;
-                    buffer.buf = (CHAR*)data.getw();
-                    buffer.len = data.size();
-                    DWORD received;
-                    DWORD flags = 0;
-                    int res3 = WSARecv(
-                        socket,
-                        &buffer,
-                        1,
-                        &received,
-                        &flags,
-                        NULL,
-                        NULL);
+                std::shared_ptr<SocketEventHandle> socket_hwnd = _socket_objects[index];
+                SOCKET socket = socket_hwnd->_socket->get();
 
-                    //Closed
-                    if (received == 0) {
-                        std::lock_guard _lg(_system_lock);
-                        _closed_socket_objects.push_back(socket_hwnd);
-                    }
-                    else {
-                        data.resize(received);
-                        _socket_objects[index]->_callback_packet(data);
-                    }
+                WSANETWORKEVENTS set_events;
+                //TODO: Handle errors
+                int res2 = WSAEnumNetworkEvents(
+                    socket,
+                    _socket_events[index],
+                    &set_events);
+
+                if (set_events.lNetworkEvents & FD_CONNECT) {
+                    _socket_objects[index]->_callback_connect();
                 }
-                else if (socket_hwnd->_type == SocketEventHandle::Type::UDP) {
-                    Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
-                    NetworkAddress source;
 
-                    WSABUF buffer;
-                    buffer.buf = (CHAR*)data.getw();
-                    buffer.len = data.size();
-                    DWORD received;
-                    DWORD flags = 0;
-                    int res3 = WSARecvFrom(
-                        socket,
-                        &buffer,
-                        1,
-                        &received,
-                        &flags,
-                        (sockaddr*)source.get_impl()->get_dataw(),
-                        source.get_impl()->sizew(),
-                        NULL,
-                        NULL
-                    );
+                if (set_events.lNetworkEvents & FD_READ) {
+                    if (socket_hwnd->_type == SocketEventHandle::Type::TCPC) {
+                        Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
+                        WSABUF buffer;
+                        buffer.buf = (CHAR*)data.getw();
+                        buffer.len = data.size();
+                        DWORD received;
+                        DWORD flags = 0;
+                        int res3 = WSARecv(
+                            socket,
+                            &buffer,
+                            1,
+                            &received,
+                            &flags,
+                            NULL,
+                            NULL);
 
-                    //Closed
-                    if (received == 0) {
-                        std::lock_guard _lg(_system_lock);
-                        _closed_socket_objects.push_back(socket_hwnd);
-                    }
-                    else {
-                        data.resize(received);
-                        if (source == socket_hwnd->_remote_address) {
-                            socket_hwnd->_callback_packet(data);
+                        //Closed
+                        if (received == 0) {
+                            std::lock_guard _lg(_system_lock);
+                            _closed_socket_objects.push_back(socket_hwnd);
                         }
-                        socket_hwnd->_callback_unfiltered_packet(data, source);
+                        else {
+                            data.resize(received);
+                            _socket_objects[index]->_callback_packet(data);
+                        }
+                    }
+                    else if (socket_hwnd->_type == SocketEventHandle::Type::UDP) {
+                        Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
+                        NetworkAddress source;
+
+                        WSABUF buffer;
+                        buffer.buf = (CHAR*)data.getw();
+                        buffer.len = data.size();
+                        DWORD received;
+                        DWORD flags = 0;
+                        int res3 = WSARecvFrom(
+                            socket,
+                            &buffer,
+                            1,
+                            &received,
+                            &flags,
+                            (sockaddr*)source.get_impl()->get_dataw(),
+                            source.get_impl()->sizew(),
+                            NULL,
+                            NULL
+                        );
+
+                        //Closed
+                        if (received == 0) {
+                            std::lock_guard _lg(_system_lock);
+                            _closed_socket_objects.push_back(socket_hwnd);
+                        }
+                        else {
+                            data.resize(received);
+                            if (source == socket_hwnd->_remote_address) {
+                                socket_hwnd->_callback_packet(data);
+                            }
+                            socket_hwnd->_callback_unfiltered_packet(data, source);
+                        }
+                    }
+                    else {
+
                     }
                 }
-                else {
 
-                }
-            }
+                if (set_events.lNetworkEvents & FD_ACCEPT) {
+                    TCPCHandleU hwnd;
 
-            if (set_events.lNetworkEvents & FD_ACCEPT) {
-                TCPCHandleU hwnd;
+                    int iResult;
+                    NetworkAddress remote_address;
+                    SOCKET clientSocket;
 
-                int iResult;
-                NetworkAddress remote_address;
-                SOCKET clientSocket;
+                    // Accept a client socket
+                    int len = remote_address.get_impl()->size();
+                    SOCKET client = WSAAccept(socket, (sockaddr*)remote_address.get_impl()->get_dataw(), &len, NULL, NULL);
+                    *remote_address.get_impl()->sizew() = len;
 
-                // Accept a client socket
-                int len = remote_address.get_impl()->size();
-                SOCKET client = WSAAccept(socket, (sockaddr*)remote_address.get_impl()->get_dataw(), &len, NULL, NULL);
-                *remote_address.get_impl()->sizew() = len;
+                    if (client == INVALID_SOCKET) {
+                        int error = WSAGetLastError();
+                        if (error != WSAEWOULDBLOCK && error != WSAECONNRESET) {
+                            close_socket(socket_hwnd);
+                        }
+                    }
+                    else {
+                        SocketOSData* accepted = new SocketOSData(client);
+                        TCPCHandleU new_client(new TCPC(accepted, std::move(remote_address)));
 
-                if (client == INVALID_SOCKET) {
-                    int error = WSAGetLastError();
-                    if (error != WSAEWOULDBLOCK && error != WSAECONNRESET) {
-                        close_socket(socket_hwnd);
+                        _socket_objects[index]->_callback_accept(std::move(hwnd));
                     }
                 }
-                else {
-                    SocketOSData* accepted = new SocketOSData(client);
-                    TCPCHandleU new_client(new TCPC(accepted, std::move(remote_address)));
 
-                    _socket_objects[index]->_callback_accept(std::move(hwnd));
+                if (set_events.lNetworkEvents & FD_CLOSE) {
+                    std::lock_guard _lg(_system_lock);
+                    _closed_socket_objects.push_back(socket_hwnd);
                 }
-            }
-
-            if (set_events.lNetworkEvents & FD_CLOSE) {
-                std::lock_guard _lg(_system_lock);
-                _closed_socket_objects.push_back(socket_hwnd);
             }
         }
 
@@ -808,7 +816,7 @@ namespace NATBuster::Common::Network {
     TCPSHandleU SocketEventEmitterProvider::extract_socket(TCPSHandleS hwnd) {
         std::lock_guard _lg(_sockets_lock);
 
-        if (hwnd->_self == _sockets_tcps.end()) return false;
+        if (hwnd->_self == _sockets_tcps.end()) return TCPSHandleU();
         TCPSHandleU socket = std::move(*hwnd->_self);
         _sockets_tcps.erase(hwnd->_self);
         hwnd->_self = _sockets_tcps.end();
@@ -817,7 +825,7 @@ namespace NATBuster::Common::Network {
     TCPCHandleU SocketEventEmitterProvider::extract_socket(TCPCHandleS hwnd) {
         std::lock_guard _lg(_sockets_lock);
 
-        if (hwnd->_self == _sockets_tcpc.end()) return false;
+        if (hwnd->_self == _sockets_tcpc.end()) return TCPCHandleU();
         TCPCHandleU socket = std::move(*hwnd->_self);
         _sockets_tcpc.erase(hwnd->_self);
         hwnd->_self = _sockets_tcpc.end();
@@ -826,7 +834,7 @@ namespace NATBuster::Common::Network {
     UDPHandleU SocketEventEmitterProvider::extract_socket(UDPHandleS hwnd) {
         std::lock_guard _lg(_sockets_lock);
 
-        if (hwnd->_self == _sockets_udp.end()) return false;
+        if (hwnd->_self == _sockets_udp.end()) return UDPHandleU();
         UDPHandleU socket = std::move(*hwnd->_self);
         _sockets_udp.erase(hwnd->_self);
         hwnd->_self = _sockets_udp.end();

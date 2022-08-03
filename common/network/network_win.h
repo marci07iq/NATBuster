@@ -88,7 +88,7 @@ namespace NATBuster::Common::Network {
 
         //Fast to access variables to send data to thread
 
-        HANDLE _this_thread;
+        HANDLE _this_thread = INVALID_HANDLE_VALUE;
         std::list<Common::Utils::Callback<>> _tasks;
         std::list<std::shared_ptr<SocketEventHandle>> _added_socket_objects;
         std::list<std::shared_ptr<SocketEventHandle>> _closed_socket_objects;

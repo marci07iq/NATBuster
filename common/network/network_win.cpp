@@ -593,8 +593,6 @@ namespace NATBuster::Common::Network {
                 }
 
                 if (set_events.lNetworkEvents & FD_ACCEPT) {
-                    TCPCHandleU hwnd;
-
                     int iResult;
                     NetworkAddress remote_address;
                     SOCKET clientSocket;
@@ -614,7 +612,7 @@ namespace NATBuster::Common::Network {
                         SocketOSData* accepted = new SocketOSData(client);
                         TCPCHandleU new_client(new TCPC(accepted, std::move(remote_address)));
 
-                        _socket_objects[index]->_callback_accept(std::move(hwnd));
+                        _socket_objects[index]->_callback_accept(std::move(new_client));
                     }
                 }
 
@@ -681,21 +679,25 @@ namespace NATBuster::Common::Network {
     void SocketEventEmitterProviderImpl::run_now(Common::Utils::Callback<>::raw_type fn) {
         std::lock_guard _lg(_system_lock);
         _tasks.emplace_back(fn);
+        assert(_this_thread != INVALID_HANDLE_VALUE);
         QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
     void SocketEventEmitterProviderImpl::interrupt() {
         std::lock_guard _lg(_system_lock);
+        assert(_this_thread != INVALID_HANDLE_VALUE);
         QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
 
     void SocketEventEmitterProviderImpl::start_socket(std::shared_ptr<SocketEventHandle> socket) {
         std::lock_guard _lg(_system_lock);
         _added_socket_objects.push_back(socket);
+        assert(_this_thread != INVALID_HANDLE_VALUE);
         QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
     void SocketEventEmitterProviderImpl::close_socket(std::shared_ptr<SocketEventHandle> socket) {
         std::lock_guard _lg(_system_lock);
         _closed_socket_objects.push_back(socket);
+        assert(_this_thread != INVALID_HANDLE_VALUE);
         QueueUserAPC(SocketEventEmitterProviderImpl::apc_fun, _this_thread, 0);
     }
     bool SocketEventEmitterProviderImpl::extract_socket(std::shared_ptr<SocketEventHandle> socket) {

@@ -14,6 +14,7 @@
 
 #include "callbacks.h"
 #include "time.h"
+#include "waker.h"
 #include "shared_unique.h"
 
 namespace NATBuster::Common::Utils
@@ -90,6 +91,8 @@ namespace NATBuster::Common::Utils
         //Protects timer changes
         std::mutex _timer_lock;
 
+        OnetimeWaker _waker;
+
         //External flag to keep running
         bool _running = false;
         //Thread if running in async mode
@@ -104,6 +107,8 @@ namespace NATBuster::Common::Utils
         static void loop(std::shared_ptr<EventEmitter> obj) {
             //Take ownership of the delay
             obj->_delay->bind();
+
+            obj->_waker.wake();
 
             //Issue start callback
             obj->_callback_startup();
@@ -208,6 +213,7 @@ namespace NATBuster::Common::Utils
             _running = true;
             _delay = std::move(delay);
             _thread = std::thread(EventEmitter::loop, shared_from_this());
+            _waker.wait();
         }
 
         //Can call from any thread

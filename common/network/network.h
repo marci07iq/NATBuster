@@ -10,6 +10,11 @@
 #include "../utils/event.h"
 
 namespace NATBuster::Common::Network {
+    class EventHandleOSData;
+    //Network connextion address abstract rep
+    class AddrInfoOSData;
+
+    class AddrInfoHwnd;
     //Network address abstract representation
     class NetworkAddressOSData;
     //OS RAII socket implementation
@@ -28,11 +33,10 @@ namespace NATBuster::Common::Network {
     typedef Utils::shared_unique_ptr<UDP> UDPHandleU;
     typedef std::shared_ptr<UDP> UDPHandleS;
 
-
-
-
     class NetworkAddress {
         NetworkAddressOSData* _impl = nullptr;
+
+        friend class TCPC;
     public:
         enum Type {
             Unknown,
@@ -88,6 +92,10 @@ namespace NATBuster::Common::Network {
     };
 
 
+
+
+
+
     class SocketEventHandle : private SocketBase {
     public:
         //Called from any socket, when added to the emitter
@@ -112,8 +120,8 @@ namespace NATBuster::Common::Network {
             UDP,
         } _type;
 
-    private:
-
+    protected:
+        
         StartCallback _callback_start;
         ConnectCallback _callback_connect;
         AcceptCallback _callback_accept;
@@ -137,6 +145,7 @@ namespace NATBuster::Common::Network {
 
         uint16_t _recvbuf_len = 4000;
 
+        
         inline void set_callback_connect(ConnectCallback::raw_type callback_connect) {
             _callback_connect = callback_connect;
         }
@@ -149,6 +158,8 @@ namespace NATBuster::Common::Network {
         inline void set_callback_unfiltered_packet(UnfilteredPacketCallback::raw_type callback_unfiltered_packet) {
             _callback_unfiltered_packet = callback_unfiltered_packet;
         }
+
+        virtual ErrorCode next_connect_attempt(EventHandleOSData* event_binder) = 0;
     public:
         using SocketBase::is_valid;
         using SocketBase::is_invalid;
@@ -192,6 +203,11 @@ namespace NATBuster::Common::Network {
 
         friend class SocketEventEmitterProvider;
         friend class SocketEventEmitterProviderImpl;
+
+        ErrorCode next_connect_attempt(EventHandleOSData* event_binder) override {
+            assert(false);
+            return ErrorCode::GENERIC_ERROR_INVALID_VF;
+        }
     public:
         using SocketEventHandle::set_callback_accept;
 
@@ -206,6 +222,9 @@ namespace NATBuster::Common::Network {
         friend class Utils::SharedOnly<TCPC>;
         std::list<TCPCHandleU>::iterator _self;
 
+        AddrInfoOSData* _addrs = nullptr;
+        AddrInfoOSData* _addr_current = nullptr;
+
         TCPC();
 
         TCPC(SocketOSData* socket, NetworkAddress&& remote_address);
@@ -217,15 +236,19 @@ namespace NATBuster::Common::Network {
         using SocketEventHandle::set_callback_connect;
         using SocketEventHandle::set_callback_packet;
 
-        ErrorCode connect(const std::string& name, uint16_t port);
+        ErrorCode resolve(const std::string& name, uint16_t port);
 
         static std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
-            create_connect(const std::string& name, uint16_t port);
+            create_resolve(const std::string& name, uint16_t port);
 
         void send(Utils::ConstBlobView& data);
 
         void start() override;
         bool close() override;
+
+        ErrorCode next_connect_attempt(EventHandleOSData* event_binder);
+
+        ~TCPC();
     };
 
     class UDP : public SocketEventHandle, public Utils::SharedOnly<UDP> {
@@ -242,6 +265,11 @@ namespace NATBuster::Common::Network {
 
         friend class SocketEventEmitterProvider;
         friend class SocketEventEmitterProviderImpl;
+
+        ErrorCode next_connect_attempt(EventHandleOSData* event_binder) override {
+            assert(false);
+            return ErrorCode::GENERIC_ERROR_INVALID_VF;
+        }
     public:
         using SocketEventHandle::set_callback_packet;
         using SocketEventHandle::set_callback_unfiltered_packet;

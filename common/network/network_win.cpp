@@ -74,7 +74,8 @@ namespace NATBuster::Common::Network {
         return *this;
     }
     NetworkAddress& NetworkAddress::operator=(NetworkAddress&& other) noexcept {
-        _impl = std::move(other._impl);
+        _impl = other._impl;
+        other._impl = new NetworkAddressOSData();
         return *this;
     }
 
@@ -197,11 +198,13 @@ namespace NATBuster::Common::Network {
         return _socket == INVALID_SOCKET;
     }
 
-    void SocketOSData::set_events(EventOSHandle& hwnd) {
-        WSAEventSelect(
+    void SocketOSData::set_events(HANDLE& hwnd) {
+        assert(hwnd != INVALID_HANDLE_VALUE);
+        int res = WSAEventSelect(
             _socket,
             hwnd,
             FD_READ | FD_ACCEPT | FD_CONNECT | FD_CLOSE);
+        assert(res == 0);
     }
 
     inline void SocketOSData::close() {
@@ -316,7 +319,7 @@ namespace NATBuster::Common::Network {
         _remote_address = std::move(remote_address);
     }
 
-    ErrorCode TCPC::connect(const std::string& name, uint16_t port) {
+    ErrorCode TCPC::resolve(const std::string& name, uint16_t port) {
         /*NetworkAddress local_addr;
 
         _socket.set(::socket(AF_INET6, SOCK_STREAM, 0));
@@ -378,26 +381,8 @@ namespace NATBuster::Common::Network {
             return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
         }
 
-
-        addrinfo* ptr = result;
-        _socket->set(::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol));
-        if (_socket->is_invalid()) {
-            freeaddrinfo(result);
-            return ErrorCode::NETWORK_ERROR_CREATE_SOCKET;
-        }
-
-        // Connect to server.
-        iResult = WSAConnect(_socket->get(), ptr->ai_addr, (int)ptr->ai_addrlen, NULL, NULL, NULL, NULL);
-        freeaddrinfo(result);
-        if (iResult != ERROR_SUCCESS) {
-            if (iResult == WSAEWOULDBLOCK) {
-                return ErrorCode::NETWORK_WARN_CONNECTING;
-            }
-            else {
-                _socket->close();
-                return ErrorCode::NETWORK_ERROR_CONNECT;
-            }
-        }
+        _addrs = (AddrInfoOSData*)result;
+        _addr_current = _addrs;
         /*
     for (addrinfo* ptr = result; ptr != nullptr; ptr = ptr->ai_next) {
         // Create socket
@@ -417,6 +402,9 @@ namespace NATBuster::Common::Network {
     }
     */
 
+    //No address found
+        if (_addrs == nullptr) return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
+
         return ErrorCode::OK;
     }
 
@@ -429,6 +417,87 @@ namespace NATBuster::Common::Network {
     }
     bool TCPC::close() {
         return _base->close_socket(shared_from_this());
+    }
+
+    ErrorCode TCPC::next_connect_attempt(EventHandleOSData* event_binder_wrapper) {
+        if (_addr_current == nullptr) {
+            if (_addrs != nullptr) {
+                freeaddrinfo(_addrs);
+                _addrs = nullptr;
+            }
+            return ErrorCode::NETWORK_ERROR_CONNECT;
+        }
+
+        HANDLE event_binder = event_binder_wrapper->hwnd;
+
+        if (_socket->is_invalid()) {
+            _socket->set(::socket(
+                _addr_current->ai_family,
+                _addr_current->ai_socktype,
+                _addr_current->ai_protocol));
+            if (_socket->is_invalid()) {
+                _addr_current = nullptr;
+                if (_addrs != nullptr) {
+                    freeaddrinfo(_addrs);
+                    _addrs = nullptr;
+                }
+                return ErrorCode::NETWORK_ERROR_CREATE_SOCKET;
+            }
+            _socket->set_events(event_binder);
+        }
+
+        // Connect to server.
+        int iResult = WSAConnect(
+            _socket->get(),
+            _addr_current->ai_addr,
+            (int)_addr_current->ai_addrlen,
+            NULL, NULL, NULL, NULL);
+        //Store connected address
+        *_remote_address._impl->sizew() = (int)_addr_current->ai_addrlen;
+        memcpy(
+            _remote_address._impl->get_dataw(),
+            _addr_current->ai_addr,
+            (int)_addr_current->ai_addrlen);
+
+        if(iResult == 0) {
+            //Success, wipe addrinfo
+            _addr_current = nullptr;
+            if (_addrs != nullptr) {
+                freeaddrinfo(_addrs);
+                _addrs = nullptr;
+            }
+            return ErrorCode::OK;
+        }
+        else {
+            int wsa_error = WSAGetLastError();
+            //Advance to next
+            _addr_current = (AddrInfoOSData*)_addr_current->ai_next;
+            if (_addr_current == nullptr) {
+                if (_addrs != nullptr) {
+                    freeaddrinfo(_addrs);
+                    _addrs = nullptr;
+                }
+            }
+            if (wsa_error == WSAEWOULDBLOCK) {
+                return ErrorCode::NETWORK_WARN_CONNECTING;
+            }
+            else {
+                _addr_current = nullptr;
+                if (_addrs != nullptr) {
+                    freeaddrinfo(_addrs);
+                    _addrs = nullptr;
+                }
+                _socket->close();
+                return ErrorCode::NETWORK_ERROR_CONNECT;
+            }
+        }
+    }
+
+    TCPC::~TCPC() {
+        if (_addrs != nullptr) {
+            freeaddrinfo(_addrs);
+            _addrs = nullptr;
+        }
     }
 
     UDP::UDP() : SocketEventHandle(Type::UDP) {
@@ -491,6 +560,8 @@ namespace NATBuster::Common::Network {
 
         assert(_socket_events.size() == _socket_objects.size());
 
+        std::cout << "Wait start on " << ncount << " sockets" << std::endl;
+
         if (ncount == 0) {
             SleepEx(timeout, TRUE);
         }
@@ -499,18 +570,21 @@ namespace NATBuster::Common::Network {
                 ncount,
                 _socket_events.data(),
                 FALSE, timeout, TRUE);
-            
+
             if (res == WSA_WAIT_FAILED) {
                 std::cout << "WSA Wait failed " << WSAGetLastError() << std::endl;
-            } 
+            }
             else if (res == WAIT_IO_COMPLETION) {
+                std::cout << "Wait abort" << std::endl;
                 //APC triggered
             }
             else if (res == WAIT_TIMEOUT) {
+                std::cout << "Wait timeout" << std::endl;
                 //Timeout triggered
             }
             else if (WAIT_OBJECT_0 <= res && res < (WAIT_OBJECT_0 + ncount)) {
                 int index = res - WAIT_OBJECT_0;
+                std::cout << "Wait result " << index << std::endl;
 
                 std::shared_ptr<SocketEventHandle> socket_hwnd = _socket_objects[index];
                 SOCKET socket = socket_hwnd->_socket->get();
@@ -522,11 +596,37 @@ namespace NATBuster::Common::Network {
                     _socket_events[index],
                     &set_events);
 
+                /*bool bResult = WSAResetEvent(_socket_events[index]);
+                if (bResult == FALSE) {
+                    std::cout << "Event reset error" << std::endl;
+                }*/
+
                 if (set_events.lNetworkEvents & FD_CONNECT) {
-                    _socket_objects[index]->_callback_connect();
+                    int error = set_events.iErrorCode[FD_CONNECT_BIT];
+                    if (socket_hwnd->_type == SocketEventHandle::Type::TCPC) {
+                        if (error == 0) {
+                            std::cout << "Connect success" << std::endl;
+                            _socket_objects[index]->_callback_connect();
+                        }
+                        else {
+                            std::cout << "Connect error " << error << std::endl;
+                            std::cout << "Next attempt..." << std::endl;
+                            EventHandleOSData hwnd_wrapper;
+                            hwnd_wrapper.hwnd = _socket_events[index];
+                            ErrorCode code = socket_hwnd->next_connect_attempt(&hwnd_wrapper);
+                            if (is_error(code)) {
+                                socket_hwnd->_callback_error(code);
+                                _closed_socket_objects.push_back(socket_hwnd);
+                            }
+                        }
+                    }
+                    else {
+                        assert(false);
+                    }
                 }
 
                 if (set_events.lNetworkEvents & FD_READ) {
+                    std::cout << "Readable" << std::endl;
                     if (socket_hwnd->_type == SocketEventHandle::Type::TCPC) {
                         Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
                         WSABUF buffer;
@@ -588,35 +688,42 @@ namespace NATBuster::Common::Network {
                         }
                     }
                     else {
-
+                        assert(false);
                     }
                 }
 
                 if (set_events.lNetworkEvents & FD_ACCEPT) {
-                    int iResult;
-                    NetworkAddress remote_address;
-                    SOCKET clientSocket;
+                    if (socket_hwnd->_type == SocketEventHandle::Type::TCPS) {
+                        std::cout << "Accept" << std::endl;
+                        int iResult;
+                        NetworkAddress remote_address;
+                        SOCKET clientSocket;
 
-                    // Accept a client socket
-                    int len = remote_address.get_impl()->size();
-                    SOCKET client = WSAAccept(socket, (sockaddr*)remote_address.get_impl()->get_dataw(), &len, NULL, NULL);
-                    *remote_address.get_impl()->sizew() = len;
+                        // Accept a client socket
+                        int len = remote_address.get_impl()->size();
+                        SOCKET client = WSAAccept(socket, (sockaddr*)remote_address.get_impl()->get_dataw(), &len, NULL, NULL);
+                        *remote_address.get_impl()->sizew() = len;
 
-                    if (client == INVALID_SOCKET) {
-                        int error = WSAGetLastError();
-                        if (error != WSAEWOULDBLOCK && error != WSAECONNRESET) {
-                            close_socket(socket_hwnd);
+                        if (client == INVALID_SOCKET) {
+                            int error = WSAGetLastError();
+                            if (error != WSAEWOULDBLOCK && error != WSAECONNRESET) {
+                                close_socket(socket_hwnd);
+                            }
+                        }
+                        else {
+                            SocketOSData* accepted = new SocketOSData(client);
+                            TCPCHandleU new_client(new TCPC(accepted, std::move(remote_address)));
+
+                            _socket_objects[index]->_callback_accept(std::move(new_client));
                         }
                     }
                     else {
-                        SocketOSData* accepted = new SocketOSData(client);
-                        TCPCHandleU new_client(new TCPC(accepted, std::move(remote_address)));
-
-                        _socket_objects[index]->_callback_accept(std::move(new_client));
+                        assert(false);
                     }
                 }
 
                 if (set_events.lNetworkEvents & FD_CLOSE) {
+                    std::cout << "Close" << std::endl;
                     std::lock_guard _lg(_system_lock);
                     _closed_socket_objects.push_back(socket_hwnd);
                 }
@@ -627,51 +734,70 @@ namespace NATBuster::Common::Network {
         {
             std::unique_lock _lg(_system_lock);
 
-            while (_closed_socket_objects.size()) {
-                std::shared_ptr<SocketEventHandle> close_socket = _closed_socket_objects.front();
-                _closed_socket_objects.pop_front();
+            while (_closed_socket_objects.size() || _added_socket_objects.size()) {
+                while (_closed_socket_objects.size()) {
+                    std::shared_ptr<SocketEventHandle> close_socket = _closed_socket_objects.front();
+                    _closed_socket_objects.pop_front();
 
-                _system_lock.unlock();
+                    _system_lock.unlock();
 
-                for (int i = 0; i < _socket_objects.size(); i++) {
-                    if (_socket_objects[i] == close_socket) {
-                        //Close socket and event
-                        _socket_objects[i]->close();
-                        WSACloseEvent(_socket_events[i]);
-                        _socket_objects[i]->_callback_close();
+                    for (int i = 0; i < _socket_objects.size(); i++) {
+                        if (_socket_objects[i] == close_socket) {
+                            //Close socket and event
+                            std::cout << "Closing socket to " << _socket_objects[i]->get_remote() << std::endl;
+                            _socket_objects[i]->_socket->close();
+                            WSACloseEvent(_socket_events[i]);
+                            _socket_objects[i]->_callback_close();
 
-                        //Move to front
-                        _socket_objects[i] = _socket_objects[_socket_objects.size() - 1];
-                        _socket_objects.resize(_socket_objects.size() - 1);
-                        _socket_events[i] = _socket_events[_socket_events.size() - 1];
-                        _socket_events.resize(_socket_events.size() - 1);
+                            //Move to front
+                            _socket_objects[i] = _socket_objects[_socket_objects.size() - 1];
+                            _socket_objects.resize(_socket_objects.size() - 1);
+                            _socket_events[i] = _socket_events[_socket_events.size() - 1];
+                            _socket_events.resize(_socket_events.size() - 1);
 
-                        assert(_socket_events.size() == _socket_objects.size());
-                        break;
+                            assert(_socket_events.size() == _socket_objects.size());
+                            break;
+                        }
                     }
+
+                    _system_lock.lock();
                 }
 
-                _system_lock.lock();
-            }
+                while (_added_socket_objects.size()) {
+                    std::shared_ptr<SocketEventHandle> add_socket = _added_socket_objects.front();
+                    _added_socket_objects.pop_front();
 
-            while (_added_socket_objects.size()) {
-                std::shared_ptr<SocketEventHandle> add_socket = _added_socket_objects.front();
-                _added_socket_objects.pop_front();
+                    _system_lock.unlock();
 
-                _system_lock.unlock();
+                    //Create events objects
+                    HANDLE new_event = WSACreateEvent();
+                    assert(new_event != WSA_INVALID_EVENT);
 
-                //Create events objects
-                HANDLE new_event = WSACreateEvent();
-                //Bind to socket
-                add_socket->_socket->set_events(new_event);
+                    std::cout << "Added socket" << std::endl;
 
-                _socket_events.push_back(new_event);
-                _socket_objects.push_back(add_socket);
-                assert(_socket_events.size() == _socket_objects.size());
+                    if (add_socket->_type == SocketEventHandle::Type::TCPC && add_socket->is_invalid()) {
+                        EventHandleOSData hwnd_wrapper;
+                        hwnd_wrapper.hwnd = new_event;
+                        ErrorCode code = add_socket->next_connect_attempt(&hwnd_wrapper);
+                        if (is_error(code)) {
+                            add_socket->_callback_error(code);
+                            _closed_socket_objects.push_back(add_socket);
+                            continue;
+                        }
+                    }
+                    else {
+                        //Bind to socket
+                        add_socket->_socket->set_events(new_event);
+                    }
 
-                add_socket->_callback_start();
+                    _socket_events.push_back(new_event);
+                    _socket_objects.push_back(add_socket);
+                    assert(_socket_events.size() == _socket_objects.size());
 
-                _system_lock.lock();
+                    add_socket->_callback_start();
+
+                    _system_lock.lock();
+                }
             }
         }
     }

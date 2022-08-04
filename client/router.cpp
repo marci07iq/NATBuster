@@ -94,10 +94,10 @@ namespace NATBuster::Client {
     RouterTCPS::RouterTCPS(
         std::shared_ptr<Router> router,
         uint16_t local_port,
-        uint16_t remote_port) : 
+        uint16_t remote_port) :
         _local_port(local_port),
         _remote_port(remote_port)
-        {
+    {
 
     }
 
@@ -186,10 +186,8 @@ namespace NATBuster::Client {
         _socket = socket_s;
 
         //Callback once socket added to thread
-        auto connect_fuction = [socket_s, local_port]() {
-            Common::ErrorCode res = socket_s->connect("localhost", local_port);
-        };
-        socket->set_callback_start(new Common::Utils::FunctionalCallback<void>(std::bind(connect_fuction)));
+
+        Common::ErrorCode res = socket_s->resolve("localhost", local_port);
 
         //Associate socket
         _router->_provider->associate_socket(std::move(socket));
@@ -206,7 +204,7 @@ namespace NATBuster::Client {
         _router(router),
         _socket(socket)
     {
-        
+
     }
 
     void RouterTCPRoute::start() {

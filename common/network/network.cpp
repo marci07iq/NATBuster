@@ -42,10 +42,10 @@ namespace NATBuster::Common::Network {
     //TCPC
 
     std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
-        TCPC::create_connect(const std::string& name, uint16_t port) {
+        TCPC::create_resolve(const std::string& name, uint16_t port) {
 
         Utils::shared_unique_ptr<TCPC> res = TCPC::create();
-        ErrorCode code = res->connect(name, port);
+        ErrorCode code = res->resolve(name, port);
 
         return std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
             (std::move(res), code);

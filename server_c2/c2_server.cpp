@@ -264,13 +264,13 @@ namespace NATBuster::Server {
         _socket->set_callback_error(new Common::Utils::MemberWCallback<C2Server, void, Common::ErrorCode>(weak_from_this(), &C2Server::on_error));
         _socket->set_callback_close(new Common::Utils::MemberWCallback<C2Server, void>(weak_from_this(), &C2Server::on_close));
 
-        _socket->start();
 
         _server_emitter = Common::Utils::EventEmitter::create();
         _server_emitter->start_async(std::move(server_provider));
         _client_emitter = Common::Utils::EventEmitter::create();
         _client_emitter->start_async(std::move(client_provider));
 
+        _socket->start();
     }
 
     C2Server::~C2Server() {

@@ -27,6 +27,16 @@
 
 namespace NATBuster::Common::Network {
 
+    struct EventHandleOSData {
+        HANDLE hwnd;
+    };
+
+    struct AddrInfoOSData : public addrinfo {
+        
+    };
+
+    static_assert(sizeof(AddrInfoOSData) == sizeof(addrinfo));
+
     //Network address OS defined implementation
     //Represent an address (IP and port), IPV4 or IPV6
     class NetworkAddressOSData {
@@ -56,9 +66,6 @@ namespace NATBuster::Common::Network {
 
     std::ostream& operator<<(std::ostream& os, const NetworkAddressOSData& addr);
 
-    //OS Event wrapper
-    typedef HANDLE EventOSHandle;
-
     //RAII move-only wrapper for OS sockets
     class SocketOSData : Utils::NonCopyable {
         SOCKET _socket = INVALID_SOCKET;
@@ -73,7 +80,7 @@ namespace NATBuster::Common::Network {
         inline bool is_valid() const;
         inline bool is_invalid() const;
 
-        void set_events(EventOSHandle& hwnd);
+        void set_events(HANDLE& hwnd);
 
         inline void close();
         ~SocketOSData();
@@ -82,7 +89,7 @@ namespace NATBuster::Common::Network {
     class SocketEventEmitterProviderImpl : Utils::NonCopyable {
         //Variables consumed by the thread
 
-        std::vector<EventOSHandle> _socket_events;
+        std::vector<HANDLE> _socket_events;
         std::vector<std::shared_ptr<SocketEventHandle>> _socket_objects;
         std::mutex _sockets_lock;
 

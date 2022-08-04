@@ -17,6 +17,7 @@ namespace NATBuster::Common {
 
         SYSTEM_GENERIC = 0x00000000,
         OK = TYPE_OK | SYSTEM_GENERIC | 0x0000,
+        GENERIC_ERROR_INVALID_VF = TYPE_ERROR | SYSTEM_GENERIC | 0x0001,
 
         SYSTEM_NETWORK = 0x00010000,
         //Error in the network subsystem
@@ -38,6 +39,10 @@ namespace NATBuster::Common {
         //Invalid ping packet received
         OPT_UDP_INVALID_PING = TYPE_ERROR | SYSTEM_OPT_UDP | 0x0001,
     };
+
+    inline bool is_error(ErrorCode code) {
+        return ((uint32_t)code & (uint32_t)ErrorCode::MASK_TYPE) == (uint32_t)ErrorCode::TYPE_ERROR;
+    }
 
     inline void ThrowError(ErrorCode code) {
         std::cerr << "ERROR " << (uint32_t)code << std::endl;

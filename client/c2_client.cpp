@@ -77,12 +77,8 @@ namespace NATBuster::Client {
         Common::Network::TCPCHandleU socket = Common::Network::TCPC::create();
         Common::Network::TCPCHandleS socket_s = socket;
 
-        //Callback once socket added to thread
-        auto connect_fuction = [socket_s, server_name, port]() {
-            Common::ErrorCode res = socket_s->connect(server_name, port);
-        };
-        socket->set_callback_start(new Common::Utils::FunctionalCallback<void>(std::bind(connect_fuction)));
-
+        Common::ErrorCode res = socket_s->resolve(server_name, port);
+        
         //Associate socket
         provider->associate_socket(std::move(socket));
 

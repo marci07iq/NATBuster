@@ -48,7 +48,7 @@ namespace NATBuster::Common::Transport {
 
                 uint32_t new_len = 0;
                 for (auto& it : _reassemble_list) {
-                    new_len += it.size();
+                    new_len += it.size() - 5;
                 }
 
                 uint8_t* buffer = Utils::Blob::alloc(new_len);
@@ -57,7 +57,7 @@ namespace NATBuster::Common::Transport {
                 uint32_t progress = 0;
 
                 for (auto& it : _reassemble_list) {
-                    Utils::Blob::bufcpy(buffer, new_len, progress, it.getr(), it.size(), 0, it.size());
+                    Utils::Blob::bufcpy(buffer, new_len, progress, it.getr(), it.size(), 5, it.size() - 5);
                     progress += it.size();
                 }
 
@@ -78,7 +78,14 @@ namespace NATBuster::Common::Transport {
     void OPTUDP::on_receive(const Utils::ConstBlobView& data_ref) {
 
         Time::time_type_us now = Time::now();
+
+        if (data_ref.size() < 1) {
+            close();
+            return;
+        }
+
         const packet_decoder* pkt = packet_decoder::cview(data_ref);
+
 
         switch ((pkt->type)) {
             //Shouldnt get hello once connection up, but a few may still be in pipe
@@ -102,6 +109,11 @@ namespace NATBuster::Common::Transport {
             //ACK: remove from re-transmit queue, update ping time estiamte
         case packet_decoder::PacketType::PKT_ACK:
         {
+            if (data_ref.size() != 5) {
+                close();
+                return;
+            }
+
             std::lock_guard _lg(_tx_lock);
             uint32_t seq = pkt->content.packet.seq;
             auto it = _transmit_queue.begin();
@@ -133,8 +145,13 @@ namespace NATBuster::Common::Transport {
         case packet_decoder::PacketType::PKT_START:
         case packet_decoder::PacketType::PKT_END:
         case packet_decoder::PacketType::PKT_SINGLE:
-            //Safe even at roll-around
         {
+            if (data_ref.size() < 5) {
+                close();
+                return;
+            }
+
+            //Safe even at roll-around
             int32_t advance = pkt->content.packet.seq - _rx_seq;
             if (advance >= 0) {
                 Utils::Blob data = Utils::Blob::factory_empty(data_ref.size());
@@ -205,9 +222,9 @@ namespace NATBuster::Common::Transport {
                     pkt->content.packet.seq = (pkt->content.packet.seq & packet_decoder::seq_num_mask) | new_rt;
 
                     //Expand re-transmit time storage
-                    if (_transmit_queue.front().transmits.size() < new_rt) {
+                    if (_transmit_queue.front().transmits.size() <= new_rt) {
                         _transmit_queue.front().transmits.push_back(now);
-                        assert(_transmit_queue.front().transmits.size() == new_rt);
+                        assert(_transmit_queue.front().transmits.size() == new_rt + 1);
                     }
                     else {
                         _transmit_queue.front().transmits[new_rt] = now;

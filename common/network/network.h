@@ -10,9 +10,9 @@
 #include "../utils/event.h"
 
 namespace NATBuster::Common::Network {
-    class EventHandleOSData;
+    struct EventHandleOSData;
     //Network connextion address abstract rep
-    class AddrInfoOSData;
+    struct AddrInfoOSData;
 
     class AddrInfoHwnd;
     //Network address abstract representation
@@ -335,7 +335,7 @@ namespace NATBuster::Common::Network {
         TCPCHandleU extract_socket(TCPCHandleS hwnd);
         UDPHandleU extract_socket(UDPHandleS hwnd);
 
-        int count();
+        size_t count();
 
     private:
         bool close_socket(TCPSHandleS hwnd);

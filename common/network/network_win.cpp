@@ -507,6 +507,8 @@ namespace NATBuster::Common::Network {
     ErrorCode UDP::bind(NetworkAddress&& local) {
         int iResult;
 
+        _local_address = std::move(local);
+
         // Create the UDP socket
         _socket->set(::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
         if (_socket->is_invalid()) {
@@ -519,10 +521,11 @@ namespace NATBuster::Common::Network {
             _socket->close();
             return ErrorCode::NETWORK_ERROR_SERVER_BIND;
         }
+        return ErrorCode::OK;
     }
 
     void UDP::send(Utils::ConstBlobView& data) {
-        ::send(_socket->get(), (const char*)data.getr(), data.size(), 0);
+        ::sendto(_socket->get(), (const char*)data.getr(), data.size(), 0, (sockaddr*)_remote_address.get_impl()->get_data(), _remote_address.get_impl()->size());
     }
 
     void UDP::start() {
@@ -553,14 +556,14 @@ namespace NATBuster::Common::Network {
         std::lock_guard _lg(_sockets_lock);
 
         int64_t delay_ms = (delay + 999) / 1000;
-        DWORD timeout = (delay_ms < std::numeric_limits<DWORD>::max()) ? delay_ms : INFINITE;
+        DWORD timeout = ((delay_ms < std::numeric_limits<DWORD>::max()) ? (DWORD)delay_ms : INFINITE);
         if (delay < 0) timeout = INFINITE;
 
-        DWORD ncount = _socket_events.size();
+        DWORD ncount = (DWORD)_socket_events.size();
 
         assert(_socket_events.size() == _socket_objects.size());
 
-        std::cout << "Wait start on " << ncount << " sockets" << std::endl;
+        //std::cout << "Wait start on " << ncount << " sockets" << std::endl;
 
         if (ncount == 0) {
             SleepEx(timeout, TRUE);
@@ -572,19 +575,19 @@ namespace NATBuster::Common::Network {
                 FALSE, timeout, TRUE);
 
             if (res == WSA_WAIT_FAILED) {
-                std::cout << "WSA Wait failed " << WSAGetLastError() << std::endl;
+                //std::cout << "WSA Wait failed " << WSAGetLastError() << std::endl;
             }
             else if (res == WAIT_IO_COMPLETION) {
-                std::cout << "Wait abort" << std::endl;
+                //std::cout << "Wait abort" << std::endl;
                 //APC triggered
             }
             else if (res == WAIT_TIMEOUT) {
-                std::cout << "Wait timeout" << std::endl;
+                //std::cout << "Wait timeout" << std::endl;
                 //Timeout triggered
             }
             else if (WAIT_OBJECT_0 <= res && res < (WAIT_OBJECT_0 + ncount)) {
                 int index = res - WAIT_OBJECT_0;
-                std::cout << "Wait result " << index << std::endl;
+                //std::cout << "Wait result " << index << std::endl;
 
                 std::shared_ptr<SocketEventHandle> socket_hwnd = _socket_objects[index];
                 SOCKET socket = socket_hwnd->_socket->get();
@@ -674,17 +677,26 @@ namespace NATBuster::Common::Network {
                             NULL
                         );
 
-                        //Closed
-                        if (received == 0) {
-                            std::lock_guard _lg(_system_lock);
-                            _closed_socket_objects.push_back(socket_hwnd);
+                        if (res3 == 0) {
+                            //Closed
+                            if (received == 0) {
+                                std::lock_guard _lg(_system_lock);
+                                _closed_socket_objects.push_back(socket_hwnd);
+                            }
+                            else {
+                                data.resize(received);
+                                if (source == socket_hwnd->_remote_address) {
+                                    socket_hwnd->_callback_packet(data);
+                                }
+                                socket_hwnd->_callback_unfiltered_packet(data, source);
+                            }
                         }
                         else {
-                            data.resize(received);
-                            if (source == socket_hwnd->_remote_address) {
-                                socket_hwnd->_callback_packet(data);
+                            int wsa_error = WSAGetLastError();
+                            if (wsa_error != WSAECONNRESET) {
+                                std::cout << wsa_error << std::endl;
+                                assert(false);
                             }
-                            socket_hwnd->_callback_unfiltered_packet(data, source);
                         }
                     }
                     else {
@@ -695,9 +707,7 @@ namespace NATBuster::Common::Network {
                 if (set_events.lNetworkEvents & FD_ACCEPT) {
                     if (socket_hwnd->_type == SocketEventHandle::Type::TCPS) {
                         std::cout << "Accept" << std::endl;
-                        int iResult;
                         NetworkAddress remote_address;
-                        SOCKET clientSocket;
 
                         // Accept a client socket
                         int len = remote_address.get_impl()->size();
@@ -739,7 +749,7 @@ namespace NATBuster::Common::Network {
                     std::shared_ptr<SocketEventHandle> close_socket = _closed_socket_objects.front();
                     _closed_socket_objects.pop_front();
 
-                    _system_lock.unlock();
+                    _lg.unlock();
 
                     for (int i = 0; i < _socket_objects.size(); i++) {
                         if (_socket_objects[i] == close_socket) {
@@ -760,14 +770,14 @@ namespace NATBuster::Common::Network {
                         }
                     }
 
-                    _system_lock.lock();
+                    _lg.lock();
                 }
 
                 while (_added_socket_objects.size()) {
                     std::shared_ptr<SocketEventHandle> add_socket = _added_socket_objects.front();
                     _added_socket_objects.pop_front();
 
-                    _system_lock.unlock();
+                    _lg.unlock();
 
                     //Create events objects
                     HANDLE new_event = WSACreateEvent();
@@ -782,6 +792,7 @@ namespace NATBuster::Common::Network {
                         if (is_error(code)) {
                             add_socket->_callback_error(code);
                             _closed_socket_objects.push_back(add_socket);
+                            _lg.lock();
                             continue;
                         }
                     }
@@ -796,7 +807,7 @@ namespace NATBuster::Common::Network {
 
                     add_socket->_callback_start();
 
-                    _system_lock.lock();
+                    _lg.lock();
                 }
             }
         }
@@ -969,7 +980,7 @@ namespace NATBuster::Common::Network {
         return socket;
     }
 
-    int SocketEventEmitterProvider::count() {
+    size_t SocketEventEmitterProvider::count() {
         std::lock_guard _lg(_sockets_lock);
         return _sockets_tcps.size() + _sockets_tcpc.size() + _sockets_udp.size();
     }

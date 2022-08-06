@@ -6,6 +6,7 @@
 namespace NATBuster::Common::Crypto {
     int PKey::key_password_cb(char* buf, int size, int rwflag, void* u)
     {
+        (void)u;
         std::string pass;
         if (rwflag == 0) {
             std::cout << "Enter pass phrase for key" << std::endl;
@@ -39,7 +40,7 @@ namespace NATBuster::Common::Crypto {
 
         memcpy(buf, pass.c_str(), len);
 
-        return len;
+        return (int)len;
     }
 
     PKey::PKey(PKey&& other) noexcept {
@@ -197,7 +198,7 @@ namespace NATBuster::Common::Crypto {
         int res = PEM_write_bio_PKCS8PrivateKey(mem, _key, nullptr, nullptr, 0, nullptr, nullptr);
 
         //Create output space
-        out.resize(BIO_ctrl_pending(mem));
+        out.resize((uint32_t)BIO_ctrl_pending(mem));
 
         //Copy out
         BIO_read(mem, out.getw(), out.size());
@@ -219,7 +220,7 @@ namespace NATBuster::Common::Crypto {
         int res = PEM_write_bio_PUBKEY(mem, _key);
 
         //Create output space
-        out.resize(BIO_ctrl_pending(mem));
+        out.resize((uint32_t)BIO_ctrl_pending(mem));
 
         //Copy out
         BIO_read(mem, out.getw(), out.size());
@@ -267,7 +268,7 @@ namespace NATBuster::Common::Crypto {
             return false;
         }
 
-        sig_out.resize(siglen);
+        sig_out.resize((uint32_t)siglen);
 
         EVP_MD_CTX_free(md_ctx);
 
@@ -309,14 +310,14 @@ namespace NATBuster::Common::Crypto {
             return false;
         }
 
-        secret_out.resize(secret_len_szt);
+        secret_out.resize((uint32_t)secret_len_szt);
 
         if (1 != (EVP_PKEY_derive(ctx, secret_out.getw(), &secret_len_szt))) {
             EVP_PKEY_CTX_free(ctx);
             return false;
         }
 
-        secret_out.resize(secret_len_szt);
+        secret_out.resize((uint32_t)secret_len_szt);
 
         EVP_PKEY_CTX_free(ctx);
         return true;

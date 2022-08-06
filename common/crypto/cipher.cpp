@@ -193,7 +193,11 @@ namespace NATBuster::Common::Crypto {
         if (1 != EVP_EncryptUpdate(_ctx, cipher.getw(), &len, in.getr(), in.size()))
             return false;
 
-        int total_len = len;
+        if (len < 0) {
+            assert(false);
+            return false;
+        }
+        uint32_t total_len = len;
         assert(total_len <= cipher.size());
 
         Utils::BlobSliceView cipher_remain = cipher.slice_right(total_len);
@@ -249,7 +253,11 @@ namespace NATBuster::Common::Crypto {
         //Data starts at 16 offset, auth tag before
         if (!EVP_DecryptUpdate(_ctx, out.getw(), &len, cipher.getr(), cipher.size()))
             return false;
-        int total_len = len;
+        if (len < 0) {
+            assert(false);
+            return false;
+        }
+        uint32_t total_len = len;
         assert(total_len <= out.size());
 
         //Set expected auth tag

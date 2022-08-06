@@ -23,6 +23,8 @@ namespace NATBuster::Common::Utils {
         }
     public:
         virtual void operator()(ARGS... args) const = 0;
+
+        virtual ~CallbackBase();
     };
 
     //Empty callback, calls nothing
@@ -34,8 +36,9 @@ namespace NATBuster::Common::Utils {
 
         }
         inline void operator()(ARGS... args) const override {
-
+            ((void)args)...;
         }
+
     };
 
     //Simple function pointer
@@ -53,6 +56,7 @@ namespace NATBuster::Common::Utils {
         inline void operator()(ARGS... args) const override {
             _fn(std::forward<ARGS>(args)...);
         }
+
     };
 
     //std::function callback
@@ -70,6 +74,7 @@ namespace NATBuster::Common::Utils {
         inline void operator()(ARGS... args) const override {
             _fn(std::forward<ARGS>(args)...);
         }
+
     };
 
     //Member function callback, via a raw pointer

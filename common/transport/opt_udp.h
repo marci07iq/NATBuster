@@ -72,6 +72,8 @@ namespace NATBuster::Common::Transport {
             static inline const packet_decoder* cview(const Utils::ConstBlobView& packet) {
                 return (const packet_decoder*)(packet.getr());
             }
+
+            ~packet_decoder() = delete;
         };
 
         static_assert(offsetof(packet_decoder, type) == 0);
@@ -147,10 +149,10 @@ namespace NATBuster::Common::Transport {
 
         //Calculate the delay between subsequent retransmits, based on the current ping
         inline Time::time_delta_type_us next_retransmit_delta() {
-            Time::time_delta_type_us res = 1000000 * (
+            Time::time_delta_type_us res = (Time::time_delta_type_us) (1000000.f * (
                 _settings.ping_rt_mul * _ping +
                 _settings.jitter_rt_mul * sqrt(_ping2 - _ping * _ping)
-                );
+                ));
             //Sum 3ms re-transmit is just spamming
             return std::min<Time::time_delta_type_us>(std::max<Time::time_delta_type_us>(_settings.min_retransmit, res), 500000);
         }

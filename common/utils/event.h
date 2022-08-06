@@ -222,7 +222,7 @@ namespace NATBuster::Common::Utils
             //Create new timer object
             {
                 std::lock_guard _lg(_timer_lock);
-                std::shared_ptr<timer> new_timer = std::make_shared<timer>(cb, expiry);
+                new_timer = std::make_shared<timer>(cb, expiry);
                 new_timer->self = _timer_additions.insert(_timer_additions.end(), new_timer);
             }
 

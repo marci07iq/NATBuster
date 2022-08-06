@@ -27,10 +27,10 @@ namespace NATBuster::Client {
         }
     }
     void Router::on_packet(const Common::Utils::ConstBlobView& data) {
-
+        (void)data;
     }
     void Router::on_error(Common::ErrorCode code) {
-
+        (void)code;
     }
     void Router::on_close() {
         {
@@ -95,6 +95,7 @@ namespace NATBuster::Client {
         std::shared_ptr<Router> router,
         uint16_t local_port,
         uint16_t remote_port) :
+        _router(router),
         _local_port(local_port),
         _remote_port(remote_port)
     {

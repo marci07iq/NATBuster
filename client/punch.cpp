@@ -194,7 +194,7 @@ namespace NATBuster::Client {
         std::shared_ptr<Common::Transport::OPTUDP> opt_udp = Common::Transport::OPTUDP::create(_is_client, _c2_client->_client_emitter, punched_s);
         //Create the Session
         Common::Crypto::PKey self_key;
-        self_key.copy_public_from(_self_key);
+        self_key.copy_private_from(_self_key);
         std::shared_ptr<Common::Transport::OPTSession> opt_session = Common::Transport::OPTSession::create(_is_client, opt_udp, std::move(self_key), _trusted_users);
 
         _punch_callback(opt_session);

@@ -14,7 +14,7 @@ namespace NATBuster::Common::Transport {
         packet_decoder* pkt = packet_decoder::view(ping);
         pkt->type = packet_decoder::PacketType::MGMT_PING;
         for (int i = 0; i < 64; i++) {
-            Random::fast_fill(pkt->content.ping.bytes, 64);
+            Crypto::random(pkt->content.ping.bytes, 64);
         }
 
         _socket->send(ping);
@@ -58,8 +58,10 @@ namespace NATBuster::Common::Transport {
 
                 for (auto& it : _reassemble_list) {
                     Utils::Blob::bufcpy(buffer, new_len, progress, it.getr(), it.size(), 5, it.size() - 5);
-                    progress += it.size();
+                    progress += it.size() - 5;
                 }
+
+                assert(progress == new_len);
 
                 Utils::Blob assembled = Utils::Blob::factory_consume(buffer, new_len);
 
@@ -114,32 +116,35 @@ namespace NATBuster::Common::Transport {
                 return;
             }
 
-            std::lock_guard _lg(_tx_lock);
-            uint32_t seq = pkt->content.packet.seq;
-            auto it = _transmit_queue.begin();
-            while (it != _transmit_queue.end()) {
-                if (
-                    //Check correct SEQ number
-                    (packet_decoder::view(it->packet)->content.packet.seq & packet_decoder::seq_num_mask) ==
-                    (seq & packet_decoder::seq_num_mask) &&
-                    //Actually existing re-transmit attempt
-                    ((seq & packet_decoder::seq_rt_mask) < it->transmits.size())
-                    ) {
-                    //Time of flight
-                    Time::time_delta_type_us tof = now - it->transmits[seq & packet_decoder::seq_rt_mask];
-                    //Update ping
-                    _ping += _settings.ping_average_weight * (tof / 1000000.f - _ping);
-                    _ping2 += _settings.ping_average_weight * ((tof / 1000000.f) * (tof / 1000000.f) - _ping2);
-                    //Remove from re-transmit system
-                    auto it2 = it++;
-                    _transmit_queue.erase(it2);
-                }
-                else {
-                    ++it;
+            {
+                std::lock_guard _lg(_tx_lock);
+                uint32_t seq = pkt->content.packet.seq;
+                auto it = _transmit_queue.begin();
+                while (it != _transmit_queue.end()) {
+                    if (
+                        //Check correct SEQ number
+                        (packet_decoder::view(it->packet)->content.packet.seq & packet_decoder::seq_num_mask) ==
+                        (seq & packet_decoder::seq_num_mask) &&
+                        //Actually existing re-transmit attempt
+                        ((seq & packet_decoder::seq_rt_mask) < it->transmits.size())
+                        ) {
+                        //Time of flight
+                        Time::time_delta_type_us tof = now - it->transmits[seq & packet_decoder::seq_rt_mask];
+                        //Update ping
+                        _ping += _settings.ping_average_weight * (tof / 1000000.f - _ping);
+                        _ping2 += _settings.ping_average_weight * ((tof / 1000000.f) * (tof / 1000000.f) - _ping2);
+                        //Remove from re-transmit system
+                        auto it2 = it++;
+                        _transmit_queue.erase(it2);
+                    }
+                    else {
+                        ++it;
+                    }
                 }
             }
             reset_retransmit_timer();
         }
+        break;
         //Data packet
         case packet_decoder::PacketType::PKT_MID:
         case packet_decoder::PacketType::PKT_START:
@@ -149,6 +154,15 @@ namespace NATBuster::Common::Transport {
             if (data_ref.size() < 5) {
                 close();
                 return;
+            }
+
+            //Send ack
+            {
+                Utils::Blob ack_packet = Utils::Blob::factory_empty(5);
+                packet_decoder* ack_view = packet_decoder::view(ack_packet);
+                ack_view->type = packet_decoder::PKT_ACK;
+                ack_view->content.ack.seq = pkt->content.packet.seq;
+                _socket->send(ack_packet);
             }
 
             //Safe even at roll-around
@@ -214,12 +228,16 @@ namespace NATBuster::Common::Transport {
 
             //Retransmit all outdated packets
             if (_transmit_queue.size()) {
-                packet_decoder* pkt = packet_decoder::view(_transmit_queue.front().packet);
-                uint32_t old_rt = (pkt->content.packet.seq & packet_decoder::seq_rt_mask);
-                while (_transmit_queue.front().transmits[old_rt] + retransmit_delta < now) {
+                while (true) {
+                    packet_decoder* pkt = packet_decoder::view(_transmit_queue.front().packet);
+                    uint32_t old_rt = (pkt->content.packet.seq & packet_decoder::seq_rt_mask);
+                    if (now < _transmit_queue.front().transmits[old_rt] + retransmit_delta) {
+                        break;
+                    }
                     //Advance to next re-transmit number
                     uint32_t new_rt = ((old_rt + 1) & packet_decoder::seq_rt_mask);
                     pkt->content.packet.seq = (pkt->content.packet.seq & packet_decoder::seq_num_mask) | new_rt;
+                    assert((pkt->content.packet.seq & packet_decoder::seq_rt_mask) == new_rt);
 
                     //Expand re-transmit time storage
                     if (_transmit_queue.front().transmits.size() <= new_rt) {
@@ -229,6 +247,7 @@ namespace NATBuster::Common::Transport {
                     else {
                         _transmit_queue.front().transmits[new_rt] = now;
                     }
+                    assert(_transmit_queue.front().transmits[new_rt] == now);
 
                     //Send packet
                     _socket->send(_transmit_queue.front().packet);

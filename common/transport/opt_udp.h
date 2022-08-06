@@ -60,6 +60,7 @@ namespace NATBuster::Common::Transport {
             union {
                 struct ping_data { uint8_t bytes[64]; } ping;
                 struct packet_data { uint32_t seq; uint8_t data[1]; } packet;
+                struct ack_data { uint32_t seq; } ack;
                 struct raw_data { uint8_t data[1]; } raw;
             } content;
 
@@ -151,7 +152,7 @@ namespace NATBuster::Common::Transport {
                 _settings.jitter_rt_mul * sqrt(_ping2 - _ping * _ping)
                 );
             //Sum 3ms re-transmit is just spamming
-            return (res < _settings.min_retransmit) ? _settings.min_retransmit : res;
+            return std::min<Time::time_delta_type_us>(std::max<Time::time_delta_type_us>(_settings.min_retransmit, res), 500000);
         }
 
         //Send a ping packet

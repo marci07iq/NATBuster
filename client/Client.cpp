@@ -158,6 +158,13 @@ int main() {
     std::shared_ptr<User> remote = std::make_shared<User>("remote", remote_public_key);
     std::shared_ptr<User> ipserver = std::make_shared<User>("ipserver", ipserver_public_key);
     std::shared_ptr<User> c2server = std::make_shared<User>("c2server", c2server_public_key);
+    remote->ports.push_back(
+        User::Permissions::PortSettings{
+            .dir_push = true,
+            .proto_tcp = true,
+            .port_min = 1,
+            .port_max = 65535
+        });
 
     std::shared_ptr<UserGroup> authorised_c2_clients = std::make_shared<UserGroup>();
     authorised_c2_clients->addUser(remote);

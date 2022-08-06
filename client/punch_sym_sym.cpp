@@ -72,7 +72,10 @@ namespace NATBuster::Client {
         }
 
         {
-            size_t used_ports = 0;
+            float fail_chance = 1;
+
+            size_t ports_cursor = 0;
+            size_t open_ports = 0;
 
             auto on_packet = [&](
                 Common::Network::UDPHandleS socket,
@@ -82,7 +85,7 @@ namespace NATBuster::Client {
                         Common::Network::NetworkAddress src_cpy(src);
                         socket->set_remote(std::move(src_cpy));
                         std::cout << "Holepunch successful from remote "
-                            << socket->get_remote() << std::endl;
+                            << socket->get_remote() << " at chance " << 100*(1- fail_chance) << "%" << std::endl;
 
                         {
                             found_socket = socket->get_base()->extract_socket(socket);
@@ -103,7 +106,7 @@ namespace NATBuster::Client {
                 }
 
                 //Spawn a new socket, if any ports left
-                if (used_ports < port_count) {
+                if (ports_cursor < port_count) {
                     //Must have at least one bucket
                     if (
                         socket_buckets.size() == 0 ||
@@ -123,7 +126,7 @@ namespace NATBuster::Client {
                         if (new_socket.first->is_valid()) {
                             Common::Network::UDPHandleS new_socket_s = new_socket.first;
 
-                            Common::ErrorCode remote = new_socket_s->set_remote(_remote, ports[used_ports]);
+                            Common::ErrorCode remote = new_socket_s->set_remote(_remote, ports[ports_cursor]);
                             //Bind callback
                             new_socket_s->set_callback_unfiltered_packet(new Common::Utils::FunctionalCallback<
                                 void,
@@ -135,8 +138,9 @@ namespace NATBuster::Client {
                                 socket_buckets.back()->associate_socket(std::move(new_socket.first));
                                 socket_buckets.back()->start_socket(new_socket_s);
                                 new_socket_s->send(_magic_ob);
+                                ++open_ports;
                             }
-                            ++used_ports;
+                            ++ports_cursor;
                         }
                     }
                     else {
@@ -150,6 +154,17 @@ namespace NATBuster::Client {
                 if (now < next_socket) {
                     std::this_thread::sleep_for(std::chrono::microseconds(next_socket - now));
                 }
+
+                float new_fail_chance = fail_chance * (1.f - open_ports / 65535.f);
+                if (int(fail_chance * 20) > int(new_fail_chance * 20)) {
+                    std::string res = "Punch progress: [";
+                    for (int i = 0; i < 20; i++) {
+                        res += (i < int((1.f - new_fail_chance) * 20)) ? '=' : ' ';
+                    }
+                    res += "]";
+                    std::cout << res << std::endl;
+                }
+                fail_chance = new_fail_chance;
             }
         }
 

@@ -163,7 +163,7 @@ namespace NATBuster::Common::Network {
 
     std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr)
     {
-        os << addr.get_addr() << ":" << addr.get_port() << std::endl;
+        os << addr.get_addr() << ":" << addr.get_port();
         return os;
     }
 
@@ -631,7 +631,7 @@ namespace NATBuster::Common::Network {
                 }
 
                 if (set_events.lNetworkEvents & FD_READ) {
-                    std::cout << "Readable" << std::endl;
+                    //std::cout << "Readable" << std::endl;
                     if (socket_hwnd->_type == SocketEventHandle::Type::TCPC) {
                         Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
                         WSABUF buffer;
@@ -787,7 +787,7 @@ namespace NATBuster::Common::Network {
                     HANDLE new_event = WSACreateEvent();
                     assert(new_event != WSA_INVALID_EVENT);
 
-                    std::cout << "Added socket" << std::endl;
+                    //std::cout << "Added socket" << std::endl;
 
                     if (add_socket->_type == SocketEventHandle::Type::TCPC && add_socket->is_invalid()) {
                         EventHandleOSData hwnd_wrapper;

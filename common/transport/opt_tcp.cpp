@@ -14,7 +14,6 @@ namespace NATBuster::Common::Transport {
     }
 
     void OPTTCP::on_receive(const Utils::ConstBlobView& data_ref) {
-        std::cout << "PKT in" << std::endl;
         Utils::Blob data = Utils::Blob::factory_empty(data_ref.size());
         data.copy_from(data_ref);
         _reassamble_total_len += data.size();

@@ -133,6 +133,9 @@ namespace NATBuster::Client {
 
     class RouterTCPRoute : public Common::Utils::SharedOnly<RouterTCPRoute> {
         friend class Common::Utils::SharedOnly<RouterTCPRoute>;
+        //Hide the normaél create function
+        using Common::Utils::SharedOnly<RouterTCPRoute>::create;
+
         //The main router, for registering identity
         std::shared_ptr<Router> _router;
 
@@ -149,6 +152,7 @@ namespace NATBuster::Client {
         Common::Network::TCPCHandleS _socket;
 
         void on_socket_open();
+        void on_pipe_open();
         void on_pipe_packet(const Common::Utils::ConstBlobView& data);
         void on_socket_packet(const Common::Utils::ConstBlobView& data);
         void on_error(Common::ErrorCode code);
@@ -163,18 +167,24 @@ namespace NATBuster::Client {
 
         RouterTCPRoute(
             std::shared_ptr<Router> router,
-            Common::Network::TCPCHandleU&& socket,
-            uint16_t remote_port
+            Common::Network::TCPCHandleU&& socket
             );
 
-        void start();
+        void start_server();
+
+        void start_client(uint16_t remote_port);
     public:
+        //Incoming pipe -> open local TCP connection
+        //When TCP opened -> accept pipe
         static std::shared_ptr<RouterTCPRoute> create_server(
             std::shared_ptr<Router> router,
             std::shared_ptr<Common::Transport::OPTPipe> pipe,
             uint16_t local_port
         );
 
+        //Incoming socket -> open pipe request
+        //Pipe opened -> add TCP socket to event emitter
+        //Ideally we would only accept the TCP client socket at this stage, but this is not possible in linux, only windows
         static std::shared_ptr<RouterTCPRoute> create_client(
             std::shared_ptr<Router> router,
             Common::Network::TCPCHandleU&& socket,

@@ -96,6 +96,8 @@ namespace NATBuster::Server {
         void start();
 
         void init() override;
+
+        void close();
     };
 
 

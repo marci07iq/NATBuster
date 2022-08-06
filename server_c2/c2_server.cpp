@@ -100,6 +100,13 @@ namespace NATBuster::Server {
 
         {
             std::lock_guard _lg(_server->_connection_lock);
+            auto it = _server->_connection_lookup.find(fingerprint_copy);
+            if (it != _server->_connection_lookup.end()) {
+                std::cout << "Ejecting previous client" << std::endl;
+                it->second->_self_lu = _server->_connection_lookup.end();
+                it->second->close();
+                _server->_connection_lookup.erase(it);
+            }
             _self_lu = _server->_connection_lookup.emplace(std::move(fingerprint_copy), shared_from_this()).first;
         }
 
@@ -163,9 +170,14 @@ namespace NATBuster::Server {
     //Socket was closed
     void C2ServerEndpoint::on_close() {
         {
+            std::cout << "C2ServerEndpoint self erasing" << std::endl;
             std::lock_guard _lg(_server->_connection_lock);
-            _server->_connection_lookup.erase(_self_lu);
-            _server->_connections.erase(_self);
+            if (_self_lu != _server->_connection_lookup.end()) {
+                _server->_connection_lookup.erase(_self_lu);
+            }
+            if (_self != _server->_connections.end()) {
+                _server->_connections.erase(_self);
+            }
         }
     }
 
@@ -199,6 +211,9 @@ namespace NATBuster::Server {
         start();
     }
 
+    void C2ServerEndpoint::close() {
+        _underlying->close();
+    }
 
     void C2Server::on_accept(Common::Network::TCPCHandleU&& socket) {
         std::cout << "ACCEPTED FROM " << socket->get_remote() << std::endl;

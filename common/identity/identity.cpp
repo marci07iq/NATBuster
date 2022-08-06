@@ -10,7 +10,7 @@ namespace NATBuster::Common::Identity {
 
         os << user.name << "[";
         Utils::print_hex(fingerprint.cslice_left(8), os);
-        os << "...]" << std::endl;
+        os << "...]";
         return os;
     }
 };

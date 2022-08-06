@@ -298,25 +298,31 @@ namespace NATBuster::Common::Transport {
     }
     //Called when a socket error occurs
     void OPTPipes::on_error(ErrorCode code) {
-        std::shared_lock _lg(_pipe_lock);
+        {
+            std::shared_lock _lg(_pipe_lock);
 
-        for (auto& it : _pipes) {
-            std::shared_ptr<OPTPipe> pipe = it.second.lock();
-            if (pipe) {
-                pipe->_callback_error(code);
+            for (auto& it : _pipes) {
+                std::shared_ptr<OPTPipe> pipe = it.second.lock();
+                if (pipe) {
+                    pipe->_callback_error(code);
+                }
             }
         }
+        _callback_error(code);
     }
     //Socket was closed
     void OPTPipes::on_close() {
-        std::shared_lock _lg(_pipe_lock);
+        {
+            std::shared_lock _lg(_pipe_lock);
 
-        for (auto& it : _pipes) {
-            std::shared_ptr<OPTPipe> pipe = it.second.lock();
-            if (pipe) {
-                pipe->_callback_close();
+            for (auto& it : _pipes) {
+                std::shared_ptr<OPTPipe> pipe = it.second.lock();
+                if (pipe) {
+                    pipe->_callback_close();
+                }
             }
         }
+        _callback_close();
     }
 
     OPTPipes::OPTPipes(

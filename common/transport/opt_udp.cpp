@@ -323,7 +323,7 @@ namespace NATBuster::Common::Transport {
                 ((packet_data == data_left) ? packet_decoder::PacketType::PKT_END : packet_decoder::PacketType::PKT_MID));
 
             pview->content.packet.seq = seq;
-            ++seq;
+            seq += packet_decoder::seq_rt_cnt;
             packets_left--;
             progress += packet_data;
 

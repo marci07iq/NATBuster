@@ -11,6 +11,8 @@
 
 using namespace NATBuster::Server;
 using NATBuster::Common::Crypto::PKey;
+using NATBuster::Common::Crypto::PrKey;
+using NATBuster::Common::Crypto::PuKey;
 using NATBuster::Common::Utils::Blob;
 using NATBuster::Common::Identity::User;
 using NATBuster::Common::Identity::UserGroup;
@@ -32,15 +34,15 @@ int main() {
     Blob client1_public_key_b = Blob::factory_string(client1_public_key_s);
     Blob client2_public_key_b = Blob::factory_string(client2_public_key_s);
 
-    PKey c2server_private_key;
-    c2server_private_key.load_private(c2server_private_key_b);
-    PKey client1_public_key;
-    client1_public_key.load_public(client1_public_key_b);
-    PKey client2_public_key;
-    client2_public_key.load_public(client2_public_key_b);
+    std::shared_ptr<PrKey> c2server_private_key = std::make_shared<PrKey>();
+    c2server_private_key->load_private(c2server_private_key_b);
+    std::shared_ptr<PuKey> client1_public_key = std::make_shared<PuKey>();
+    client1_public_key->load_public(client1_public_key_b);
+    std::shared_ptr<PuKey> client2_public_key = std::make_shared<PuKey>();
+    client2_public_key->load_public(client2_public_key_b);
 
     Blob c2server_fingerprint;
-    c2server_private_key.fingerprint(c2server_fingerprint);
+    c2server_private_key->fingerprint(c2server_fingerprint);
     std::cout << "IP Server fingerprint: ";
     NATBuster::Common::Utils::print_hex(c2server_fingerprint);
     std::cout << std::endl;
@@ -57,7 +59,7 @@ int main() {
     authorised_users2->addUser(client1);
     authorised_users2->addUser(client2);
 
-    server = std::make_shared<C2Server>(5987, authorised_users2, std::move(c2server_private_key));
+    server = std::make_shared<C2Server>((uint16_t)5987, authorised_users2, std::move(c2server_private_key));
     server->start();
 
     int x;

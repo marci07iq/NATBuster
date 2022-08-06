@@ -34,7 +34,7 @@ namespace NATBuster::Client {
             std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
             std::shared_ptr<Common::Utils::EventEmitter> emitter,
             std::shared_ptr<Common::Identity::UserGroup> authorised_server,
-            Common::Crypto::PKey&& self);
+            const std::shared_ptr<const Common::Crypto::PrKey> self);
 
         void start();
 

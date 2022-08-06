@@ -3,10 +3,10 @@
 
 namespace NATBuster::Common::Proto {
     KEXV1_A::KEXV1_A(
-        Crypto::PKey&& self,
-        std::shared_ptr<Identity::UserGroup> known_remotes
+        const std::shared_ptr<const Crypto::PrKey> self,
+        const std::shared_ptr<const Identity::UserGroup> known_remotes
     ) :
-        KEXV1(std::move(self), known_remotes) {
+        KEXV1(self, known_remotes) {
         _state = State::S0_New;
     }
 
@@ -37,7 +37,7 @@ namespace NATBuster::Common::Proto {
             _state = KEXV1::S2_M2;
 
             //Create new DH key
-            if (!_dh_key_a.generate_ec25519()) return fail(KEX_Event::ErrorCrypto);
+            if (!_dh_key_self.generate_ec25519()) return fail(KEX_Event::ErrorCrypto);
             //Create new nonce
             if (!Crypto::random(_nonce_a, 64)) return fail(KEX_Event::ErrorCrypto);
 
@@ -52,7 +52,7 @@ namespace NATBuster::Common::Proto {
 
             //Write dh public key
             Utils::BlobSliceView pkey = c_hello_w.prepare_writeable_record();
-            if (!_dh_key_a.export_public(pkey)) return fail(KEX_Event::ErrorCrypto);
+            if (!_dh_key_self.export_public(pkey)) return fail(KEX_Event::ErrorCrypto);
             c_hello_w.finish_writeable_record(pkey);
 
             //Write nonce
@@ -74,8 +74,8 @@ namespace NATBuster::Common::Proto {
             //Remote DH key
             Utils::ConstBlobSliceView dh_key_b;
             if (!packet_reader.next_record(dh_key_b)) return fail(KEX_Event::ErrorMalformed);
-            if (!_dh_key_b.load_public(dh_key_b)) return fail(KEX_Event::ErrorCrypto);
-            if (!_dh_key_a.ecdhe(_dh_key_b, _k)) return fail(KEX_Event::ErrorCrypto);
+            if (!_dh_key_remote.load_public(dh_key_b)) return fail(KEX_Event::ErrorCrypto);
+            if (!_dh_key_self.ecdhe(_dh_key_remote, _k)) return fail(KEX_Event::ErrorCrypto);
 
             //Remote nonce
             Utils::ConstBlobSliceView nonce_b;
@@ -84,12 +84,12 @@ namespace NATBuster::Common::Proto {
             _nonce_b.copy_from(nonce_b);
 
             //Calcualte secret hash
-            if (!secret_hash_calculate()) return fail(KEX_Event::ErrorCrypto);
+            if (!secret_hash_calculate(true)) return fail(KEX_Event::ErrorCrypto);
 
             //Remote public key
             Utils::ConstBlobSliceView lt_key_b;
             if (!packet_reader.next_record(lt_key_b)) return fail(KEX_Event::ErrorMalformed);
-            Crypto::PKey lt_key_b_obj;
+            Crypto::PuKey lt_key_b_obj;
             if (!lt_key_b_obj.load_public(lt_key_b)) return fail(KEX_Event::ErrorCrypto);
             //Check if we already know the key
             if (_lt_key_remote.has_key()) {
@@ -195,16 +195,16 @@ namespace NATBuster::Common::Proto {
 
                 //Write public key
                 Utils::BlobSliceView lt_key_self = c_id_w.prepare_writeable_record();
-                if (!_lt_key_self.export_public(lt_key_self)) return fail(KEX_Event::ErrorCrypto);
+                if (!_lt_key_self->export_public(lt_key_self)) return fail(KEX_Event::ErrorCrypto);
                 c_id_w.finish_writeable_record(lt_key_self);
 
                 //Calculate proof data
                 Utils::Blob client_proof_data = Utils::Blob::factory_empty(0, 0, 200);
-                if (!client_proof_hash(client_proof_data, _lt_key_self))  return fail(KEX_Event::ErrorCrypto);
+                if (!client_proof_hash(client_proof_data, *_lt_key_self.get()))  return fail(KEX_Event::ErrorCrypto);
 
                 //Write identity proof
                 Utils::BlobSliceView client_proof = c_id_w.prepare_writeable_record();
-                if (!_lt_key_self.sign(client_proof_data, client_proof)) return fail(KEX_Event::ErrorCrypto);
+                if (!_lt_key_self->sign(client_proof_data, client_proof)) return fail(KEX_Event::ErrorCrypto);
                 c_id_w.finish_writeable_record(client_proof);
 
                 out->send_kex(c_id);
@@ -250,10 +250,10 @@ namespace NATBuster::Common::Proto {
 
 
     KEXV1_B::KEXV1_B(
-        Crypto::PKey&& self,
-        std::shared_ptr<Identity::UserGroup> known_remotes
+        const std::shared_ptr<const Crypto::PrKey> self,
+        const std::shared_ptr<const Identity::UserGroup> known_remotes
     ) :
-        KEXV1(std::move(self), known_remotes) {
+        KEXV1(self, known_remotes) {
         _state = State::S0_New;
     }
 
@@ -298,7 +298,7 @@ namespace NATBuster::Common::Proto {
             //Clean memory garbage
             kex_reset();
             //Create new DH key
-            if (!_dh_key_b.generate_ec25519()) return fail(KEX_Event::ErrorCrypto);
+            if (!_dh_key_self.generate_ec25519()) return fail(KEX_Event::ErrorCrypto);
             //Create new nonce
             if (!Crypto::random(_nonce_b, 64)) return fail(KEX_Event::ErrorCrypto);
 
@@ -307,8 +307,8 @@ namespace NATBuster::Common::Proto {
             //Remote DH key
             Utils::ConstBlobSliceView dh_key_a;
             if (!packet_reader.next_record(dh_key_a)) return fail(KEX_Event::ErrorMalformed);
-            if (!_dh_key_a.load_public(dh_key_a)) return fail(KEX_Event::ErrorCrypto);
-            if (!_dh_key_b.ecdhe(_dh_key_a, _k)) return fail(KEX_Event::ErrorCrypto);
+            if (!_dh_key_remote.load_public(dh_key_a)) return fail(KEX_Event::ErrorCrypto);
+            if (!_dh_key_self.ecdhe(_dh_key_remote, _k)) return fail(KEX_Event::ErrorCrypto);
 
             //Remote nonce
             Utils::ConstBlobSliceView nonce_a;
@@ -317,7 +317,7 @@ namespace NATBuster::Common::Proto {
             _nonce_a.copy_from(nonce_a);
 
             //Calcualte secret hash
-            if (!secret_hash_calculate()) return fail(KEX_Event::ErrorCrypto);
+            if (!secret_hash_calculate(false)) return fail(KEX_Event::ErrorCrypto);
 
             //Should not have any more inbound data
             if (!packet_reader.eof()) return fail(KEX_Event::ErrorMalformed);
@@ -335,7 +335,7 @@ namespace NATBuster::Common::Proto {
 
             //Write dh public key
             Utils::BlobSliceView ekey = s_hello_w.prepare_writeable_record();
-            if (!_dh_key_b.export_public(ekey)) return fail(KEX_Event::ErrorCrypto);
+            if (!_dh_key_self.export_public(ekey)) return fail(KEX_Event::ErrorCrypto);
             s_hello_w.finish_writeable_record(ekey);
 
             //Write nonce
@@ -343,12 +343,12 @@ namespace NATBuster::Common::Proto {
 
             //Write lt public key
             Utils::BlobSliceView lkey = s_hello_w.prepare_writeable_record();
-            if (!_lt_key_self.export_public(lkey)) return fail(KEX_Event::ErrorCrypto);
+            if (!_lt_key_self->export_public(lkey)) return fail(KEX_Event::ErrorCrypto);
             s_hello_w.finish_writeable_record(lkey);
 
             //Write h signature
             Utils::BlobSliceView h_sign = s_hello_w.prepare_writeable_record();
-            if (!_lt_key_self.sign(_h, h_sign)) return fail(KEX_Event::ErrorCrypto);
+            if (!_lt_key_self->sign(_h, h_sign)) return fail(KEX_Event::ErrorCrypto);
             s_hello_w.finish_writeable_record(h_sign);
 
             out->send_kex(s_hello);
@@ -421,7 +421,7 @@ namespace NATBuster::Common::Proto {
             //Remote LT key
             Utils::ConstBlobSliceView lt_key_a;
             if (!packet_reader.next_record(lt_key_a)) return fail(KEX_Event::ErrorMalformed);
-            Crypto::PKey lt_key_a_obj;
+            Crypto::PuKey lt_key_a_obj;
             if (!lt_key_a_obj.load_public(lt_key_a)) return fail(KEX_Event::ErrorCrypto);
             //Check if we already know the key
             if (_lt_key_remote.has_key()) {
@@ -479,6 +479,7 @@ namespace NATBuster::Common::Proto {
     }
 
     KEX::KEX_Event KEXV1_B::init_kex(Transport::OPTSession* out) {
+        (void)out;
         /*if (_state == S0_New || _state == KF_Done) {
             //Clean memory garbage
             kex_reset();

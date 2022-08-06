@@ -98,8 +98,8 @@ namespace NATBuster::Client {
 
         PunchCallback _punch_callback;
 
-        Common::Crypto::PKey _self_key;
-        std::shared_ptr<Common::Identity::UserGroup> _trusted_users;
+        const std::shared_ptr<const Common::Crypto::PrKey> _self_key;
+        const std::shared_ptr<const Common::Identity::UserGroup> _trusted_users;
 
         void on_open();
         void on_packet(const Common::Utils::ConstBlobView& data);
@@ -111,8 +111,8 @@ namespace NATBuster::Client {
         Puncher(
             std::shared_ptr<C2Client> c2_client,
             bool is_client,
-            Common::Crypto::PKey&& self_key,
-            std::shared_ptr<Common::Identity::UserGroup> trusted_users,
+            const std::shared_ptr<const Common::Crypto::PrKey> self_key,
+            const std::shared_ptr<const Common::Identity::UserGroup> trusted_users,
             std::shared_ptr<Common::Transport::OPTBase> underlying
         );
 
@@ -122,8 +122,8 @@ namespace NATBuster::Client {
         static std::shared_ptr<Puncher> create(
             std::shared_ptr<C2Client> c2_client,
             bool is_client,
-            Common::Crypto::PKey&& self_key,
-            std::shared_ptr<Common::Identity::UserGroup> trusted_users,
+            const std::shared_ptr<const Common::Crypto::PrKey> self_key,
+            const std::shared_ptr<const Common::Identity::UserGroup> trusted_users,
             std::shared_ptr<Common::Transport::OPTBase> underlying
         );
 

@@ -57,7 +57,7 @@ namespace NATBuster::Client {
         if (_settings.port_start == 0) {
             //Fill array with all numbers
             for (size_t i = 0; i < ports.size(); i++) {
-                ports[i] = i + _settings.port_min;
+                ports[i] = ((uint16_t)i) + _settings.port_min;
             }
             auto rng = std::default_random_engine{};
             uint32_t seed;

@@ -24,15 +24,11 @@ namespace NATBuster::Client {
                 if (user) {
                     std::cout << "Pipe request from " << *user << std::endl;
 
-                    Common::Crypto::PKey self_key;
-                    self_key.copy_private_from(_self);
                     std::shared_ptr<Common::Identity::UserGroup> trusted_users = std::make_shared<Common::Identity::UserGroup>();
                     trusted_users->addUser(user);
-                    std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, pipe_req.pipe, std::move(self_key), trusted_users);
+                    std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, pipe_req.pipe, _self, trusted_users);
 
-                    Common::Crypto::PKey self_key2;
-                    self_key2.copy_private_from(_self);
-                    std::shared_ptr<Puncher> puncher = Puncher::create(shared_from_this(), false, std::move(self_key2), trusted_users, session);
+                    std::shared_ptr<Puncher> puncher = Puncher::create(shared_from_this(), false, _self, trusted_users, session);
 
                     puncher->set_punch_callback(new Common::Utils::MemberWCallback<C2Client, void, std::shared_ptr<Common::Transport::OPTSession>>(weak_from_this(), &C2Client::on_punch));
 
@@ -46,10 +42,10 @@ namespace NATBuster::Client {
         }
     }
     void C2Client::on_packet(const Common::Utils::ConstBlobView& data) {
-
+        (void)data;
     }
     void C2Client::on_error(Common::ErrorCode code) {
-
+        std::cout << "Error: " << code << std::endl;
     }
     void C2Client::on_close() {
 
@@ -67,9 +63,9 @@ namespace NATBuster::Client {
         std::shared_ptr<Common::Utils::EventEmitter> emitter,
         std::shared_ptr<Common::Identity::UserGroup> authorised_server,
         std::shared_ptr<Common::Identity::UserGroup> authorised_clients,
-        Common::Crypto::PKey&& self) :
+        const std::shared_ptr<const Common::Crypto::PrKey> self) :
         _authorised_clients(authorised_clients),
-        _self(std::move(self)),
+        _self(self),
         _client_emitter(emitter),
         _client_emitter_provider(provider) {
 
@@ -78,6 +74,8 @@ namespace NATBuster::Client {
         Common::Network::TCPCHandleS socket_s = socket;
 
         Common::ErrorCode res = socket_s->resolve(server_name, port);
+        //TODO
+        (void)res;
         
         //Associate socket
         provider->associate_socket(std::move(socket));
@@ -85,9 +83,7 @@ namespace NATBuster::Client {
         //Create OPT TCP
         Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(true, emitter, socket_s);
         //Create OPT Session
-        Common::Crypto::PKey self_copy;
-        self_copy.copy_private_from(_self);
-        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(true, opt, std::move(self_copy), authorised_server);
+        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(true, opt, _self, authorised_server);
         _underlying = Common::Transport::OPTPipes::create(true, session);
     }
 

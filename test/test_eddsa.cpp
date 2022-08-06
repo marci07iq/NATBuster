@@ -8,7 +8,7 @@
 int main() {
     {
         //Signing needs Ed25519
-        NATBuster::Common::Crypto::PKey key_a;
+        NATBuster::Common::Crypto::PrKey key_a;
         if (!key_a.generate_ed25519()) goto error;
 
         NATBuster::Common::Utils::Blob a_public = NATBuster::Common::Utils::Blob();
@@ -17,7 +17,7 @@ int main() {
         
         if (a_public.size() == 0) goto error;
        
-        NATBuster::Common::Crypto::PKey key_a_pub;
+        NATBuster::Common::Crypto::PuKey key_a_pub;
         if (!key_a_pub.load_public(a_public)) goto error;
 
         NATBuster::Common::Utils::Blob a_sign = NATBuster::Common::Utils::Blob();

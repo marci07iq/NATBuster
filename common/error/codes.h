@@ -44,6 +44,11 @@ namespace NATBuster::Common {
         return ((uint32_t)code & (uint32_t)ErrorCode::MASK_TYPE) == (uint32_t)ErrorCode::TYPE_ERROR;
     }
 
+    inline std::ostream& operator<<(std::ostream& stream, const ErrorCode& code) {
+        stream << (uint32_t)code;
+        return stream;
+    }
+
     inline void ThrowError(ErrorCode code) {
         std::cerr << "ERROR " << (uint32_t)code << std::endl;
         throw code;

@@ -87,7 +87,7 @@ namespace NATBuster::Server {
         //Identity is now available
         //Insert into lookup table
         std::shared_ptr<Common::Identity::User> user = _underlying->getUser();
-        if (!user->key.fingerprint(_identity_fingerprint)) {
+        if (!user->key->fingerprint(_identity_fingerprint)) {
             //Can't have an anon
             _underlying->close();
         }
@@ -118,7 +118,7 @@ namespace NATBuster::Server {
                 const Common::Utils::ConstBlobSliceView dst_fingerprint = pipe_req.content.cslice_right(1);
                 //Source fingerprint
                 Common::Utils::Blob src_fingerprint;
-                if (pipe_req.pipe->getUser()->key.fingerprint(src_fingerprint)) {
+                if (pipe_req.pipe->getUser()->key->fingerprint(src_fingerprint)) {
                     std::cout << "Pipe request from " << *pipe_req.pipe->getUser() << std::endl;
 
                     if (dst_fingerprint.size() == 32) {
@@ -153,11 +153,11 @@ namespace NATBuster::Server {
     }
     //Called when a packet can be read
     void C2ServerEndpoint::on_packet(const Common::Utils::ConstBlobView& data) {
-
+        (void)data;
     }
     //Called when a socket error occurs
     void C2ServerEndpoint::on_error(Common::ErrorCode code) {
-
+        std::cout << "Error " << code << std::endl;
     }
     //Timer
     //Socket was closed
@@ -208,9 +208,7 @@ namespace NATBuster::Server {
         //Create OPT TCP
         Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(false, _client_emitter.get_shared(), socket_s);
         //Create OPT Session
-        Common::Crypto::PKey self_copy;
-        self_copy.copy_private_from(_self);
-        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, std::move(self_copy), _authorised_users);
+        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, _self, _authorised_users);
         std::shared_ptr<Common::Transport::OPTPipes> pipes = Common::Transport::OPTPipes::create(false, session);
 
         std::shared_ptr<C2ServerEndpoint> endpoint = C2ServerEndpoint::create(socket_s, pipes, shared_from_this());
@@ -227,8 +225,8 @@ namespace NATBuster::Server {
 
     C2Server::C2Server(
         uint16_t port,
-        std::shared_ptr<Common::Identity::UserGroup> authorised_users,
-        Common::Crypto::PKey&& self
+        const std::shared_ptr<const Common::Identity::UserGroup> authorised_users,
+        const std::shared_ptr<const Common::Crypto::PrKey> self
     ) :
         _port(port),
         _authorised_users(authorised_users),

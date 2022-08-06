@@ -13,6 +13,7 @@ if (MSVC)
     add_compile_options(/bigobj)
 
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
 
     add_compile_options (/W4)
     add_compile_options (/WX)

@@ -97,25 +97,26 @@ namespace NATBuster::Common::Proto {
 
         //Ephemeral DH keys used for the kex
 
-        Crypto::PKey _dh_key_a;
-        Crypto::PKey _dh_key_b;
+        //Self is A if client, B if not.
+        Crypto::PrKey _dh_key_self;
+        Crypto::PuKey _dh_key_remote;
 
         //Long term private key of this side
         //Long term public key of other side
         //If empty, any remote is accepted
 
-        const Crypto::PKey _lt_key_self;
-        Crypto::PKey _lt_key_remote;
+        const std::shared_ptr<const Crypto::PrKey> _lt_key_self;
+        Crypto::PuKey _lt_key_remote;
 
         std::shared_ptr<Identity::User> _user_remote;
-        std::shared_ptr<Identity::UserGroup> _users_remote;
+        const std::shared_ptr<const Identity::UserGroup> _users_remote;
 
         KEXV1(
-            Crypto::PKey&& self,
-            std::shared_ptr<Identity::UserGroup> known_remotes) :
-            _lt_key_self(std::move(self)),
+            const std::shared_ptr<const Crypto::PrKey> self,
+            const std::shared_ptr<const Identity::UserGroup> known_remotes) :
+            _lt_key_self(self),
             _users_remote(known_remotes) {
-            assert(_lt_key_self.has_key());
+            assert(_lt_key_self->has_key());
         }
 
         //Wipe the internal state
@@ -130,11 +131,11 @@ namespace NATBuster::Common::Proto {
             _k.erase();
             _h.erase();
 
-            _dh_key_a.erase();
-            _dh_key_b.erase();
+            _dh_key_self.erase();
+            _dh_key_remote.erase();
         }
 
-        bool secret_hash_calculate() {
+        bool secret_hash_calculate(bool is_client) {
             Utils::Blob hash_content;
             Utils::PackedBlobWriter hash_content_w(hash_content);
 
@@ -143,11 +144,21 @@ namespace NATBuster::Common::Proto {
             hash_content_w.add_record(_k);
 
             Utils::Blob dh_key_a;
-            if (!_dh_key_a.export_public(dh_key_a)) return false;
+            if (is_client) {
+                if (!_dh_key_self.export_public(dh_key_a)) return false;
+            }
+            else {
+                if (!_dh_key_remote.export_public(dh_key_a)) return false;
+            }
             hash_content_w.add_record(dh_key_a);
 
             Utils::Blob dh_key_b;
-            if (!_dh_key_a.export_public(dh_key_b)) return false;
+            if (is_client) {
+                if (!_dh_key_remote.export_public(dh_key_b)) return false;
+            }
+            else {
+                if (!_dh_key_self.export_public(dh_key_b)) return false;
+            }
             hash_content_w.add_record(dh_key_b);
 
             hash_content_w.add_record(_nonce_a);
@@ -159,7 +170,7 @@ namespace NATBuster::Common::Proto {
             return true;
         }
 
-        bool client_proof_hash(Utils::BlobView& dst, const Crypto::PKey& client_key) const {
+        bool client_proof_hash(Utils::BlobView& dst, const Crypto::PuKey& client_key) const {
             Utils::Blob hash_content;
             Utils::PackedBlobWriter hash_content_w(hash_content);
 
@@ -230,8 +241,8 @@ namespace NATBuster::Common::Proto {
         //KF_Done
     public:
         KEXV1_A(
-            Crypto::PKey&& self,
-            std::shared_ptr<Identity::UserGroup> known_remotes
+            const std::shared_ptr<const Crypto::PrKey> self,
+            const std::shared_ptr<const Identity::UserGroup> known_remotes
         );
 
 
@@ -268,8 +279,8 @@ namespace NATBuster::Common::Proto {
         //KF_Done
     public:
         KEXV1_B(
-            Crypto::PKey&& self,
-            std::shared_ptr<Identity::UserGroup> known_remotes
+            const std::shared_ptr<const Crypto::PrKey> self,
+            const std::shared_ptr<const Identity::UserGroup> known_remotes
         );
 
         KEX::KEX_Event recv(const Utils::ConstBlobView& packet, Transport::OPTSession* out);

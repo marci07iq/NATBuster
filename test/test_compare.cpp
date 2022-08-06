@@ -7,14 +7,16 @@
 int main() {
     {
         using NATBuster::Common::Crypto::PKey;
+        using NATBuster::Common::Crypto::PrKey;
+        using NATBuster::Common::Crypto::PuKey;
         using NATBuster::Common::Utils::Blob;
 
         //Generate two different ED keys
 
-        PKey key_a;
+        PrKey key_a;
         if (!key_a.generate_ed25519()) goto error;
 
-        PKey key_b;
+        PrKey key_b;
         if (!key_b.generate_ed25519()) goto error;
 
         Blob a_public = Blob();
@@ -27,13 +29,13 @@ int main() {
         if (b_public.size() == 0) goto error;
         
         //Load the public key from A
-        PKey key_a_pub;
+        PuKey key_a_pub;
         if (!key_a_pub.load_public(a_public)) goto error;
 
         //Load the public key (twice) from B
-        PKey key_b_pub;
+        PuKey key_b_pub;
         if (!key_b_pub.load_public(b_public)) goto error;
-        PKey key_b2_pub;
+        PuKey key_b2_pub;
         if (!key_b2_pub.load_public(b_public)) goto error;
 
         //Compare the 5 previous keys in every possible order.

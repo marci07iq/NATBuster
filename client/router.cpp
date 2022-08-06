@@ -65,7 +65,9 @@ namespace NATBuster::Client {
     }
 
     void Router::pushPort(uint16_t local_port, uint16_t remote_port) {
-
+        //Todo
+        (void)local_port;
+        (void)remote_port;
     }
 
 
@@ -79,7 +81,7 @@ namespace NATBuster::Client {
         RouterTCPRoute::create_client(_router, std::move(socket), _remote_port);
     }
     void RouterTCPS::on_error(Common::ErrorCode code) {
-
+        std::cout << "Error " << code << std::endl;
     }
     void RouterTCPS::on_close() {
         {
@@ -147,7 +149,7 @@ namespace NATBuster::Client {
         _pipe->send(data);
     }
     void RouterTCPRoute::on_error(Common::ErrorCode code) {
-
+        std::cout << "Error " << code << std::endl;
     }
     void RouterTCPRoute::on_pipe_close() {
         {
@@ -189,10 +191,11 @@ namespace NATBuster::Client {
         //Callback once socket added to thread
 
         Common::ErrorCode res = socket_s->resolve("localhost", local_port);
+        //TODO
+        (void)res;
 
         //Associate socket
         _router->_provider->associate_socket(std::move(socket));
-
     }
 
     RouterTCPRoute::RouterTCPRoute(
@@ -205,7 +208,8 @@ namespace NATBuster::Client {
         _router(router),
         _socket(socket)
     {
-
+        (void)remote_port;
+        ///TODO!!!
     }
 
     void RouterTCPRoute::start() {
@@ -224,6 +228,10 @@ namespace NATBuster::Client {
 
         _pipe->set_callback_close(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_pipe_close));
         _socket->set_callback_close(new Common::Utils::MemberWCallback<RouterTCPRoute, void>(weak_from_this(), &RouterTCPRoute::on_socket_close));
+
+        /*Common::Utils::Blob open_data = Common::Utils::Blob::factory_empty(2);
+        *(uint16_t*)open_data.getw() = remote_port;
+        _pipe->start_client(open_data);*/
 
         _socket->start();
     }

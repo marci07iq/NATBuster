@@ -42,12 +42,8 @@ int main()
     char buffer[DATA_BUFSIZE];
 
     DWORD EventTotal = 0;
-    DWORD RecvBytes = 0;
-    DWORD Flags = 0;
-    DWORD BytesTransferred = 0;
 
     WSAEVENT EventArray[WSA_MAXIMUM_WAIT_EVENTS];
-    WSAOVERLAPPED AcceptOverlapped;
     SOCKET ListenSocket = INVALID_SOCKET;
     SOCKET AcceptSocket = INVALID_SOCKET;
 

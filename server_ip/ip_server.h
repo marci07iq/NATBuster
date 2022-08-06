@@ -54,9 +54,9 @@ namespace NATBuster::Server {
         Common::Utils::shared_unique_ptr<Common::Utils::EventEmitter> _client_emitter;
 
         //List of users authorised to use the server
-        std::shared_ptr<Common::Identity::UserGroup> _authorised_users;
+        const std::shared_ptr<const Common::Identity::UserGroup> _authorised_users;
         //Identity of this server
-        Common::Crypto::PKey _self;
+        const std::shared_ptr<const Common::Crypto::PrKey> _self;
 
 
         void on_accept(Common::Network::TCPCHandleU&& socket);
@@ -67,8 +67,8 @@ namespace NATBuster::Server {
 
         IPServer(
             uint16_t port,
-            std::shared_ptr<Common::Identity::UserGroup> authorised_users,
-            Common::Crypto::PKey&& self
+            const std::shared_ptr<const Common::Identity::UserGroup> authorised_users,
+            const std::shared_ptr<const Common::Crypto::PrKey> self
         );
 
         void start();

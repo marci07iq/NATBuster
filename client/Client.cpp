@@ -13,6 +13,8 @@
 using namespace NATBuster::Client;
 using namespace NATBuster::Common;
 using NATBuster::Common::Crypto::PKey;
+using NATBuster::Common::Crypto::PrKey;
+using NATBuster::Common::Crypto::PuKey;
 using NATBuster::Common::Utils::Blob;
 using NATBuster::Common::Identity::User;
 using NATBuster::Common::Identity::UserGroup;
@@ -25,7 +27,7 @@ void keygen() {
     using namespace NATBuster::Common::Crypto;
     using NATBuster::Common::Utils::Blob;
 
-    PKey key;
+    PrKey key;
     key.generate_ed25519();
 
     std::cout << "Filename (no extension): " << std::endl;
@@ -37,13 +39,13 @@ void keygen() {
 
 }
 
-void get_ip(std::shared_ptr<UserGroup> auth_servers, PKey&& self) {
+void get_ip(std::shared_ptr<UserGroup> auth_servers, std::shared_ptr<PrKey> self) {
     std::cout << "Querying from 127.0.0.1:5987" << std::endl;
 
     std::shared_ptr<NATBuster::Client::IPClient> query = NATBuster::Client::IPClient::create(
-        "127.0.0.1", 5987,
+        "127.0.0.1", (uint16_t)5987,
         main_provider, main_emitter,
-        auth_servers, std::move(self));
+        auth_servers, self);
 
     query->wait();
 
@@ -57,18 +59,18 @@ void get_ip(std::shared_ptr<UserGroup> auth_servers, PKey&& self) {
 
 std::shared_ptr<NATBuster::Client::C2Client> c2_instance;
 
-void login(std::shared_ptr<UserGroup> c2_servers, std::shared_ptr<UserGroup> c2_clients, PKey&& self) {
+void login(std::shared_ptr<UserGroup> c2_servers, std::shared_ptr<UserGroup> c2_clients, std::shared_ptr<PrKey> self) {
     std::cout << "Querying from 127.0.0.1:5987" << std::endl;
 
     c2_instance = NATBuster::Client::C2Client::create(
-        "127.0.0.1", 5987,
+        "127.0.0.1", (uint16_t)5987,
         main_provider, main_emitter,
-        c2_servers, c2_clients, std::move(self));
+        c2_servers, c2_clients, self);
 }
 
 //std::shared_ptr<NATBuster::Client::Router> router;
 
-void punch(PKey&& self, std::shared_ptr<User> remote_user) {
+void punch(std::shared_ptr<PrKey> self, std::shared_ptr<User> remote_user) {
     /*std::string remote;
     std::cout << "Remote address: ";
     std::cin >> remote;
@@ -99,7 +101,7 @@ void punch(PKey&& self, std::shared_ptr<User> remote_user) {
             std::cout << "Error" << std::endl;
         }
     }*/
-    c2_instance->punch(std::move(self), remote_user);
+    c2_instance->punch(self, remote_user);
 }
 
 void forward() {
@@ -137,27 +139,25 @@ int main() {
     Blob ipserver_public_key_b = Blob::factory_string(ipserver_public_key_s);
     Blob c2server_public_key_b = Blob::factory_string(c2server_public_key_s);
 
-    PKey client_private_key;
-    PKey remote_public_key;
-    PKey ipserver_public_key;
-    PKey c2server_public_key;
-    client_private_key.load_private(client_private_key_b);
-    remote_public_key.load_public(remote_public_key_b);
-    ipserver_public_key.load_public(ipserver_public_key_b);
-    c2server_public_key.load_public(c2server_public_key_b);
+    std::shared_ptr<PrKey> client_private_key = std::make_shared<PrKey>();
+    client_private_key->load_private(client_private_key_b);
+    std::shared_ptr<PuKey> remote_public_key = std::make_shared<PuKey>();
+    remote_public_key->load_public(remote_public_key_b);
+    std::shared_ptr<PuKey> ipserver_public_key = std::make_shared<PuKey>();
+    ipserver_public_key->load_public(ipserver_public_key_b);
+    std::shared_ptr<PuKey> c2server_public_key = std::make_shared<PuKey>();
+    c2server_public_key->load_public(c2server_public_key_b);
 
     Blob client_fingerprint;
-    client_private_key.fingerprint(client_fingerprint);
+    client_private_key->fingerprint(client_fingerprint);
     std::cout << "Client fingerprint: ";
     NATBuster::Common::Utils::print_hex(client_fingerprint);
     std::cout << std::endl;
 
-    PKey self_copy;
-    self_copy.copy_public_from(client_private_key);
-    std::shared_ptr<User> client = std::make_shared<User>("client", std::move(self_copy));
-    std::shared_ptr<User> remote = std::make_shared<User>("remote", std::move(remote_public_key));
-    std::shared_ptr<User> ipserver = std::make_shared<User>("ipserver", std::move(ipserver_public_key));
-    std::shared_ptr<User> c2server = std::make_shared<User>("c2server", std::move(c2server_public_key));
+    std::shared_ptr<User> client = std::make_shared<User>("client", client_private_key);
+    std::shared_ptr<User> remote = std::make_shared<User>("remote", remote_public_key);
+    std::shared_ptr<User> ipserver = std::make_shared<User>("ipserver", ipserver_public_key);
+    std::shared_ptr<User> c2server = std::make_shared<User>("c2server", c2server_public_key);
 
     std::shared_ptr<UserGroup> authorised_c2_clients = std::make_shared<UserGroup>();
     authorised_c2_clients->addUser(remote);
@@ -187,9 +187,7 @@ int main() {
             break;
         }
         if (command == "get_ip") {
-            PKey self_copy;
-            self_copy.copy_private_from(client_private_key);
-            get_ip(authorised_ip_servers, std::move(self_copy));
+            get_ip(authorised_ip_servers, client_private_key);
         }
         else if (command == "help" || command == "?") {
             std::cout << "Commands" << std::endl;
@@ -202,17 +200,13 @@ int main() {
             keygen();
         }
         else if (command == "login") {
-            PKey self_copy;
-            self_copy.copy_private_from(client_private_key);
-            login(authorised_c2_servers, authorised_c2_clients, std::move(self_copy));
+            login(authorised_c2_servers, authorised_c2_clients, client_private_key);
         }
         else if (command == "forward") {
             forward();
         }
         else if (command == "punch") {
-            PKey self_copy;
-            self_copy.copy_private_from(client_private_key);
-            punch(std::move(self_copy), remote);
+            punch(client_private_key, remote);
         }
         else {
             std::cout << "Unknown command. Type help" << std::endl;

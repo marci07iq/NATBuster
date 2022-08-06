@@ -268,6 +268,7 @@ namespace NATBuster::Common::Network {
         friend class SocketEventEmitterProviderImpl;
 
         ErrorCode next_connect_attempt(EventHandleOSData* event_binder) override {
+            (void)event_binder;
             assert(false);
             return ErrorCode::GENERIC_ERROR_INVALID_VF;
         }

@@ -39,7 +39,7 @@ namespace NATBuster::Client {
         _underlying->close();
     }
     void IPClient::on_error(Common::ErrorCode code) {
-
+        std::cout << "Error: " << code << std::endl;
     }
     void IPClient::on_timeout() {
         _underlying->close();
@@ -55,7 +55,7 @@ namespace NATBuster::Client {
         std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
         std::shared_ptr<Common::Utils::EventEmitter> emitter,
         std::shared_ptr<Common::Identity::UserGroup> authorised_server,
-        Common::Crypto::PKey&& self) {
+        const std::shared_ptr<const Common::Crypto::PrKey> self) {
 
         //Create client socket
         Common::Network::TCPCHandleU socket = Common::Network::TCPC::create();
@@ -74,7 +74,7 @@ namespace NATBuster::Client {
         //Create OPT TCP
         Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(true, emitter, socket_s);
         //Create OPT Session
-        _underlying = Common::Transport::OPTSession::create(true, opt, std::move(self), authorised_server);
+        _underlying = Common::Transport::OPTSession::create(true, opt, self, authorised_server);
 
     }
 

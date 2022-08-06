@@ -81,9 +81,7 @@ namespace NATBuster::Server {
         //Create OPT TCP
         Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(false, _client_emitter.get_shared(), socket_s);
         //Create OPT Session
-        Common::Crypto::PKey self_copy;
-        self_copy.copy_private_from(_self);
-        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, std::move(self_copy), _authorised_users);
+        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, _self, _authorised_users);
 
         std::shared_ptr<IPServerEndpoint> endpoint = IPServerEndpoint::create(socket_s, session, shared_from_this());
 
@@ -99,8 +97,8 @@ namespace NATBuster::Server {
 
     IPServer::IPServer(
         uint16_t port,
-        std::shared_ptr<Common::Identity::UserGroup> authorised_users,
-        Common::Crypto::PKey&& self
+        const std::shared_ptr<const Common::Identity::UserGroup> authorised_users,
+        const std::shared_ptr<const Common::Crypto::PrKey> self
     ) :
         _port(port),
         _authorised_users(authorised_users),

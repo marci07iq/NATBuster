@@ -24,7 +24,7 @@ namespace NATBuster::Common::Utils {
     public:
         virtual void operator()(ARGS... args) const = 0;
 
-        virtual ~CallbackBase();
+        virtual ~CallbackBase() = default;
     };
 
     //Empty callback, calls nothing
@@ -35,8 +35,7 @@ namespace NATBuster::Common::Utils {
         NoCallback() {
 
         }
-        inline void operator()(ARGS... args) const override {
-            ((void)args)...;
+        inline void operator()([[maybe_unused]]  ARGS... args) const override {
         }
 
     };

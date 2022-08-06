@@ -172,7 +172,7 @@ namespace NATBuster::Client {
         }
     }
     void Puncher::on_error(Common::ErrorCode code) {
-
+        std::cout << "Error " << code << std::endl;
     }
     void Puncher::on_close() {
         {
@@ -193,9 +193,7 @@ namespace NATBuster::Client {
         //Create the OPT
         std::shared_ptr<Common::Transport::OPTUDP> opt_udp = Common::Transport::OPTUDP::create(_is_client, _c2_client->_client_emitter, punched_s);
         //Create the Session
-        Common::Crypto::PKey self_key;
-        self_key.copy_private_from(_self_key);
-        std::shared_ptr<Common::Transport::OPTSession> opt_session = Common::Transport::OPTSession::create(_is_client, opt_udp, std::move(self_key), _trusted_users);
+        std::shared_ptr<Common::Transport::OPTSession> opt_session = Common::Transport::OPTSession::create(_is_client, opt_udp, _self_key, _trusted_users);
 
         _punch_callback(opt_session);
     }
@@ -203,8 +201,8 @@ namespace NATBuster::Client {
     Puncher::Puncher(
         std::shared_ptr<C2Client> c2_client,
         bool is_client,
-        Common::Crypto::PKey&& self_key,
-        std::shared_ptr<Common::Identity::UserGroup> trusted_users,
+        const std::shared_ptr<const Common::Crypto::PrKey> self_key,
+        const std::shared_ptr<const Common::Identity::UserGroup> trusted_users,
         std::shared_ptr<Common::Transport::OPTBase> underlying
     ) : _c2_client(c2_client), _is_client(is_client), _self_key(std::move(self_key)), _trusted_users(trusted_users), _underlying(underlying) {
         _outbound_magic_content = Common::Utils::Blob::factory_empty(64);
@@ -235,8 +233,8 @@ namespace NATBuster::Client {
     std::shared_ptr<Puncher> Puncher::create(
         std::shared_ptr<C2Client> c2_client,
         bool is_client,
-        Common::Crypto::PKey&& self_key,
-        std::shared_ptr<Common::Identity::UserGroup> trusted_users,
+        const std::shared_ptr<const Common::Crypto::PrKey> self_key,
+        const std::shared_ptr<const Common::Identity::UserGroup> trusted_users,
         std::shared_ptr<Common::Transport::OPTBase> underlying
     ) {
         return std::shared_ptr<Puncher>(new Puncher(c2_client, is_client, std::move(self_key), trusted_users, underlying));

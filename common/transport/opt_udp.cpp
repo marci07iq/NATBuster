@@ -47,8 +47,8 @@ namespace NATBuster::Common::Transport {
             if (type == packet_decoder::PacketType::PKT_END || type == packet_decoder::PacketType::PKT_SINGLE) {
 
                 uint32_t new_len = 0;
-                for (auto& it : _reassemble_list) {
-                    new_len += it.size() - 5;
+                for (auto& it2 : _reassemble_list) {
+                    new_len += it2.size() - 5;
                 }
 
                 uint8_t* buffer = Utils::Blob::alloc(new_len);
@@ -56,9 +56,9 @@ namespace NATBuster::Common::Transport {
                 //Write progress
                 uint32_t progress = 0;
 
-                for (auto& it : _reassemble_list) {
-                    Utils::Blob::bufcpy(buffer, new_len, progress, it.getr(), it.size(), 5, it.size() - 5);
-                    progress += it.size() - 5;
+                for (auto& it2 : _reassemble_list) {
+                    Utils::Blob::bufcpy(buffer, new_len, progress, it2.getr(), it2.size(), 5, it2.size() - 5);
+                    progress += it2.size() - 5;
                 }
 
                 assert(progress == new_len);

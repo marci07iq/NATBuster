@@ -273,7 +273,8 @@ namespace NATBuster::Common::Network {
         // Resolve the server address and port
         std::string port_s = std::to_string(port);
         addrinfo* result = nullptr;
-        iResult = ::getaddrinfo(nullptr, port_s.c_str(), &hints, &result);
+
+        iResult = ::getaddrinfo((name.size() == 0) ? nullptr : name.c_str(), port_s.c_str(), &hints, &result);
         if (iResult != 0) {
             return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
         }
@@ -538,7 +539,7 @@ namespace NATBuster::Common::Network {
     //SocketEventEmitterImpl
 
     void __stdcall SocketEventEmitterProviderImpl::apc_fun(ULONG_PTR data) {
-
+        (void)data;
     }
 
     void SocketEventEmitterProviderImpl::bind() {
@@ -598,6 +599,7 @@ namespace NATBuster::Common::Network {
                     socket,
                     _socket_events[index],
                     &set_events);
+                (void)res2;
 
                 /*bool bResult = WSAResetEvent(_socket_events[index]);
                 if (bResult == FALSE) {
@@ -645,10 +647,12 @@ namespace NATBuster::Common::Network {
                             &flags,
                             NULL,
                             NULL);
+                        //TODO
+                        (void)res3;
 
                         //Closed
                         if (received == 0) {
-                            std::lock_guard _lg(_system_lock);
+                            std::lock_guard _lg2(_system_lock);
                             _closed_socket_objects.push_back(socket_hwnd);
                         }
                         else {
@@ -680,7 +684,7 @@ namespace NATBuster::Common::Network {
                         if (res3 == 0) {
                             //Closed
                             if (received == 0) {
-                                std::lock_guard _lg(_system_lock);
+                                std::lock_guard _lg2(_system_lock);
                                 _closed_socket_objects.push_back(socket_hwnd);
                             }
                             else {
@@ -734,7 +738,7 @@ namespace NATBuster::Common::Network {
 
                 if (set_events.lNetworkEvents & FD_CLOSE) {
                     std::cout << "Close" << std::endl;
-                    std::lock_guard _lg(_system_lock);
+                    std::lock_guard _lg2(_system_lock);
                     _closed_socket_objects.push_back(socket_hwnd);
                 }
             }
@@ -742,14 +746,14 @@ namespace NATBuster::Common::Network {
 
         //Execute updates
         {
-            std::unique_lock _lg(_system_lock);
+            std::unique_lock _lg2(_system_lock);
 
             while (_closed_socket_objects.size() || _added_socket_objects.size()) {
                 while (_closed_socket_objects.size()) {
                     std::shared_ptr<SocketEventHandle> close_socket = _closed_socket_objects.front();
                     _closed_socket_objects.pop_front();
 
-                    _lg.unlock();
+                    _lg2.unlock();
 
                     for (int i = 0; i < _socket_objects.size(); i++) {
                         if (_socket_objects[i] == close_socket) {
@@ -770,14 +774,14 @@ namespace NATBuster::Common::Network {
                         }
                     }
 
-                    _lg.lock();
+                    _lg2.lock();
                 }
 
                 while (_added_socket_objects.size()) {
                     std::shared_ptr<SocketEventHandle> add_socket = _added_socket_objects.front();
                     _added_socket_objects.pop_front();
 
-                    _lg.unlock();
+                    _lg2.unlock();
 
                     //Create events objects
                     HANDLE new_event = WSACreateEvent();
@@ -792,7 +796,7 @@ namespace NATBuster::Common::Network {
                         if (is_error(code)) {
                             add_socket->_callback_error(code);
                             _closed_socket_objects.push_back(add_socket);
-                            _lg.lock();
+                            _lg2.lock();
                             continue;
                         }
                     }
@@ -807,7 +811,7 @@ namespace NATBuster::Common::Network {
 
                     add_socket->_callback_start();
 
-                    _lg.lock();
+                    _lg2.lock();
                 }
             }
         }

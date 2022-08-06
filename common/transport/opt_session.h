@@ -92,8 +92,8 @@ namespace NATBuster::Common::Transport {
         OPTSession(
             bool is_client,
             std::shared_ptr<OPTBase> underlying,
-            Crypto::PKey&& self,
-            std::shared_ptr<Identity::UserGroup> known_remotes
+            const std::shared_ptr<const Crypto::PrKey> self,
+            const std::shared_ptr<const Identity::UserGroup> known_remotes
         );
 
     public:

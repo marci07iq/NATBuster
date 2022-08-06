@@ -70,15 +70,18 @@ namespace NATBuster::Common::Identity {
     public:
         static std::shared_ptr<User> Anonymous;
 
-        const Crypto::PKey key;
+        const std::shared_ptr<const Crypto::PuKey> key;
 
-        User(const std::string& name, Crypto::PKey&& key, std::shared_ptr<PermGroup> base = std::shared_ptr<PermGroup>()) :
-            PermGroup(name, base), key(std::move(key)) {
+        User(
+            const std::string& name,
+            const std::shared_ptr<const Crypto::PuKey> key,
+            std::shared_ptr<PermGroup> base = std::shared_ptr<PermGroup>()) :
+            PermGroup(name, base), key(key) {
 
         }
 
         bool isAnonymous() {
-            return key.has_key();
+            return key->has_key();
         }
     };
 
@@ -97,7 +100,7 @@ namespace NATBuster::Common::Identity {
         }
 
         //Find key among known identities
-        std::shared_ptr<User> findUser(const Crypto::PKey& key) const {
+        std::shared_ptr<User> findUser(const Crypto::PuKey& key) const {
             Utils::Blob fingerprint;
             key.fingerprint(fingerprint);
             return findUser(fingerprint);
@@ -115,7 +118,7 @@ namespace NATBuster::Common::Identity {
 
         //Get the user associate with a key
         //If key is not known, returns anonymous
-        std::shared_ptr<User> findUserDefault(const Crypto::PKey& key) const {
+        std::shared_ptr<User> findUserDefault(const Crypto::PuKey& key) const {
             std::shared_ptr<User> known = findUser(key);
             if (known) {
                 return known;
@@ -123,10 +126,10 @@ namespace NATBuster::Common::Identity {
             return User::Anonymous;
         }
 
-        bool isMember(const Crypto::PKey& key) const {
+        bool isMember(const Crypto::PuKey& key) const {
             if (!key.has_key()) return false;
             for (const auto& it : _identites) {
-                if (it.second->key.is_same(key)) {
+                if (it.second->key->is_same(key)) {
                     return true;
                 }
             }
@@ -135,11 +138,11 @@ namespace NATBuster::Common::Identity {
 
         bool addUser(std::shared_ptr<User> identity) {
             //Anonymous key can't be added
-            if (!identity->key.has_key()) {
+            if (!identity->key->has_key()) {
                 return false;
             }
             Utils::Blob fingerprint;
-            identity->key.fingerprint(fingerprint);
+            identity->key->fingerprint(fingerprint);
             std::shared_ptr<User> known = findUser(fingerprint);
             if (known) {
                 return false;

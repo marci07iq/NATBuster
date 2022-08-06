@@ -155,7 +155,7 @@ namespace NATBuster::Common::Utils
 
                 //Run expired timers
                 bool has_next_timer = false;
-                Time::time_type_us next_timer;
+                Time::time_type_us next_timer = 0;
                 {
                     auto it = timers.begin();
                     while (it != timers.end()) {

@@ -1,7 +1,7 @@
 #include "network.h"
 
 
-namespace NATBuster::Common::Network {
+namespace NATBuster::Network {
     //SocketBase
 
     SocketBase::SocketBase(SocketOSData* socket) noexcept : _socket(socket) {

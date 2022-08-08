@@ -1,7 +1,7 @@
 #include "opt_session.h"
 #include "kex_v1.h"
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     //Called when the emitter starts
     void OPTSession::on_open() {
         //Start the key exchange
@@ -27,7 +27,7 @@ namespace NATBuster::Common::Transport {
 
         switch (type)
         {
-        case NATBuster::Common::Transport::OPTSession::DATA:
+        case NATBuster::Transport::OPTSession::DATA:
             if (_flags._first_kex_ok) {
                 _callback_packet(content);
             }
@@ -36,33 +36,33 @@ namespace NATBuster::Common::Transport {
                 close();
             }
             break;
-        case NATBuster::Common::Transport::OPTSession::KEX:
+        case NATBuster::Transport::OPTSession::KEX:
         {
             Proto::KEX::KEX_Event res = _kex->recv(content, this);
             switch (res)
             {
-            case NATBuster::Common::Proto::KEX::KEX_Event::OK:
+            case NATBuster::Proto::KEX::KEX_Event::OK:
                 break;
-            case NATBuster::Common::Proto::KEX::KEX_Event::OK_Done:
+            case NATBuster::Proto::KEX::KEX_Event::OK_Done:
                 if (!_flags._first_kex_ok) {
                     //Let upper levels know that the tunnle is ready
                     _callback_open();
                 }
                 _flags._first_kex_ok = true;
                 break;
-            case NATBuster::Common::Proto::KEX::KEX_Event::ErrorGeneric:
-            case NATBuster::Common::Proto::KEX::KEX_Event::ErrorMalformed:
-            case NATBuster::Common::Proto::KEX::KEX_Event::ErrorNotrust:
-            case NATBuster::Common::Proto::KEX::KEX_Event::ErrorCrypto:
-            case NATBuster::Common::Proto::KEX::KEX_Event::ErrorSend:
-            case NATBuster::Common::Proto::KEX::KEX_Event::ErrorState:
+            case NATBuster::Proto::KEX::KEX_Event::ErrorGeneric:
+            case NATBuster::Proto::KEX::KEX_Event::ErrorMalformed:
+            case NATBuster::Proto::KEX::KEX_Event::ErrorNotrust:
+            case NATBuster::Proto::KEX::KEX_Event::ErrorCrypto:
+            case NATBuster::Proto::KEX::KEX_Event::ErrorSend:
+            case NATBuster::Proto::KEX::KEX_Event::ErrorState:
             default:
                 close();
                 break;
             }
         }
         break;
-        case NATBuster::Common::Transport::OPTSession::ENC_OFF:
+        case NATBuster::Transport::OPTSession::ENC_OFF:
             if (_flags._enc_off_enable) {
                 _flags._enc_on_ib = false;
             }
@@ -70,7 +70,7 @@ namespace NATBuster::Common::Transport {
                 close();
             }
             break;
-        case NATBuster::Common::Transport::OPTSession::CLOSE:
+        case NATBuster::Transport::OPTSession::CLOSE:
         default:
             close();
             break;

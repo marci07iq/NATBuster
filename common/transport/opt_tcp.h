@@ -12,7 +12,7 @@
 //Packet: Logical blocks of data
 //Frame: Induvidual 
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     class OPTTCP;
 
     typedef std::shared_ptr<OPTTCP> OPTTCPHandle;

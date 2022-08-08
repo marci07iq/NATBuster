@@ -5,27 +5,30 @@
 
 #include "../common/utils/hex.h"
 
-#include "ip_client.h"
-#include "c2_client.h"
-#include "router.h"
-#include "punch_sym_sym.h"
+#include "../common/endpoint/c2_client.h"
+#include "../common/endpoint/ip_client.h"
+#include "../common/endpoint/router.h"
+#include "../common/punch/sym_sym.h"
 
-using namespace NATBuster::Client;
-using namespace NATBuster::Common;
-using NATBuster::Common::Crypto::PKey;
-using NATBuster::Common::Crypto::PrKey;
-using NATBuster::Common::Crypto::PuKey;
-using NATBuster::Common::Utils::Blob;
-using NATBuster::Common::Identity::User;
-using NATBuster::Common::Identity::UserGroup;
-using NATBuster::Client::HolepunchSym;
+using NATBuster::Crypto::PKey;
+using NATBuster::Crypto::PrKey;
+using NATBuster::Crypto::PuKey;
+using NATBuster::Utils::Blob;
+using NATBuster::Identity::User;
+using NATBuster::Identity::UserGroup;
+using NATBuster::Network::SocketEventEmitterProvider;
+using NATBuster::Utils::EventEmitter;
+using NATBuster::Endpoint::IPClient;
+using NATBuster::Endpoint::C2Client;
+using NATBuster::Endpoint::RouterTCPS;
+using NATBuster::Utils::shared_unique_ptr;
 
-std::shared_ptr<Network::SocketEventEmitterProvider> main_provider;
-std::shared_ptr<Utils::EventEmitter> main_emitter;
+std::shared_ptr<SocketEventEmitterProvider> main_provider;
+std::shared_ptr<EventEmitter> main_emitter;
 
 void keygen() {
-    using namespace NATBuster::Common::Crypto;
-    using NATBuster::Common::Utils::Blob;
+    using namespace NATBuster::Crypto;
+    using NATBuster::Utils::Blob;
 
     PrKey key;
     key.generate_ed25519();
@@ -42,7 +45,7 @@ void keygen() {
 void get_ip(std::shared_ptr<UserGroup> auth_servers, std::shared_ptr<PrKey> self) {
     std::cout << "Querying from 127.0.0.1:5987" << std::endl;
 
-    std::shared_ptr<NATBuster::Client::IPClient> query = NATBuster::Client::IPClient::create(
+    std::shared_ptr<IPClient> query = IPClient::create(
         "127.0.0.1", (uint16_t)5987,
         main_provider, main_emitter,
         auth_servers, self);
@@ -57,12 +60,12 @@ void get_ip(std::shared_ptr<UserGroup> auth_servers, std::shared_ptr<PrKey> self
     }
 }
 
-std::shared_ptr<NATBuster::Client::C2Client> c2_instance;
+std::shared_ptr<C2Client> c2_instance;
 
 void login(std::shared_ptr<UserGroup> c2_servers, std::shared_ptr<UserGroup> c2_clients, std::shared_ptr<PrKey> self) {
     std::cout << "Querying from 127.0.0.1:5987" << std::endl;
 
-    c2_instance = NATBuster::Client::C2Client::create(
+    c2_instance = C2Client::create(
         "127.0.0.1", (uint16_t)5987,
         main_provider, main_emitter,
         c2_servers, c2_clients, self);
@@ -91,7 +94,7 @@ void punch(std::shared_ptr<PrKey> self, std::shared_ptr<User> remote_user) {
         punch->sync_launch();
         if (punch->done()) {
             std::cout << "Done" << std::endl;
-            NATBuster::Common::Network::UDPHandle socket = punch->get_socket();
+            NATBuster::Network::UDPHandle socket = punch->get_socket();
             if (socket && socket->valid()) {
                 std::cout << "Success" << std::endl;
                 socket->send(Blob::factory_string("Hello!"));
@@ -114,7 +117,7 @@ void forward() {
 
     std::lock_guard _lg(c2_instance->_open_routers_lock);
 
-    NATBuster::Client::RouterTCPS::create(
+    RouterTCPS::create(
         c2_instance->_open_routers.front(), local_port, remote_port);
 }
 
@@ -151,7 +154,7 @@ int main() {
     Blob client_fingerprint;
     client_private_key->fingerprint(client_fingerprint);
     std::cout << "Client fingerprint: ";
-    NATBuster::Common::Utils::print_hex(client_fingerprint);
+    NATBuster::Utils::print_hex(client_fingerprint);
     std::cout << std::endl;
 
     std::shared_ptr<User> client = std::make_shared<User>("client", client_private_key);
@@ -177,11 +180,11 @@ int main() {
 
     std::cout << "Starting threads" << std::endl;
     {
-        Utils::shared_unique_ptr<Network::SocketEventEmitterProvider> provider =
-            Network::SocketEventEmitterProvider::create();
+        shared_unique_ptr<SocketEventEmitterProvider> provider =
+            SocketEventEmitterProvider::create();
         main_provider = provider;
 
-        main_emitter = Utils::EventEmitter::create();
+        main_emitter = EventEmitter::create();
         main_emitter->start_async(std::move(provider));
     }
 

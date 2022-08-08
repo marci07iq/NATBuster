@@ -13,7 +13,7 @@
 
 #include "copy_protection.h"
 
-namespace NATBuster::Common::Utils {
+namespace NATBuster::Utils {
     //Type erasure
     template <typename... ARGS>
     class CallbackBase {

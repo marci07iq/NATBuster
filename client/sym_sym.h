@@ -1,20 +1,20 @@
 #pragma once
 
-#include "../common/network/network.h"
-#include "../common/utils/waker.h"
+#include "../network/network.h"
+#include "../utils/waker.h"
 
 #include <algorithm>
 #include <random>
 
 
-namespace NATBuster::Client {
+namespace NATBuster::Punch {
     //Class to perform the punch between two symmetric NATs
     //Opens hunders of outbound UDP ports, aimed at random ports on the target
     //By the birthday paradox, this should succeed after ~sqrt(65536) tries
-    class HolepunchSym : public Common::Utils::SharedOnly<HolepunchSym> {
-        friend class Common::Utils::SharedOnly<HolepunchSym>;
+    class HolepunchSym : public Utils::SharedOnly<HolepunchSym> {
+        friend class Utils::SharedOnly<HolepunchSym>;
     public:
-        using PunchCallback = Common::Utils::Callback<Common::Network::UDPHandleU>;
+        using PunchCallback = Utils::Callback<Network::UDPHandleU>;
 
         struct HolepunchSymSettings {
             //The ephemeral range of the other router, to try and attack
@@ -28,18 +28,18 @@ namespace NATBuster::Client {
             uint16_t num_ports = 750;
 
             //Delay before punching begins
-            Common::Time::time_delta_type_us startup_delay = 0;
+            Time::time_delta_type_us startup_delay = 0;
 
             //Total max time
-            Common::Time::time_delta_type_us timeout = 40000000; //40 sec: 30 for opening + 10 for waiting for remote
+            Time::time_delta_type_us timeout = 40000000; //40 sec: 30 for opening + 10 for waiting for remote
         };
     private:
         
         std::thread _thread;
-        Common::Utils::OnetimeWaker _waker;
+        Utils::OnetimeWaker _waker;
 
-        Common::Utils::Blob _magic_ob;
-        Common::Utils::Blob _magic_ib;
+        Utils::Blob _magic_ob;
+        Utils::Blob _magic_ib;
         std::string _remote;
         HolepunchSymSettings _settings;
 
@@ -49,16 +49,16 @@ namespace NATBuster::Client {
 
         HolepunchSym(
             const std::string& remote,
-            Common::Utils::Blob&& magic_ob,
-            Common::Utils::Blob&& magic_ib,
+            Utils::Blob&& magic_ob,
+            Utils::Blob&& magic_ib,
             HolepunchSymSettings settings
         );
 
     public:
         static std::shared_ptr<HolepunchSym> create(
             const std::string& remote,
-            Common::Utils::Blob&& magic_ob,
-            Common::Utils::Blob&& magic_ib,
+            Utils::Blob&& magic_ob,
+            Utils::Blob&& magic_ib,
             HolepunchSymSettings settings = HolepunchSymSettings()
         );
 

@@ -3,34 +3,34 @@
 #include <map>
 #include <stdint.h>
 
-#include "../common/transport/opt_pipes.h"
-#include "../common/utils/event.h"
-#include "../common/utils/blob.h"
-#include "../common/network/network.h"
+#include "../transport/opt_pipes.h"
+#include "../utils/event.h"
+#include "../utils/blob.h"
+#include "../network/network.h"
 
 //Terminology used in this part of the project
 //Packet: Logical blocks of data
 //Frame: Induvidual 
 
-namespace NATBuster::Client {
+namespace NATBuster::Endpoint {
     class RouterTCPRoute;
     class RouterTCPS;
 
     class C2Client;
 
-    class Router : public Common::Utils::SharedOnly<Router> {
-        friend class Common::Utils::SharedOnly<Router>;
+    class Router : public Utils::SharedOnly<Router> {
+        friend class Utils::SharedOnly<Router>;
 #pragma pack(push, 1)
         //To decode the TCP forward requests
-        struct request_decoder : Common::Utils::NonStack {
+        struct request_decoder : Utils::NonStack {
             uint16_t dest_port;
 
             //Need as non const ref, so caller must maintain ownership of Packet
-            static inline request_decoder* view(Common::Utils::BlobView& packet) {
+            static inline request_decoder* view(Utils::BlobView& packet) {
                 return (request_decoder*)(packet.getw());
             }
 
-            static inline const request_decoder* cview(const Common::Utils::ConstBlobView& packet) {
+            static inline const request_decoder* cview(const Utils::ConstBlobView& packet) {
                 return (const request_decoder*)(packet.getr());
             }
 
@@ -47,10 +47,10 @@ namespace NATBuster::Client {
         std::list<std::shared_ptr<Router>>::iterator _self;
 
         //The underlying comms layer
-        std::shared_ptr<Common::Transport::OPTPipes> _underlying;
+        std::shared_ptr<Transport::OPTPipes> _underlying;
 
-        std::shared_ptr<Common::Network::SocketEventEmitterProvider> _provider;
-        std::shared_ptr<Common::Utils::EventEmitter> _emitter;
+        std::shared_ptr<Network::SocketEventEmitterProvider> _provider;
+        std::shared_ptr<Utils::EventEmitter> _emitter;
 
         //The opened TCPS sockets to send to the remote side
         std::list<std::shared_ptr<RouterTCPS>> _open_tcps;
@@ -65,28 +65,28 @@ namespace NATBuster::Client {
         
 
         //Collection of TCP server sockets that need to be forwareded
-        /*Common::Network::SocketHWNDPool<Common::Network::TCPSHandle> _tcp_server_sockets;
+        /*Network::SocketHWNDPool<Network::TCPSHandle> _tcp_server_sockets;
         //Event emitter for TCP server sockets
-        Common::Utils::PollEventEmitter<
-            Common::Network::SocketHWNDPool<Common::Network::TCPSHandle>,
-            Common::Network::TCPSHandle
+        Utils::PollEventEmitter<
+            Network::SocketHWNDPool<Network::TCPSHandle>,
+            Network::TCPSHandle
         > _tcp_server_emitter;
 
-        static std::list<Common::Network::TCPSHandle> create_servers(std::map<uint16_t, uint16_t> port_maps) {
-            std::list<Common::Network::TCPSHandle> res;
+        static std::list<Network::TCPSHandle> create_servers(std::map<uint16_t, uint16_t> port_maps) {
+            std::list<Network::TCPSHandle> res;
             for
         }*/
 
         void on_open();
-        void on_pipe(Common::Transport::OPTPipeOpenData pipe_req);
-        void on_packet(const Common::Utils::ConstBlobView& data);
-        void on_error(Common::ErrorCode code);
+        void on_pipe(Transport::OPTPipeOpenData pipe_req);
+        void on_packet(const Utils::ConstBlobView& data);
+        void on_error(ErrorCode code);
         void on_close();
 
 
         Router(
             std::shared_ptr<C2Client> c2_client,
-            std::shared_ptr<Common::Transport::OPTPipes> underlying
+            std::shared_ptr<Transport::OPTPipes> underlying
         );
 
         void start();
@@ -96,28 +96,28 @@ namespace NATBuster::Client {
 
         void pushPort(uint16_t local_port, uint16_t remote_port);
 
-        /*std::shared_ptr<Common::Transport::OPTPipe> openPipe(const Common::Crypto::PKey& key) {
-            Common::Utils::Blob fingerprint;
+        /*std::shared_ptr<Transport::OPTPipe> openPipe(const Crypto::PKey& key) {
+            Utils::Blob fingerprint;
             key.fingerprint(fingerprint);
             return openPipe(fingerprint);
         }*/
     };
 
-    class RouterTCPS : public Common::Utils::SharedOnly<RouterTCPS> {
-        friend class Common::Utils::SharedOnly<RouterTCPS>;
+    class RouterTCPS : public Utils::SharedOnly<RouterTCPS> {
+        friend class Utils::SharedOnly<RouterTCPS>;
         std::shared_ptr<Router> _router;
 
         //The iterator to self registration
         std::list<std::shared_ptr<RouterTCPS>>::iterator _self;
 
         uint16_t _local_port;
-        Common::Network::TCPSHandleS _tcp_server_socket;
+        Network::TCPSHandleS _tcp_server_socket;
 
         uint16_t _remote_port;
 
         void on_open();
-        void on_accept(Common::Network::TCPCHandleU&& socket);
-        void on_error(Common::ErrorCode code);
+        void on_accept(Network::TCPCHandleU&& socket);
+        void on_error(ErrorCode code);
         void on_close();
 
         RouterTCPS(
@@ -131,10 +131,10 @@ namespace NATBuster::Client {
     };
 
 
-    class RouterTCPRoute : public Common::Utils::SharedOnly<RouterTCPRoute> {
-        friend class Common::Utils::SharedOnly<RouterTCPRoute>;
+    class RouterTCPRoute : public Utils::SharedOnly<RouterTCPRoute> {
+        friend class Utils::SharedOnly<RouterTCPRoute>;
         //Hide the normaél create function
-        using Common::Utils::SharedOnly<RouterTCPRoute>::create;
+        using Utils::SharedOnly<RouterTCPRoute>::create;
 
         //The main router, for registering identity
         std::shared_ptr<Router> _router;
@@ -143,31 +143,31 @@ namespace NATBuster::Client {
         std::list<std::shared_ptr<RouterTCPRoute>>::iterator _self;
 
         //The underlying pipe
-        std::shared_ptr<Common::Transport::OPTPipe> _pipe;
+        std::shared_ptr<Transport::OPTPipe> _pipe;
 
         //Client side: Accepts a TCP server connection, opens a pipe to the remote
         //Server side: Receives the pipe, forwards it to a new tcp client socket
         bool _is_client;
 
-        Common::Network::TCPCHandleS _socket;
+        Network::TCPCHandleS _socket;
 
         void on_socket_open();
         void on_pipe_open();
-        void on_pipe_packet(const Common::Utils::ConstBlobView& data);
-        void on_socket_packet(const Common::Utils::ConstBlobView& data);
-        void on_error(Common::ErrorCode code);
+        void on_pipe_packet(const Utils::ConstBlobView& data);
+        void on_socket_packet(const Utils::ConstBlobView& data);
+        void on_error(ErrorCode code);
         void on_pipe_close();
         void on_socket_close();
 
         RouterTCPRoute(
             std::shared_ptr<Router> router,
-            std::shared_ptr<Common::Transport::OPTPipe> pipe,
+            std::shared_ptr<Transport::OPTPipe> pipe,
             uint16_t local_port
             );
 
         RouterTCPRoute(
             std::shared_ptr<Router> router,
-            Common::Network::TCPCHandleU&& socket
+            Network::TCPCHandleU&& socket
             );
 
         void start_server();
@@ -178,7 +178,7 @@ namespace NATBuster::Client {
         //When TCP opened -> accept pipe
         static std::shared_ptr<RouterTCPRoute> create_server(
             std::shared_ptr<Router> router,
-            std::shared_ptr<Common::Transport::OPTPipe> pipe,
+            std::shared_ptr<Transport::OPTPipe> pipe,
             uint16_t local_port
         );
 
@@ -187,7 +187,7 @@ namespace NATBuster::Client {
         //Ideally we would only accept the TCP client socket at this stage, but this is not possible in linux, only windows
         static std::shared_ptr<RouterTCPRoute> create_client(
             std::shared_ptr<Router> router,
-            Common::Network::TCPCHandleU&& socket,
+            Network::TCPCHandleU&& socket,
             uint16_t remote_port
             );
 

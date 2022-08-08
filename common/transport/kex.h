@@ -12,11 +12,11 @@
 
 #include "../identity/identity.h"
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     class OPTSession;
 };
 
-namespace NATBuster::Common::Proto {
+namespace NATBuster::Proto {
     class KEX : Utils::NonCopyable {
     public:
         enum class KEX_Event {

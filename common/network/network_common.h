@@ -1,6 +1,6 @@
 #include "../utils/event.h"
 
-namespace NATBuster::Common::Network {
+namespace NATBuster::Network {
     /*class TCPS;
     class TCPC;
     class UDP;

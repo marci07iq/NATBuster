@@ -6,7 +6,7 @@
 
 #include "opt_base.h"
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     class OPTPipes;
 
     class OPTPipe : public OPTBase, public Utils::SharedOnly<OPTPipe> {

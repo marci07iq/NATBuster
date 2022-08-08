@@ -7,19 +7,19 @@
 
 #include "../common/utils/hex.h"
 
-#include "c2_server.h"
+#include "../common/endpoint/c2_server.h"
 
-using namespace NATBuster::Server;
-using NATBuster::Common::Crypto::PKey;
-using NATBuster::Common::Crypto::PrKey;
-using NATBuster::Common::Crypto::PuKey;
-using NATBuster::Common::Utils::Blob;
-using NATBuster::Common::Identity::User;
-using NATBuster::Common::Identity::UserGroup;
-//usingg namespace NATBuster::Common::Network;
-//using namespace NATBuster::Common::Transport;
-//using NATBuster::Common::Utils::Void;
-//using NATBuster::Common::Utils::MemberCallback;
+using NATBuster::Crypto::PKey;
+using NATBuster::Crypto::PrKey;
+using NATBuster::Crypto::PuKey;
+using NATBuster::Utils::Blob;
+using NATBuster::Identity::User;
+using NATBuster::Identity::UserGroup;
+using NATBuster::Endpoint::C2Server;
+//usingg namespace NATBuster::Network;
+//using namespace NATBuster::Transport;
+//using NATBuster::Utils::Void;
+//using NATBuster::Utils::MemberCallback;
 
 
 std::shared_ptr<C2Server> server;
@@ -44,7 +44,7 @@ int main() {
     Blob c2server_fingerprint;
     c2server_private_key->fingerprint(c2server_fingerprint);
     std::cout << "IP Server fingerprint: ";
-    NATBuster::Common::Utils::print_hex(c2server_fingerprint);
+    NATBuster::Utils::print_hex(c2server_fingerprint);
     std::cout << std::endl;
 
     std::shared_ptr<User> client1 = std::make_shared<User>("client1", std::move(client1_public_key));

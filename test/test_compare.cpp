@@ -6,10 +6,10 @@
 
 int main() {
     {
-        using NATBuster::Common::Crypto::PKey;
-        using NATBuster::Common::Crypto::PrKey;
-        using NATBuster::Common::Crypto::PuKey;
-        using NATBuster::Common::Utils::Blob;
+        using NATBuster::Crypto::PKey;
+        using NATBuster::Crypto::PrKey;
+        using NATBuster::Crypto::PuKey;
+        using NATBuster::Utils::Blob;
 
         //Generate two different ED keys
 

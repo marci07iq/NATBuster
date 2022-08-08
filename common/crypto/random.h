@@ -2,7 +2,7 @@
 
 #include "../utils/blob.h"
 
-namespace NATBuster::Common::Crypto {
+namespace NATBuster::Crypto {
     bool random(Utils::BlobView& out, const uint32_t len);
 
     bool random(uint8_t* dst, const uint32_t len);

@@ -25,7 +25,7 @@
 
 #include "network.h"
 
-namespace NATBuster::Common::Network {
+namespace NATBuster::Network {
 
     struct EventHandleOSData {
         HANDLE hwnd;
@@ -96,7 +96,7 @@ namespace NATBuster::Common::Network {
         //Fast to access variables to send data to thread
 
         HANDLE _this_thread = INVALID_HANDLE_VALUE;
-        std::list<Common::Utils::Callback<>> _tasks;
+        std::list<Utils::Callback<>> _tasks;
         std::list<std::shared_ptr<SocketEventHandle>> _added_socket_objects;
         std::list<std::shared_ptr<SocketEventHandle>> _closed_socket_objects;
         std::mutex _system_lock;
@@ -107,7 +107,7 @@ namespace NATBuster::Common::Network {
 
         void wait(Time::time_delta_type_us delay);
 
-        void run_now(Common::Utils::Callback<>::raw_type fn);
+        void run_now(Utils::Callback<>::raw_type fn);
 
         void interrupt();
 

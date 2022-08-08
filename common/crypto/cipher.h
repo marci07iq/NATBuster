@@ -9,7 +9,7 @@
 #include "../utils/copy_protection.h"
 #include "../utils/blob.h"
 
-namespace NATBuster::Common::Crypto {
+namespace NATBuster::Crypto {
     /*enum class CipherAlgo : uint8_t {
         AES_256_GCM = 0,
         AES_256_CBC = 1

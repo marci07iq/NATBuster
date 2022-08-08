@@ -1,17 +1,19 @@
 #pragma once
 
-#include "punch_sym_sym.h"
-#include "../common/transport/opt_udp.h"
-#include "../common/transport/opt_session.h"
+#include "sym_sym.h"
+#include "../transport/opt_udp.h"
+#include "../transport/opt_session.h"
 
-namespace NATBuster::Client {
+namespace NATBuster::Endpoint {
     class C2Client;
+}
 
+namespace NATBuster::Punch {
     //Class to negotiate punching
-    class Puncher : public Common::Utils::SharedOnly<Puncher> {
-        friend class Common::Utils::SharedOnly<Puncher>;
+    class Puncher : public Utils::SharedOnly<Puncher> {
+        friend class Utils::SharedOnly<Puncher>;
     public:
-        using PunchCallback = Common::Utils::Callback<std::shared_ptr<Common::Transport::OPTSession>>;
+        using PunchCallback = Utils::Callback<std::shared_ptr<Transport::OPTSession>>;
     private:
 
         enum State : uint8_t {
@@ -42,7 +44,7 @@ namespace NATBuster::Client {
             uint16_t rate_limit;
         };
 
-        struct packet_decoder : Common::Utils::NonStack {
+        struct packet_decoder : Utils::NonStack {
             enum PacketType : uint8_t {
                 //Self description
                 PUNCH_DESCRIBE = 1,
@@ -62,11 +64,11 @@ namespace NATBuster::Client {
             } content;
 
             //Need as non const ref, so caller must maintain ownership of Packet
-            static inline packet_decoder* view(Common::Utils::BlobView& packet) {
+            static inline packet_decoder* view(Utils::BlobView& packet) {
                 return (packet_decoder*)(packet.getw());
             }
 
-            static inline const packet_decoder* cview(const Common::Utils::ConstBlobView& packet) {
+            static inline const packet_decoder* cview(const Utils::ConstBlobView& packet) {
                 return (const packet_decoder*)(packet.getr());
             }
 
@@ -83,7 +85,7 @@ namespace NATBuster::Client {
 #pragma pack(pop)
 
         //The C2 client this puncher belongs to
-        std::shared_ptr<C2Client> _c2_client;
+        std::shared_ptr<Endpoint::C2Client> _c2_client;
 
         //The iterator to self registration
         std::list<std::shared_ptr<Puncher>>::iterator _self;
@@ -91,40 +93,40 @@ namespace NATBuster::Client {
         bool _is_client;
 
         //The underlying comms layer to the other sides puncher
-        std::shared_ptr<Common::Transport::OPTBase> _underlying;
+        std::shared_ptr<Transport::OPTBase> _underlying;
 
-        Common::Utils::Blob _outbound_magic_content;
+        Utils::Blob _outbound_magic_content;
         std::shared_ptr<HolepunchSym> _puncher;
 
         PunchCallback _punch_callback;
 
-        const std::shared_ptr<const Common::Crypto::PrKey> _self_key;
-        const std::shared_ptr<const Common::Identity::UserGroup> _trusted_users;
+        const std::shared_ptr<const Crypto::PrKey> _self_key;
+        const std::shared_ptr<const Identity::UserGroup> _trusted_users;
 
         void on_open();
-        void on_packet(const Common::Utils::ConstBlobView& data);
-        void on_error(Common::ErrorCode code);
+        void on_packet(const Utils::ConstBlobView& data);
+        void on_error(ErrorCode code);
         void on_close();
 
-        void on_punch(Common::Network::UDPHandleU punched);
+        void on_punch(Network::UDPHandleU punched);
 
         Puncher(
-            std::shared_ptr<C2Client> c2_client,
+            std::shared_ptr<Endpoint::C2Client> c2_client,
             bool is_client,
-            const std::shared_ptr<const Common::Crypto::PrKey> self_key,
-            const std::shared_ptr<const Common::Identity::UserGroup> trusted_users,
-            std::shared_ptr<Common::Transport::OPTBase> underlying
+            const std::shared_ptr<const Crypto::PrKey> self_key,
+            const std::shared_ptr<const Identity::UserGroup> trusted_users,
+            std::shared_ptr<Transport::OPTBase> underlying
         );
 
         
         void fail();
     public:
         static std::shared_ptr<Puncher> create(
-            std::shared_ptr<C2Client> c2_client,
+            std::shared_ptr<Endpoint::C2Client> c2_client,
             bool is_client,
-            const std::shared_ptr<const Common::Crypto::PrKey> self_key,
-            const std::shared_ptr<const Common::Identity::UserGroup> trusted_users,
-            std::shared_ptr<Common::Transport::OPTBase> underlying
+            const std::shared_ptr<const Crypto::PrKey> self_key,
+            const std::shared_ptr<const Identity::UserGroup> trusted_users,
+            std::shared_ptr<Transport::OPTBase> underlying
         );
 
         void start();

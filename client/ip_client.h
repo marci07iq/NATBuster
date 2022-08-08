@@ -1,29 +1,29 @@
 #pragma once
 
 
-#include "../common/transport/opt_tcp.h"
-#include "../common/transport/opt_session.h"
+#include "../transport/opt_tcp.h"
+#include "../transport/opt_session.h"
 
-#include "../common/utils/waker.h"
+#include "../utils/waker.h"
 
-namespace NATBuster::Client {
-    class IPClient : public Common::Utils::SharedOnly<IPClient> {
-        friend class Common::Utils::SharedOnly<IPClient>;
+namespace NATBuster::Endpoint {
+    class IPClient : public Utils::SharedOnly<IPClient> {
+        friend class Utils::SharedOnly<IPClient>;
         //The underlying comms layer
-        std::shared_ptr<Common::Transport::OPTBase> _underlying;
+        std::shared_ptr<Transport::OPTBase> _underlying;
         //The raw socket
-        //Common::Network::TCPCHandle _socket;
+        //Network::TCPCHandle _socket;
 
         bool _success = false;
         std::string _my_ip;
         uint16_t _my_port;
         std::mutex _data_lock;
 
-        Common::Utils::OnetimeWaker _waker;
+        Utils::OnetimeWaker _waker;
 
         void on_open();
-        void on_packet(const Common::Utils::ConstBlobView& data);
-        void on_error(Common::ErrorCode code);
+        void on_packet(const Utils::ConstBlobView& data);
+        void on_error(ErrorCode code);
         void on_timeout();
         void on_close();
 
@@ -31,10 +31,10 @@ namespace NATBuster::Client {
         IPClient(
             std::string server_name,
             uint16_t port,
-            std::shared_ptr<Common::Network::SocketEventEmitterProvider> provider,
-            std::shared_ptr<Common::Utils::EventEmitter> emitter,
-            std::shared_ptr<Common::Identity::UserGroup> authorised_server,
-            const std::shared_ptr<const Common::Crypto::PrKey> self);
+            std::shared_ptr<Network::SocketEventEmitterProvider> provider,
+            std::shared_ptr<Utils::EventEmitter> emitter,
+            std::shared_ptr<Identity::UserGroup> authorised_server,
+            const std::shared_ptr<const Crypto::PrKey> self);
 
         void start();
 

@@ -1,13 +1,13 @@
 #include "punch.h"
-#include "c2_client.h"
-#include "../common/crypto/random.h"
+#include "../endpoint/c2_client.h"
+#include "../crypto/random.h"
 
-namespace NATBuster::Client {
+namespace NATBuster::Punch {
     void Puncher::on_open() {
         if (_is_client) {
             if (_state == S0_New) {
                 //Send client hello
-                Common::Utils::Blob chello = Common::Utils::Blob::factory_empty(72, 0, 20);
+                Utils::Blob chello = Utils::Blob::factory_empty(72, 0, 20);
                 packet_decoder* chello_view = packet_decoder::view(chello);
                 chello_view->type = packet_decoder::PUNCH_DESCRIBE;
                 chello_view->content.describe.nat.port_min = 1024;
@@ -16,9 +16,9 @@ namespace NATBuster::Client {
                 chello.copy_from(_outbound_magic_content, 8);
 
                 //TODO: Get from IP server
-                Common::Utils::Blob ip = Common::Utils::Blob::factory_string("localhost");
+                Utils::Blob ip = Utils::Blob::factory_string("localhost");
 
-                Common::Utils::PackedBlobWriter chello_w(chello);
+                Utils::PackedBlobWriter chello_w(chello);
                 chello_w.add_record(ip);
 
                 _underlying->send(chello);
@@ -27,7 +27,7 @@ namespace NATBuster::Client {
             }
         }
     }
-    void Puncher::on_packet(const Common::Utils::ConstBlobView& data) {
+    void Puncher::on_packet(const Utils::ConstBlobView& data) {
         if (data.size() == 0) close();
 
         const packet_decoder* view = packet_decoder::cview(data);
@@ -52,12 +52,12 @@ namespace NATBuster::Client {
                 puncher_settings.rate = view->content.describe.nat.rate_limit;
 
                 //Prepend one extra byte to the magic value
-                Common::Utils::Blob ib_magic = Common::Utils::Blob::factory_empty(1 + 64);
-                *(uint8_t*)ib_magic.getw() = Common::Transport::OPTUDP::MGMT_HELLO;
+                Utils::Blob ib_magic = Utils::Blob::factory_empty(1 + 64);
+                *(uint8_t*)ib_magic.getw() = Transport::OPTUDP::MGMT_HELLO;
                 ib_magic.copy_from(data.cslice(8, 64), 1);
 
-                Common::Utils::PackedBlobReader data_reader(data.cslice_right(72));
-                Common::Utils::ConstBlobSliceView ip;
+                Utils::PackedBlobReader data_reader(data.cslice_right(72));
+                Utils::ConstBlobSliceView ip;
                 if (!data_reader.next_record(ip)) return fail();
                 if (!data_reader.eof()) return fail();
 
@@ -65,17 +65,17 @@ namespace NATBuster::Client {
                 std::string ip_s((const char*)ip.getr(), ip.size());
 
                 //Outbound blob with paddig
-                Common::Utils::Blob ob_magic = Common::Utils::Blob::factory_empty(1 + 64);
-                *(uint8_t*)ob_magic.getw() = Common::Transport::OPTUDP::MGMT_HELLO;
+                Utils::Blob ob_magic = Utils::Blob::factory_empty(1 + 64);
+                *(uint8_t*)ob_magic.getw() = Transport::OPTUDP::MGMT_HELLO;
                 ob_magic.copy_from(_outbound_magic_content, 1);
 
                 _puncher = HolepunchSym::create(ip_s, std::move(ob_magic), std::move(ib_magic), puncher_settings);
-                _puncher->set_punch_callback(new Common::Utils::MemberWCallback<Puncher, void, Common::Network::UDPHandleU>(weak_from_this(), &Puncher::on_punch));
+                _puncher->set_punch_callback(new Utils::MemberWCallback<Puncher, void, Network::UDPHandleU>(weak_from_this(), &Puncher::on_punch));
 
                 _state = S2_SHello;
             }
             {
-                Common::Utils::Blob start = Common::Utils::Blob::factory_empty(1);
+                Utils::Blob start = Utils::Blob::factory_empty(1);
                 *(uint8_t*)start.getw() = (uint8_t)packet_decoder::PUNCH_START;
                 _underlying->send(start);
                 _puncher->async_launch();
@@ -109,12 +109,12 @@ namespace NATBuster::Client {
                 puncher_settings.rate = view->content.describe.nat.rate_limit;
 
                 //Prepend one extra byte to the magic value
-                Common::Utils::Blob ib_magic = Common::Utils::Blob::factory_empty(1 + 64);
-                *(uint8_t*)ib_magic.getw() = Common::Transport::OPTUDP::MGMT_HELLO;
+                Utils::Blob ib_magic = Utils::Blob::factory_empty(1 + 64);
+                *(uint8_t*)ib_magic.getw() = Transport::OPTUDP::MGMT_HELLO;
                 ib_magic.copy_from(data.cslice(8, 64), 1);
 
-                Common::Utils::PackedBlobReader data_reader(data.cslice_right(72));
-                Common::Utils::ConstBlobSliceView ip;
+                Utils::PackedBlobReader data_reader(data.cslice_right(72));
+                Utils::ConstBlobSliceView ip;
                 if (!data_reader.next_record(ip)) return fail();
                 if (!data_reader.eof()) return fail();
 
@@ -122,18 +122,18 @@ namespace NATBuster::Client {
                 std::string ip_s((const char*)ip.getr(), ip.size());
 
                 //Outbound blob with paddig
-                Common::Utils::Blob ob_magic = Common::Utils::Blob::factory_empty(1 + 64);
-                *(uint8_t*)ob_magic.getw() = Common::Transport::OPTUDP::MGMT_HELLO;
+                Utils::Blob ob_magic = Utils::Blob::factory_empty(1 + 64);
+                *(uint8_t*)ob_magic.getw() = Transport::OPTUDP::MGMT_HELLO;
                 ob_magic.copy_from(_outbound_magic_content, 1);
 
                 _puncher = HolepunchSym::create(ip_s, std::move(ob_magic), std::move(ib_magic), puncher_settings);
-                _puncher->set_punch_callback(new Common::Utils::MemberWCallback<Puncher, void, Common::Network::UDPHandleU>(weak_from_this(), &Puncher::on_punch));
+                _puncher->set_punch_callback(new Utils::MemberWCallback<Puncher, void, Network::UDPHandleU>(weak_from_this(), &Puncher::on_punch));
 
                 _state = S1_CHello;
             }
             //Reply with server hello
             {
-                Common::Utils::Blob shello = Common::Utils::Blob::factory_empty(72, 0, 20);
+                Utils::Blob shello = Utils::Blob::factory_empty(72, 0, 20);
                 packet_decoder* shello_view = packet_decoder::view(shello);
                 shello_view->type = packet_decoder::PUNCH_DESCRIBE;
                 shello_view->content.describe.nat.port_min = 1024;
@@ -142,9 +142,9 @@ namespace NATBuster::Client {
                 shello.copy_from(_outbound_magic_content, 8);
 
                 //TODO: Get from IP server
-                Common::Utils::Blob ip = Common::Utils::Blob::factory_string("localhost");
+                Utils::Blob ip = Utils::Blob::factory_string("localhost");
 
-                Common::Utils::PackedBlobWriter shello_w(shello);
+                Utils::PackedBlobWriter shello_w(shello);
                 shello_w.add_record(ip);
 
                 _underlying->send(shello);
@@ -171,7 +171,7 @@ namespace NATBuster::Client {
             }
         }
     }
-    void Puncher::on_error(Common::ErrorCode code) {
+    void Puncher::on_error(ErrorCode code) {
         std::cout << "Error " << code << std::endl;
     }
     void Puncher::on_close() {
@@ -184,29 +184,29 @@ namespace NATBuster::Client {
         }
     }
 
-    void Puncher::on_punch(Common::Network::UDPHandleU punched) {
+    void Puncher::on_punch(Network::UDPHandleU punched) {
         std::cout << "Punch successful" << std::endl;
 
-        Common::Network::UDPHandleS punched_s = punched;
+        Network::UDPHandleS punched_s = punched;
         _c2_client->_client_emitter_provider->associate_socket(std::move(punched));
 
         //Create the OPT
-        std::shared_ptr<Common::Transport::OPTUDP> opt_udp = Common::Transport::OPTUDP::create(_is_client, _c2_client->_client_emitter, punched_s);
+        std::shared_ptr<Transport::OPTUDP> opt_udp = Transport::OPTUDP::create(_is_client, _c2_client->_client_emitter, punched_s);
         //Create the Session
-        std::shared_ptr<Common::Transport::OPTSession> opt_session = Common::Transport::OPTSession::create(_is_client, opt_udp, _self_key, _trusted_users);
+        std::shared_ptr<Transport::OPTSession> opt_session = Transport::OPTSession::create(_is_client, opt_udp, _self_key, _trusted_users);
 
         _punch_callback(opt_session);
     }
 
     Puncher::Puncher(
-        std::shared_ptr<C2Client> c2_client,
+        std::shared_ptr<Endpoint::C2Client> c2_client,
         bool is_client,
-        const std::shared_ptr<const Common::Crypto::PrKey> self_key,
-        const std::shared_ptr<const Common::Identity::UserGroup> trusted_users,
-        std::shared_ptr<Common::Transport::OPTBase> underlying
+        const std::shared_ptr<const Crypto::PrKey> self_key,
+        const std::shared_ptr<const Identity::UserGroup> trusted_users,
+        std::shared_ptr<Transport::OPTBase> underlying
     ) : _c2_client(c2_client), _is_client(is_client), _self_key(std::move(self_key)), _trusted_users(trusted_users), _underlying(underlying) {
-        _outbound_magic_content = Common::Utils::Blob::factory_empty(64);
-        Common::Crypto::random(_outbound_magic_content.getw(), _outbound_magic_content.size());
+        _outbound_magic_content = Utils::Blob::factory_empty(64);
+        Crypto::random(_outbound_magic_content.getw(), _outbound_magic_content.size());
     }
 
     void Puncher::start() {
@@ -216,10 +216,10 @@ namespace NATBuster::Client {
             std::cout << "Puncher self registering" << std::endl;
         }
 
-        _underlying->set_callback_open(new Common::Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_open));
-        _underlying->set_callback_packet(new Common::Utils::MemberWCallback<Puncher, void, const Common::Utils::ConstBlobView&>(weak_from_this(), &Puncher::on_packet));
-        _underlying->set_callback_error(new Common::Utils::MemberWCallback<Puncher, void, Common::ErrorCode>(weak_from_this(), &Puncher::on_error));
-        _underlying->set_callback_close(new Common::Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_close));
+        _underlying->set_callback_open(new Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_open));
+        _underlying->set_callback_packet(new Utils::MemberWCallback<Puncher, void, const Utils::ConstBlobView&>(weak_from_this(), &Puncher::on_packet));
+        _underlying->set_callback_error(new Utils::MemberWCallback<Puncher, void, ErrorCode>(weak_from_this(), &Puncher::on_error));
+        _underlying->set_callback_close(new Utils::MemberWCallback<Puncher, void>(weak_from_this(), &Puncher::on_close));
 
         _underlying->start();
     }
@@ -231,11 +231,11 @@ namespace NATBuster::Client {
     }
 
     std::shared_ptr<Puncher> Puncher::create(
-        std::shared_ptr<C2Client> c2_client,
+        std::shared_ptr<Endpoint::C2Client> c2_client,
         bool is_client,
-        const std::shared_ptr<const Common::Crypto::PrKey> self_key,
-        const std::shared_ptr<const Common::Identity::UserGroup> trusted_users,
-        std::shared_ptr<Common::Transport::OPTBase> underlying
+        const std::shared_ptr<const Crypto::PrKey> self_key,
+        const std::shared_ptr<const Identity::UserGroup> trusted_users,
+        std::shared_ptr<Transport::OPTBase> underlying
     ) {
         return std::shared_ptr<Puncher>(new Puncher(c2_client, is_client, std::move(self_key), trusted_users, underlying));
     }

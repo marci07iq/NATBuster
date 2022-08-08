@@ -4,7 +4,7 @@
 
 #include "hash.h"
 
-namespace NATBuster::Common::Crypto {
+namespace NATBuster::Crypto {
 
     struct hash_algo_params {
         const char* openssl_name;

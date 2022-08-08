@@ -1,46 +1,33 @@
 # P2P Port forward utility
 
 Utility to create a P2P tunnel between any two machines, regardless of their NAT or firewall.
-
-## Prior art:
-- Port forwarding on your router. (Requires technical skills, requires access to router)
-- UPnP: Temporary portforward by your device asking the router to do it. (Disabled in most routers)
-- WebRTC can open P2P channels between two machines, if at least one of them is located behind a non-symmetric (non-enterprise) NAT.
-
-## Goal:
-- Open a tunnel even if both devices are behind a symmetric NAT, using UDP hole punching, and the birthday paradox.
-- Similair user experience to SSH Port forward, but allow both TCP and UDP ports to be forwarded to the remote machine
-- Opened tunnel is UDP, giving superior speed if implemented correctly.
-- Users can forward TCP or UDP. Need to implement TCP like communications over UDP link.
+By running the client application in the background on your machine, you can open a direct P2P tunnel to it, and use it to forward ports similair to SSH portforward.
 
 ## Components:
-- Command and Control (C2) server: to pass messages between devices before a P2P tunnel can be opened
-- IP server(s): similair to STUN server in WebRTC, helps devices identify their own public IP and NAT properties.    
-  - Optional, an advanced user could set these properties, if known and static
-  - Multiple servers needed to test NAT properties.
-- Client application: Constantly running in background, connected to C2. Waiting to receive connection requests from other clients.
-  - Should also include features for key generation, user access control, .. so the user doesn't need to edit config files
+- Client application: Runs in background on target machine, accepts incomming connections
+- Command and Control (C2) server: Constantly connected to all client applications, to facilitate message passing before a direct tunnel is established
+- IP Server: Helps clients determine their own public IP address, and NAT properties. At least two servers are needed to determine the 
 
 ## Security:
-- C2 server only acts to facilitate message passing between devices.
-- All communications to the control servers are encrypted.
-- All communications between devices E2E encrypted when running through the C2 server.
-- Optionally, opened tunnel also E2E encrypted, to achieve port forward and VPN like behaviour simultaneously.
-- Permission to open a tunnel to your machine is restricted with public keys, similair to SSH.
-- Using widely accepted high security algorithms (Ed25519, ECDH, AES-256-GCM)
+- All connections between devices are authenticated and encrypted with Ed25519 public keys, much like SSH public key login.
+- Strict permission and indentity checks in both server and client applications
+- Optionally, opened P2P tunnel is also E2E encrypted, to achieve port forward and VPN like behaviour simultaneously.
 - NOTE: Do not use this in security critical applications until properly tested and examined by experts.
 
 # Progress:
-Early stages of development. Don't expect it to work yet.
-- Object and callback oriented wrapper for windows sockets
-- Object oriented wrapper above the neccessare OpenSSL primitives
-- Components needed for an E2E, authenticated connection
-- IP Server functional
-- UDP punching works if used manually
+Barebones functionality working
+- All major components somewhat working
+- Client application user interface lacking in features
+- All keys hardcoded
+
+# Building
+- Currently only Windows socket wrapper available.
+## Prerequisites:
+- CMake
+- OpenSSL dev library. 
+  - On Windows/Visual Studio, recommended to use vcpkg to install this.
+- wxWidgets library
 
 # Todo:
 - Create socket wrapper for linux
-- Rewrite socket threading model: Callback should be associated per socket, not thread. Many sockets should be allocated to one thread, dynamically add/remove them.
-- Connect C2 to hole puncher
-- Connect punched socket to the port forwarding Router
-- Add hole punching for less restrictive NATs
+- Add faster hole punching for less restrictive NATs

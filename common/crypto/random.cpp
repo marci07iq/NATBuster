@@ -2,7 +2,7 @@
 
 #include "random.h"
 
-namespace NATBuster::Common::Crypto {
+namespace NATBuster::Crypto {
     bool random(Utils::BlobView& out, const uint32_t len) {
         out.resize(len);
         return 1 == RAND_bytes(out.getw(), len);

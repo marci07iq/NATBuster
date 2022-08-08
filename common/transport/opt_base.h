@@ -10,7 +10,7 @@
 
 #include "../identity/identity.h"
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     //Ordered packet transport
     class OPTBase : Utils::NonCopyable {
     public:

@@ -1,6 +1,6 @@
 #include "blob.h"
 
-namespace NATBuster::Common::Utils {
+namespace NATBuster::Utils {
     
     _ConstBlobView::_ConstBlobView() {
 

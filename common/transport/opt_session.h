@@ -9,13 +9,13 @@
 
 #include "kex.h"
 
-namespace NATBuster::Common::Proto {
+namespace NATBuster::Proto {
     class KEXV1;
     class KEXV1_A;
     class KEXV1_B;
 }
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     //Client: The initiator of the connection
     //Server: The destination of the connection
     //Assumed that server has a whitelist of all known client keys

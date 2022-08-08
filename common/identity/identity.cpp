@@ -1,6 +1,6 @@
 #include "identity.h"
 
-namespace NATBuster::Common::Identity {
+namespace NATBuster::Identity {
     std::shared_ptr<User> User::Anonymous = std::make_shared<User>("anonymous", std::make_shared<Crypto::PrKey>());
 
     std::ostream& operator<<(std::ostream& os, const User& user)

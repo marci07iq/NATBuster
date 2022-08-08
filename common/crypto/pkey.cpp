@@ -3,7 +3,7 @@
 //Inject the BIO-WinAPI binding
 #include <openssl/applink.c>
 
-namespace NATBuster::Common::Crypto {
+namespace NATBuster::Crypto {
     int PKey::key_password_cb(char* buf, int size, int rwflag, void* u)
     {
         (void)u;

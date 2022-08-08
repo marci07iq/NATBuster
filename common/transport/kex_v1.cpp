@@ -1,7 +1,7 @@
 #include "kex_v1.h"
 #include "opt_session.h"
 
-namespace NATBuster::Common::Proto {
+namespace NATBuster::Proto {
     KEXV1_A::KEXV1_A(
         const std::shared_ptr<const Crypto::PrKey> self,
         const std::shared_ptr<const Identity::UserGroup> known_remotes
@@ -23,7 +23,7 @@ namespace NATBuster::Common::Proto {
             //Send M1 (client version)
             //Should receive M2 (server version) next
 
-        case NATBuster::Common::Proto::KEXV1::S1_M1:
+        case NATBuster::Proto::KEXV1::S1_M1:
         {
             if (packet_type != PacketType::KEXS_VERSION) return fail(KEX_Event::ErrorState);
             if (packet_data.size() != 4) return fail(KEX_Event::ErrorMalformed);
@@ -65,7 +65,7 @@ namespace NATBuster::Common::Proto {
         break;
 
         //Client Hello sent, expecting server hello as response
-        case NATBuster::Common::Proto::KEXV1::K1_CHello:
+        case NATBuster::Proto::KEXV1::K1_CHello:
         {
             if (packet_type != PacketType::KEXS_HELLO) return fail(KEX_Event::ErrorState);
 
@@ -128,7 +128,7 @@ namespace NATBuster::Common::Proto {
         }
         break;
         //Server Hello received, should get a Server New keys immediately after
-        case NATBuster::Common::Proto::KEXV1::K2_SHello:
+        case NATBuster::Proto::KEXV1::K2_SHello:
         {
             if (packet_type != PacketType::KEXS_NEWKEYS) return fail(KEX_Event::ErrorState);
 
@@ -150,7 +150,7 @@ namespace NATBuster::Common::Proto {
 
             out->_flags._enc_on_ib = true;
 
-            _state = NATBuster::Common::Proto::KEXV1::K3_SEnc;
+            _state = NATBuster::Proto::KEXV1::K3_SEnc;
 
 
 
@@ -180,7 +180,7 @@ namespace NATBuster::Common::Proto {
 
             }
 
-            _state = NATBuster::Common::Proto::KEXV1::K4_CEnc;
+            _state = NATBuster::Proto::KEXV1::K4_CEnc;
 
             //Send client identity
             {
@@ -210,20 +210,20 @@ namespace NATBuster::Common::Proto {
                 out->send_kex(c_id);
             }
 
-            _state = NATBuster::Common::Proto::KEXV1::K5_CIdentity;
-            _state = NATBuster::Common::Proto::KEXV1::KF_Done;
+            _state = NATBuster::Proto::KEXV1::K5_CIdentity;
+            _state = NATBuster::Proto::KEXV1::KF_Done;
 
             return KEX_Event::OK_Done;
         }
         break;
 
         //No kex related packet form the server should be received in any of these states
-        case NATBuster::Common::Proto::KEXV1::S0_New:
-        case NATBuster::Common::Proto::KEXV1::K3_SEnc:
-        case NATBuster::Common::Proto::KEXV1::K4_CEnc:
-        case NATBuster::Common::Proto::KEXV1::K5_CIdentity:
-        case NATBuster::Common::Proto::KEXV1::KF_Err:
-        case NATBuster::Common::Proto::KEXV1::KF_Done:
+        case NATBuster::Proto::KEXV1::S0_New:
+        case NATBuster::Proto::KEXV1::K3_SEnc:
+        case NATBuster::Proto::KEXV1::K4_CEnc:
+        case NATBuster::Proto::KEXV1::K5_CIdentity:
+        case NATBuster::Proto::KEXV1::KF_Err:
+        case NATBuster::Proto::KEXV1::KF_Done:
         default:
             return fail(KEX_Event::ErrorState);
             break;
@@ -268,7 +268,7 @@ namespace NATBuster::Common::Proto {
         switch (_state)
         {
 
-        case NATBuster::Common::Proto::KEXV1::S0_New:
+        case NATBuster::Proto::KEXV1::S0_New:
         {
             if (packet_type != PacketType::KEXC_VERSION) return fail(KEX_Event::ErrorState);
             if (packet_data.size() != 4) return fail(KEX_Event::ErrorMalformed);
@@ -290,8 +290,8 @@ namespace NATBuster::Common::Proto {
         }
         break;
             //Not curretnyl in a kex. Should start with a client hello
-        case NATBuster::Common::Proto::KEXV1::S2_M2:
-        case NATBuster::Common::Proto::KEXV1::KF_Done:
+        case NATBuster::Proto::KEXV1::S2_M2:
+        case NATBuster::Proto::KEXV1::KF_Done:
         {
             if (packet_type != PacketType::KEXC_HELLO) return fail(KEX_Event::ErrorState);
 
@@ -382,12 +382,12 @@ namespace NATBuster::Common::Proto {
                 out->_outbound.set_iv(crypto_data.getr(), crypto_size);
             }
 
-            _state = NATBuster::Common::Proto::KEXV1::K3_SEnc;
+            _state = NATBuster::Proto::KEXV1::K3_SEnc;
             return KEX_Event::OK;
         }
         break;
         //Server new keys sent, should get client new keys back
-        case NATBuster::Common::Proto::KEXV1::K3_SEnc:
+        case NATBuster::Proto::KEXV1::K3_SEnc:
         {
             if (packet_type != PacketType::KEXC_NEWKEYS) return fail(KEX_Event::ErrorState);
 
@@ -409,12 +409,12 @@ namespace NATBuster::Common::Proto {
 
             out->_flags._enc_on_ib = true;
 
-            _state = NATBuster::Common::Proto::KEXV1::K4_CEnc;
+            _state = NATBuster::Proto::KEXV1::K4_CEnc;
             return KEX_Event::OK;
         }
         break;
         //Client new keys received, should get client identity
-        case NATBuster::Common::Proto::KEXV1::K4_CEnc:
+        case NATBuster::Proto::KEXV1::K4_CEnc:
         {
             if (packet_type != PacketType::KEXC_IDENTITY) return fail(KEX_Event::ErrorState);
 
@@ -468,10 +468,10 @@ namespace NATBuster::Common::Proto {
         break;
 
         //No kex related packet form the server should be received in any of these states
-        case NATBuster::Common::Proto::KEXV1::K1_CHello:
-        case NATBuster::Common::Proto::KEXV1::K2_SHello:
-        case NATBuster::Common::Proto::KEXV1::K5_CIdentity:
-        case NATBuster::Common::Proto::KEXV1::KF_Err:
+        case NATBuster::Proto::KEXV1::K1_CHello:
+        case NATBuster::Proto::KEXV1::K2_SHello:
+        case NATBuster::Proto::KEXV1::K5_CIdentity:
+        case NATBuster::Proto::KEXV1::KF_Err:
         default:
             return fail(KEX_Event::ErrorState);
             break;

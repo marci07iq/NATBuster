@@ -3,7 +3,7 @@
 #include "network_win.h"
 #include "network.h"
 
-namespace NATBuster::Common::Network {
+namespace NATBuster::Network {
     //WSA wrapper
 
     namespace WSA {
@@ -817,7 +817,7 @@ namespace NATBuster::Common::Network {
         }
     }
 
-    void SocketEventEmitterProviderImpl::run_now(Common::Utils::Callback<>::raw_type fn) {
+    void SocketEventEmitterProviderImpl::run_now(Utils::Callback<>::raw_type fn) {
         std::lock_guard _lg(_system_lock);
         _tasks.emplace_back(fn);
         assert(_this_thread != INVALID_HANDLE_VALUE);
@@ -889,7 +889,7 @@ namespace NATBuster::Common::Network {
         _impl->wait(delay);
     }
 
-    void SocketEventEmitterProvider::run_now(Common::Utils::Callback<>::raw_type fn) {
+    void SocketEventEmitterProvider::run_now(Utils::Callback<>::raw_type fn) {
         _impl->run_now(fn);
     }
     void SocketEventEmitterProvider::interrupt() {

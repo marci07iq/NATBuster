@@ -12,7 +12,7 @@
 //Packet: Logical blocks of data
 //Frame: Induvidual 
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     struct OPTUDPSettings {
         uint16_t _max_mtu = 1500; //Max MTU of the UDP packet to send
         bool _fec_on = false; //Enable forward error correction

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-namespace NATBuster::Common::Utils {
+namespace NATBuster::Utils {
     template <typename T>
     class shared_unique_ptr : public std::shared_ptr<T> {
     public:

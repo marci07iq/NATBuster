@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NATBuster::Client {
+namespace NATBuster::Endpoint {
     //Functions that 
     enum class C2Function {
         Portforward = 1,

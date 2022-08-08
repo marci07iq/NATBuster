@@ -4,7 +4,7 @@
 
 #include "cipher.h"
 
-namespace NATBuster::Common::Crypto {
+namespace NATBuster::Crypto {
 
     /*struct cipher_ossl_param {
         const char* key;

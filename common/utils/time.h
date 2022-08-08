@@ -3,7 +3,7 @@
 #include <chrono>
 #include <stdint.h>
 
-namespace NATBuster::Common::Time
+namespace NATBuster::Time
 {
     typedef uint64_t time_type_us;
     typedef int64_t time_delta_type_us;

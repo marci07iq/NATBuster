@@ -14,7 +14,7 @@
 
 #include "kex.h"
 
-namespace NATBuster::Common::Proto {
+namespace NATBuster::Proto {
     //Protocol V1.0.00:
 
     // A->B: PDHa, Na

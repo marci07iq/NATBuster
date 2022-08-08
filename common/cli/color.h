@@ -1,4 +1,4 @@
-namespace NATBuster::Common::CLI {
+namespace NATBuster::CLI {
     namespace Color {
         const char* Reset = "\x1b[0m";
 

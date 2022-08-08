@@ -7,7 +7,7 @@
 #include "../network/network.h"
 #include "../utils/random.h"
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     void OPTUDP::send_ping() {
         Utils::Blob ping = Utils::Blob::factory_empty(65);
 

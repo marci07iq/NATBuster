@@ -14,7 +14,7 @@
 #include "../utils/copy_protection.h"
 #include "../utils/blob.h"
 
-namespace NATBuster::Common::Crypto {
+namespace NATBuster::Crypto {
     enum class PKeyAlgo : int {
         Undef = NID_undef,
         Ec25519 = NID_X25519,

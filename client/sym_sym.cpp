@@ -1,7 +1,7 @@
-#include "punch_sym_sym.h"
-#include "../common/crypto/random.h"
+#include "sym_sym.h"
+#include "../crypto/random.h"
 
-namespace NATBuster::Client {
+namespace NATBuster::Punch {
 
     void HolepunchSym::sync_launch_static(std::shared_ptr<HolepunchSym> obj) {
         obj->sync_launch();
@@ -13,8 +13,8 @@ namespace NATBuster::Client {
 
     HolepunchSym::HolepunchSym(
         const std::string& remote,
-        Common::Utils::Blob&& magic_ob,
-        Common::Utils::Blob&& magic_ib,
+        Utils::Blob&& magic_ob,
+        Utils::Blob&& magic_ib,
         HolepunchSymSettings settings
     ) :
         _magic_ob(std::move(magic_ob)),
@@ -35,20 +35,20 @@ namespace NATBuster::Client {
 
     std::shared_ptr<HolepunchSym> HolepunchSym::create(
         const std::string& remote,
-        Common::Utils::Blob&& magic_ob,
-        Common::Utils::Blob&& magic_ib,
+        Utils::Blob&& magic_ob,
+        Utils::Blob&& magic_ib,
         HolepunchSymSettings settings
     ) {
         return std::shared_ptr<HolepunchSym>(new HolepunchSym(remote, std::move(magic_ob), std::move(magic_ib), settings));
     }
 
     void HolepunchSym::sync_launch() {
-        Common::Time::time_type_us lifetime = Common::Time::now() + _settings.timeout;
+        Time::time_type_us lifetime = Time::now() + _settings.timeout;
 
-        Common::Time::time_type_us next_socket = Common::Time::now();
+        Time::time_type_us next_socket = Time::now();
 
-        std::list<Common::Utils::shared_unique_ptr<Common::Network::SocketEventEmitterProvider>> socket_buckets;
-        Common::Network::UDPHandleU found_socket;
+        std::list<Utils::shared_unique_ptr<Network::SocketEventEmitterProvider>> socket_buckets;
+        Network::UDPHandleU found_socket;
 
         uint16_t port_range_len = _settings.port_max - _settings.port_min + (uint16_t)1;
         uint16_t port_count = std::min(_settings.num_ports, port_range_len);
@@ -61,7 +61,7 @@ namespace NATBuster::Client {
             }
             auto rng = std::default_random_engine{};
             uint32_t seed;
-            if (!Common::Crypto::random_u32(seed)) goto done;
+            if (!Crypto::random_u32(seed)) goto done;
             rng.seed(seed);
             std::shuffle(std::begin(ports), std::end(ports), rng);
         }
@@ -78,11 +78,11 @@ namespace NATBuster::Client {
             size_t open_ports = 0;
 
             auto on_packet = [&](
-                Common::Network::UDPHandleS socket,
-                const Common::Utils::ConstBlobView& data,
-                Common::Network::NetworkAddress& src) -> void {
+                Network::UDPHandleS socket,
+                const Utils::ConstBlobView& data,
+                Network::NetworkAddress& src) -> void {
                     if (data == _magic_ib) {
-                        Common::Network::NetworkAddress src_cpy(src);
+                        Network::NetworkAddress src_cpy(src);
                         socket->set_remote(std::move(src_cpy));
                         std::cout << "Holepunch successful from remote "
                             << socket->get_remote() << " at chance " << 100*(1- fail_chance) << "%" << std::endl;
@@ -96,7 +96,7 @@ namespace NATBuster::Client {
                     }
             };
 
-            while (Common::Time::now() < lifetime) {
+            while (Time::now() < lifetime) {
                 //Check all existing socket buckets
                 for (auto& sockets : socket_buckets) {
                     //Check every socket in there, till there is nothimg more to find                
@@ -110,31 +110,31 @@ namespace NATBuster::Client {
                     //Must have at least one bucket
                     if (
                         socket_buckets.size() == 0 ||
-                        Common::Network::SocketEventEmitterProvider::MAX_SOCKETS <= (socket_buckets.back()->count() + 2)
+                        Network::SocketEventEmitterProvider::MAX_SOCKETS <= (socket_buckets.back()->count() + 2)
                         ) {
-                        Common::Utils::shared_unique_ptr provider = Common::Network::SocketEventEmitterProvider::create();
+                        Utils::shared_unique_ptr provider = Network::SocketEventEmitterProvider::create();
                         provider->bind();
                         socket_buckets.emplace_back(std::move(provider));
                     }
 
                     //Create new socket
                     std::pair<
-                        Common::Network::UDPHandleU,
-                        Common::ErrorCode
-                    > new_socket = Common::Network::UDP::create_bind("localhost", 0);
-                    if (new_socket.second == Common::ErrorCode::OK) {
+                        Network::UDPHandleU,
+                        ErrorCode
+                    > new_socket = Network::UDP::create_bind("localhost", 0);
+                    if (new_socket.second == ErrorCode::OK) {
                         if (new_socket.first->is_valid()) {
-                            Common::Network::UDPHandleS new_socket_s = new_socket.first;
+                            Network::UDPHandleS new_socket_s = new_socket.first;
 
-                            Common::ErrorCode remote = new_socket_s->set_remote(_remote, ports[ports_cursor]);
+                            ErrorCode remote = new_socket_s->set_remote(_remote, ports[ports_cursor]);
                             //Bind callback
-                            new_socket_s->set_callback_unfiltered_packet(new Common::Utils::FunctionalCallback<
+                            new_socket_s->set_callback_unfiltered_packet(new Utils::FunctionalCallback<
                                 void,
-                                const Common::Utils::ConstBlobView&,
-                                Common::Network::NetworkAddress&
+                                const Utils::ConstBlobView&,
+                                Network::NetworkAddress&
                             >(std::bind(on_packet, new_socket_s, std::placeholders::_1, std::placeholders::_2)));
 
-                            if (remote == Common::ErrorCode::OK) {
+                            if (remote == ErrorCode::OK) {
                                 socket_buckets.back()->associate_socket(std::move(new_socket.first));
                                 socket_buckets.back()->start_socket(new_socket_s);
                                 new_socket_s->send(_magic_ob);
@@ -149,8 +149,8 @@ namespace NATBuster::Client {
                 }
 
                 //Wait rate-limiting period
-                next_socket = next_socket + (Common::Time::time_type_us)(1000000.f / _settings.rate);
-                Common::Time::time_type_us now = Common::Time::now();
+                next_socket = next_socket + (Time::time_type_us)(1000000.f / _settings.rate);
+                Time::time_type_us now = Time::now();
                 if (now < next_socket) {
                     std::this_thread::sleep_for(std::chrono::microseconds(next_socket - now));
                 }
@@ -169,9 +169,9 @@ namespace NATBuster::Client {
         }
 
     done:
-        found_socket->set_callback_unfiltered_packet(new Common::Utils::NoCallback<
-            const Common::Utils::ConstBlobView&,
-            Common::Network::NetworkAddress&>());
+        found_socket->set_callback_unfiltered_packet(new Utils::NoCallback<
+            const Utils::ConstBlobView&,
+            Network::NetworkAddress&>());
 
         _punch_callback(std::move(found_socket));
 

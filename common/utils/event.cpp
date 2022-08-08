@@ -1,7 +1,7 @@
 #include "event.h"
 
 
-namespace NATBuster::Common::Utils {
+namespace NATBuster::Utils {
 
     
 };

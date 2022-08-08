@@ -7,7 +7,7 @@
 #include "../network/network.h"
 #include "../utils/random.h"
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     void OPTTCP::on_open() {
         std::cout << "ASD" << std::endl;
         _callback_open();

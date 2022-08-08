@@ -8,14 +8,14 @@
 int main() {
     {
         //Cant do ecdh on Ed25519
-        NATBuster::Common::Crypto::Hash sha256(NATBuster::Common::Crypto::HashAlgo::SHA256);
+        NATBuster::Crypto::Hash sha256(NATBuster::Crypto::HashAlgo::SHA256);
         
-        NATBuster::Common::Utils::Blob data = NATBuster::Common::Utils::Blob::factory_string("test");
-        NATBuster::Common::Utils::Blob result = NATBuster::Common::Utils::Blob();
+        NATBuster::Utils::Blob data = NATBuster::Utils::Blob::factory_string("test");
+        NATBuster::Utils::Blob result = NATBuster::Utils::Blob();
 
         if (!sha256.calc(data, result)) goto error;
 
-        NATBuster::Common::Utils::print_hex(result);
+        NATBuster::Utils::print_hex(result);
         std::cout << std::endl;
 
         return 0;

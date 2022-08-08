@@ -9,7 +9,7 @@
 #include "../utils/callbacks.h"
 #include "../utils/event.h"
 
-namespace NATBuster::Common::Network {
+namespace NATBuster::Network {
     struct EventHandleOSData;
     //Network connextion address abstract rep
     struct AddrInfoOSData;
@@ -312,7 +312,7 @@ namespace NATBuster::Common::Network {
 
         void wait(Time::time_delta_type_us delay);
 
-        void run_now(Common::Utils::Callback<>::raw_type fn);
+        void run_now(Utils::Callback<>::raw_type fn);
 
         void interrupt();
 

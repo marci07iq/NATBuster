@@ -1,6 +1,6 @@
 #include "opt_pipes.h"
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     //Packet types going between the C2 server abd client
     /*enum C2_PacketType {
         //C->S

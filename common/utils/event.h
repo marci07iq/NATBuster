@@ -17,7 +17,7 @@
 #include "waker.h"
 #include "shared_unique.h"
 
-namespace NATBuster::Common::Utils
+namespace NATBuster::Utils
 {
     //Abstract class to provide an interruptable delay
     //Can also be used to poll for other forms of events, and emit those
@@ -42,7 +42,7 @@ namespace NATBuster::Common::Utils
         //Can call from any thread
         //Make wait returns and run fn ASAP
         //No guarantee made on order, fn may run only when wait is called again
-        virtual void run_now(Common::Utils::Callback<>::raw_type fn) = 0;
+        virtual void run_now(Utils::Callback<>::raw_type fn) = 0;
 
         //Can call from any thread
         //Make wait return ASAP
@@ -99,7 +99,7 @@ namespace NATBuster::Common::Utils
         std::thread _thread;
         std::mutex _system_lock;
 
-        void run_now(Common::Utils::Callback<>::raw_type fn) {
+        void run_now(Utils::Callback<>::raw_type fn) {
             _delay->run_now(fn);
         }
 

@@ -1,6 +1,6 @@
 #include "time.h"
 
-namespace NATBuster::Common::Time {
+namespace NATBuster::Time {
     const time_delta_type_us TIME_DELTA_INFINTE = -1;
     const time_delta_type_us TIME_DELTA_ZERO = 0;
 

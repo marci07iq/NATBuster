@@ -7,7 +7,7 @@
 #include <queue>
 #include <thread>
 
-namespace NATBuster::Common::Utils {
+namespace NATBuster::Utils {
     template<typename T>
     class DataQueue {
         std::queue<T> data;

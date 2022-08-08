@@ -2,7 +2,7 @@
 
 #include "hex.h"
 
-namespace NATBuster::Common::Utils {
+namespace NATBuster::Utils {
     const char hex_chars[] = "0123456789ABCDEF";
 
     void print_hex(const ConstBlobView& data, std::ostream& dst, char sep) {

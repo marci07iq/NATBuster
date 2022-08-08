@@ -4,7 +4,7 @@
 #include <mutex>
 #include <condition_variable>
 
-namespace NATBuster::Common::Utils {
+namespace NATBuster::Utils {
 
     class OnetimeWaker {
         std::atomic<bool> _val;

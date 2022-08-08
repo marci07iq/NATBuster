@@ -9,7 +9,7 @@
 
 #include "copy_protection.h"
 
-namespace NATBuster::Common::Utils {
+namespace NATBuster::Utils {
     class _ConstBlobView;
     typedef const _ConstBlobView ConstBlobView;
     class BlobView;

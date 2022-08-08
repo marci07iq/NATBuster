@@ -7,7 +7,7 @@
 #include "../crypto/hash.h"
 #include "../utils/hex.h"
 
-namespace NATBuster::Common::Identity {
+namespace NATBuster::Identity {
     /*enum SettingOverride : int8_t {
         //Override previous value to allow
         Allow_Override = 1,

@@ -10,7 +10,7 @@
 #include "../utils/blob.h"
 #include "../utils/copy_protection.h"
 
-namespace NATBuster::Common::Crypto {
+namespace NATBuster::Crypto {
     enum class HashAlgo : uint8_t {
         SHA256 = 0,
         SHA512 = 1

@@ -4,7 +4,7 @@
 
 #include "shared_unique.h"
 
-namespace NATBuster::Common::Utils {
+namespace NATBuster::Utils {
     //Class that cant be copied
     class NonCopyable
     {

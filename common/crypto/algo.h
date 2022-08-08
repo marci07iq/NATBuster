@@ -3,6 +3,6 @@
 #include <map>
 #include <string>
 
-namespace NATBuster::Common::Crypto {
+namespace NATBuster::Crypto {
     
 };

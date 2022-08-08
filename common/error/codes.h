@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <iostream>
 
-namespace NATBuster::Common {
+namespace NATBuster {
     enum class ErrorCode : uint32_t {
         MASK_TYPE = 0xff000000,
         MASK_SYSTEM = 0x00ff0000,

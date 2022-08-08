@@ -3,11 +3,11 @@
 #include "../common/utils/blob.h"
 
 int main() {
-    using NATBuster::Common::Utils::Blob;
-    using NATBuster::Common::Utils::BlobView;
-    using NATBuster::Common::Utils::ConstBlobView;
-    using NATBuster::Common::Utils::BlobSliceView;
-    using NATBuster::Common::Utils::ConstBlobSliceView;
+    using NATBuster::Utils::Blob;
+    using NATBuster::Utils::BlobView;
+    using NATBuster::Utils::ConstBlobView;
+    using NATBuster::Utils::BlobSliceView;
+    using NATBuster::Utils::ConstBlobSliceView;
 
     Blob hello = Blob::factory_string("Hello");
     Blob test = Blob::factory_string("This is a test");

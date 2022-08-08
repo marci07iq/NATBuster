@@ -1,6 +1,6 @@
 #include "ip_server.h"
 
-namespace NATBuster::Server {
+namespace NATBuster::Endpoint {
 
     //Called when a packet can be read
     void IPServerEndpoint::on_open() {
@@ -9,13 +9,13 @@ namespace NATBuster::Server {
 
         std::cout << "Sending indentity to " << str_ip << ":" << str_port << std::endl;
 
-        Common::Utils::Blob blob_ip = Common::Utils::Blob::factory_string(str_ip);
-        Common::Utils::Blob blob_port = Common::Utils::Blob::factory_empty(2);
+        Utils::Blob blob_ip = Utils::Blob::factory_string(str_ip);
+        Utils::Blob blob_port = Utils::Blob::factory_empty(2);
         *((uint16_t*)(blob_port.getw())) = str_port;
 
 
-        Common::Utils::Blob blob_ip_full;
-        Common::Utils::PackedBlobWriter ip_writer(blob_ip_full);
+        Utils::Blob blob_ip_full;
+        Utils::PackedBlobWriter ip_writer(blob_ip_full);
         ip_writer.add_record(blob_ip);
         ip_writer.add_record(blob_port);
 
@@ -23,11 +23,11 @@ namespace NATBuster::Server {
         _underlying->close();
     }
     //Called when a packet can be read
-    /*void on_packet(const Common::Utils::ConstBlobView& data) {
+    /*void on_packet(const Utils::ConstBlobView& data) {
 
     }
     //Called when a packet can be read
-    void on_raw(const Common::Utils::ConstBlobView& data) {
+    void on_raw(const Utils::ConstBlobView& data) {
 
     }
     //Called when a socket error occurs
@@ -45,8 +45,8 @@ namespace NATBuster::Server {
     }
 
     IPServerEndpoint::IPServerEndpoint(
-        Common::Network::TCPCHandleS socket,
-        std::shared_ptr<Common::Transport::OPTBase> underlying,
+        Network::TCPCHandleS socket,
+        std::shared_ptr<Transport::OPTBase> underlying,
         std::shared_ptr<IPServer> server) :
         _socket(socket), _underlying(underlying), _server(server) {
 
@@ -58,11 +58,11 @@ namespace NATBuster::Server {
             _server->_connections.insert(shared_from_this());
         }
 
-        _underlying->set_callback_open(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_open));
-        _underlying->set_callback_close(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_close));
+        _underlying->set_callback_open(new Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_open));
+        _underlying->set_callback_close(new Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_close));
 
         //Set the timeout delay
-        _underlying->add_delay(new Common::Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_timeout), 100000000000);
+        _underlying->add_delay(new Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_timeout), 100000000000);
 
         _underlying->start();
     }
@@ -72,22 +72,22 @@ namespace NATBuster::Server {
     }
 
 
-    void IPServer::on_accept(Common::Network::TCPCHandleU&& socket) {
+    void IPServer::on_accept(Network::TCPCHandleU&& socket) {
 
         std::cout << "ACCEPTED FROM " << socket->get_remote() << std::endl;
 
-        Common::Network::TCPCHandleS socket_s = socket;
+        Network::TCPCHandleS socket_s = socket;
         _client_emitter_provider->associate_socket(std::move(socket));
         //Create OPT TCP
-        Common::Transport::OPTTCPHandle opt = Common::Transport::OPTTCP::create(false, _client_emitter.get_shared(), socket_s);
+        Transport::OPTTCPHandle opt = Transport::OPTTCP::create(false, _client_emitter.get_shared(), socket_s);
         //Create OPT Session
-        std::shared_ptr<Common::Transport::OPTSession> session = Common::Transport::OPTSession::create(false, opt, _self, _authorised_users);
+        std::shared_ptr<Transport::OPTSession> session = Transport::OPTSession::create(false, opt, _self, _authorised_users);
 
         std::shared_ptr<IPServerEndpoint> endpoint = IPServerEndpoint::create(socket_s, session, shared_from_this());
 
     }
 
-    void IPServer::on_error(Common::ErrorCode code) {
+    void IPServer::on_error(ErrorCode code) {
         std::cout << "ERR " << (uint32_t)code << std::endl;
     }
 
@@ -97,8 +97,8 @@ namespace NATBuster::Server {
 
     IPServer::IPServer(
         uint16_t port,
-        const std::shared_ptr<const Common::Identity::UserGroup> authorised_users,
-        const std::shared_ptr<const Common::Crypto::PrKey> self
+        const std::shared_ptr<const Identity::UserGroup> authorised_users,
+        const std::shared_ptr<const Crypto::PrKey> self
     ) :
         _port(port),
         _authorised_users(authorised_users),
@@ -109,34 +109,34 @@ namespace NATBuster::Server {
 
         //Create and bind server socket
         std::pair<
-            Common::Utils::shared_unique_ptr<Common::Network::TCPS>,
-            Common::ErrorCode
-        > create_resp = Common::Network::TCPS::create_bind("", _port);
-        if (create_resp.second != Common::ErrorCode::OK) {
+            Utils::shared_unique_ptr<Network::TCPS>,
+            ErrorCode
+        > create_resp = Network::TCPS::create_bind("", _port);
+        if (create_resp.second != ErrorCode::OK) {
             std::cout << "Can not create server socket " << (uint32_t)create_resp.second << std::endl;
             throw 1;
         }
         _socket = create_resp.first;
 
         //Create server emitter provider
-        Common::Utils::shared_unique_ptr<Common::Network::SocketEventEmitterProvider> server_provider =
-            Common::Network::SocketEventEmitterProvider::create();
+        Utils::shared_unique_ptr<Network::SocketEventEmitterProvider> server_provider =
+            Network::SocketEventEmitterProvider::create();
         _server_emitter_provider = server_provider;
 
         server_provider->associate_socket(std::move(create_resp.first));
 
         //Create client emitter provider
-        Common::Utils::shared_unique_ptr<Common::Network::SocketEventEmitterProvider> client_provider =
-            Common::Network::SocketEventEmitterProvider::create();
+        Utils::shared_unique_ptr<Network::SocketEventEmitterProvider> client_provider =
+            Network::SocketEventEmitterProvider::create();
         _client_emitter_provider = client_provider;
 
-        _socket->set_callback_accept(new Common::Utils::MemberWCallback<IPServer, void, Common::Network::TCPCHandleU&&>(weak_from_this(), &IPServer::on_accept));
-        _socket->set_callback_error(new Common::Utils::MemberWCallback<IPServer, void, Common::ErrorCode>(weak_from_this(), &IPServer::on_error));
-        _socket->set_callback_close(new Common::Utils::MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::on_close));
+        _socket->set_callback_accept(new Utils::MemberWCallback<IPServer, void, Network::TCPCHandleU&&>(weak_from_this(), &IPServer::on_accept));
+        _socket->set_callback_error(new Utils::MemberWCallback<IPServer, void, ErrorCode>(weak_from_this(), &IPServer::on_error));
+        _socket->set_callback_close(new Utils::MemberWCallback<IPServer, void>(weak_from_this(), &IPServer::on_close));
 
-        _server_emitter = Common::Utils::EventEmitter::create();
+        _server_emitter = Utils::EventEmitter::create();
         _server_emitter->start_async(std::move(server_provider));
-        _client_emitter = Common::Utils::EventEmitter::create();
+        _client_emitter = Utils::EventEmitter::create();
         _client_emitter->start_async(std::move(client_provider));
 
         _socket->start();

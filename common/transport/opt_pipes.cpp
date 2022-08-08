@@ -1,7 +1,7 @@
 #include "opt_pipes.h"
 
 
-namespace NATBuster::Common::Transport {
+namespace NATBuster::Transport {
     void OPTPipe::on_open_expired() {
         std::cout << "Pipe expiry CB" << std::endl;
         if (_open_state == OpenRequstSent) {

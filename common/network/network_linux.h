@@ -1,23 +1,11 @@
 #pragma once
 
-#ifdef WIN32
+#ifdef __linux__
 
-#define NOMINMAX
-
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-#include <windows.h>
-
-#include <winsock2.h>
-#include <mswsock.h>
-#include <ws2tcpip.h>
-#include <iphlpapi.h>
-
-#pragma comment(lib, "Ws2_32.lib")
-
-#undef NOMINMAX
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <poll.h>
 
 #include <array>
 #include <stdint.h>
@@ -27,39 +15,42 @@
 
 namespace NATBuster::Network {
 
-    struct EventHandleOSData {
-        HANDLE hwnd;
+    typedef int SOCKET;
+    static const SOCKET INVALID_SOCKET = -1;
+
+    struct EventHandleOSData : public pollfd {
     };
+    static_assert(sizeof(EventHandleOSData) == sizeof(pollfd));
 
     struct AddrInfoOSData : public addrinfo {
         
     };
-
     static_assert(sizeof(AddrInfoOSData) == sizeof(addrinfo));
+
 
     //Network address OS defined implementation
     //Represent an address (IP and port), IPV4 or IPV6
     class NetworkAddressOSData {
     public:
-        SOCKADDR_STORAGE _address;
+        sockaddr_storage _address;
 
-        INT _address_length = sizeof(_address);
+        int _address_length = sizeof(_address);
 
         NetworkAddressOSData();
         NetworkAddressOSData(NetworkAddressOSData& other);
         NetworkAddressOSData& operator=(NetworkAddressOSData& other);
 
-        inline const SOCKADDR_STORAGE* get_data() const {
-            return (SOCKADDR_STORAGE*)&_address;
+        inline const sockaddr_storage* get_data() const {
+            return (sockaddr_storage*)&_address;
         }
-        inline SOCKADDR_STORAGE* get_dataw() {
-            return (SOCKADDR_STORAGE*)&_address;
+        inline sockaddr_storage* get_dataw() {
+            return (sockaddr_storage*)&_address;
         }
 
-        inline const INT size() const {
+        inline const int size() const {
             return _address_length;
         }
-        inline INT* sizew() {
+        inline int* sizew() {
             return &_address_length;
         }
     };
@@ -80,7 +71,7 @@ namespace NATBuster::Network {
         inline bool is_valid() const;
         inline bool is_invalid() const;
 
-        void set_events(HANDLE& hwnd);
+        void set_events(pollfd& hwnd);
 
         inline void close();
         ~SocketOSData();
@@ -89,19 +80,17 @@ namespace NATBuster::Network {
     class SocketEventEmitterProviderImpl : Utils::NonCopyable {
         //Variables consumed by the thread
 
-        std::vector<HANDLE> _socket_events;
+        std::vector<pollfd> _socket_events;
         std::vector<std::shared_ptr<SocketEventHandle>> _socket_objects;
         std::mutex _sockets_lock;
 
         //Fast to access variables to send data to thread
 
-        HANDLE _this_thread = INVALID_HANDLE_VALUE;
+        int _waker_fd = -1;
         std::list<Utils::Callback<>> _tasks;
         std::list<std::shared_ptr<SocketEventHandle>> _added_socket_objects;
         std::list<std::shared_ptr<SocketEventHandle>> _closed_socket_objects;
         std::mutex _system_lock;
-
-        static void __stdcall apc_fun(ULONG_PTR data);
 
         void interrupt_unsafe();
     public:

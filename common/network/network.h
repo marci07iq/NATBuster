@@ -55,6 +55,7 @@ namespace NATBuster::Network {
         inline Type get_type() const;
         inline std::string get_addr() const;
         inline uint16_t get_port() const;
+        inline std::string get_full_addr() const;
         inline NetworkAddressOSData* get_impl() const;
 
         inline bool operator==(const NetworkAddress& rhs) const;

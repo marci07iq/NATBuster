@@ -11,11 +11,6 @@
 #include "../utils/math.h"
 
 namespace NATBuster::Crypto {
-    /*enum class CipherAlgo : uint8_t {
-        AES_256_GCM = 0,
-        AES_256_CBC = 1
-    };*/
-
 
     class CipherPacketStream : Utils::NonCopyable {
     protected:

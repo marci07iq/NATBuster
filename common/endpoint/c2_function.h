@@ -6,6 +6,6 @@ namespace NATBuster::Endpoint {
         Portforward = 1,
         Chat = 2,
         FTP = 3,
-
+        Stream = 4,
     };
 }

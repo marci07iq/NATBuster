@@ -5,13 +5,19 @@ namespace NATBuster::Utils {
 
     }
 
-    version::version(uint8_t major_, uint8_t minor_, uint16_t build_) : major(major_), minor(minor_), build(build_) {
-
+    version::version(uint8_t major_, uint8_t minor_, uint16_t build_) {
+        field.major = major_;
+        field.minor = minor_;
+        field.build = build_;
     }
 
     std::ostream& operator<<(std::ostream& of, const version& version) {
         of << version.to_string();
+        return of;
     }
 
-    const version current_version(1, 0, 0);
+    const version current_version(
+        VERSION_NUMBER_MAJOR,
+        VERSION_NUMBER_MINOR,
+        VERSION_NUMBER_BUILD);
 }

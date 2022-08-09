@@ -91,6 +91,9 @@ namespace NATBuster::Crypto {
     ) {
         assert(4 <= _tag_size - _tag_standalone_size);
         assert(_tag_size - _tag_standalone_size <= 8);
+
+        _sequential_packet_counter = 0;
+        _standalone_packet_counter = 0;
     }
 
     CipherAES256GCMPacketStream::CipherAES256GCMPacketStream(CipherAES256GCMPacketStream&& other) noexcept :

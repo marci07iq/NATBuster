@@ -3,6 +3,8 @@
 #include <list>
 #include <vector>
 
+#include <json/json.h>
+
 #include "../crypto/pkey.h"
 #include "../crypto/hash.h"
 #include "../utils/hex.h"

@@ -88,7 +88,7 @@ namespace NATBuster::Endpoint {
     }
 
     void IPServer::on_error(ErrorCode code) {
-        std::cout << "ERR " << (uint32_t)code << std::endl;
+        std::cout << code << std::endl;
     }
 
     void IPServer::on_close() {

@@ -14,22 +14,27 @@ namespace NATBuster::Utils {
                 uint8_t major;
                 uint8_t minor;
                 uint16_t build;
-            };
+            } field;
 
         };
         
         std::string to_string() const {
             return
-                std::to_string(major) + "." +
-                std::to_string(minor) + "." +
-                std::to_string(build);
+                std::to_string(field.major) + "." +
+                std::to_string(field.minor) + "." +
+                std::to_string(field.build);
         }
     };
-    static_assert(offsetof(version, num) == 0);
-    static_assert(offsetof(version, major) == 0);
-    static_assert(offsetof(version, minor) == 1);
-    static_assert(offsetof(version, build) == 2);
 
+
+    static_assert(offsetof(version, num) == 0);
+    static_assert(offsetof(version, field.major) == 0);
+    static_assert(offsetof(version, field.minor) == 1);
+    static_assert(offsetof(version, field.build) == 2);
+
+#define VERSION_NUMBER_MAJOR 1
+#define VERSION_NUMBER_MINOR 0
+#define VERSION_NUMBER_BUILD 0
 
     std::ostream& operator<<(std::ostream& of, const version& version);
 

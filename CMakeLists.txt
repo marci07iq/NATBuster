@@ -26,7 +26,8 @@ else()
 endif()
 
 find_package(OpenSSL REQUIRED)
-#find_package(jsoncpp CONFIG REQUIRED)
+find_package(jsoncpp CONFIG REQUIRED)
+find_package(wxWidgets REQUIRED COMPONENTS core)
 
 # Client
 add_subdirectory ("client")

@@ -207,7 +207,7 @@ namespace NATBuster::Network {
         ErrorCode next_connect_attempt(EventHandleOSData* event_binder) override {
             (void)event_binder;
             assert(false);
-            return ErrorCode::GENERIC_ERROR_INVALID_VF;
+            return ErrorCode::GENERIC_FATAL_INVALID_VF;
         }
     public:
         using SocketEventHandle::set_callback_accept;
@@ -270,7 +270,7 @@ namespace NATBuster::Network {
         ErrorCode next_connect_attempt(EventHandleOSData* event_binder) override {
             (void)event_binder;
             assert(false);
-            return ErrorCode::GENERIC_ERROR_INVALID_VF;
+            return ErrorCode::GENERIC_FATAL_INVALID_VF;
         }
     public:
         using SocketEventHandle::set_callback_packet;

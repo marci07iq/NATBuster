@@ -619,7 +619,7 @@ namespace NATBuster::Network {
                             EventHandleOSData hwnd_wrapper;
                             hwnd_wrapper.hwnd = _socket_events[index];
                             ErrorCode code = socket_hwnd->next_connect_attempt(&hwnd_wrapper);
-                            if (is_error(code)) {
+                            if (ErrorCodes::is_error(code)) {
                                 socket_hwnd->_callback_error(code);
                                 _closed_socket_objects.push_back(socket_hwnd);
                             }
@@ -793,7 +793,7 @@ namespace NATBuster::Network {
                         EventHandleOSData hwnd_wrapper;
                         hwnd_wrapper.hwnd = new_event;
                         ErrorCode code = add_socket->next_connect_attempt(&hwnd_wrapper);
-                        if (is_error(code)) {
+                        if (ErrorCodes::is_error(code)) {
                             add_socket->_callback_error(code);
                             _closed_socket_objects.push_back(add_socket);
                             _lg2.lock();

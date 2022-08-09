@@ -153,6 +153,13 @@ namespace NATBuster::Transport {
         return _underlying->getUser();
     }
 
+    uint32_t OPTPipe::get_mtu_normal() {
+        return Utils::clamped_sub<uint32_t>(_underlying->_underlying->get_mtu_normal(), 5);
+    }
+    uint32_t OPTPipe::get_mtu_raw() {
+        return Utils::clamped_sub<uint32_t>(_underlying->_underlying->get_mtu_raw(), 5);
+    }
+
     OPTPipe::~OPTPipe() {
         drop();
     }

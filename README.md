@@ -24,9 +24,11 @@ Barebones functionality working
 - Currently only Windows socket wrapper available.
 ## Prerequisites:
 - CMake
+- C++20 compatible compiler
 - OpenSSL dev library. 
   - On Windows/Visual Studio, recommended to use vcpkg to install this.
 - wxWidgets library
+  - On Windows/Visual Studio, recommended to use vcpkg to install this.
 
 # Todo:
 - Create socket wrapper for linux

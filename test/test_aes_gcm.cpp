@@ -21,8 +21,8 @@ int main() {
         encrypt.set_iv_common(iv_common_0);
         decrypt.set_iv_common(iv_common_0);
 
-        encrypt.set_iv_packet(iv_packet_0);
-        decrypt.set_iv_packet(iv_packet_0);
+        encrypt.set_iv_packet_normal(iv_packet_0);
+        decrypt.set_iv_packet_normal(iv_packet_0);
 
         {
             const NATBuster::Utils::Blob data = NATBuster::Utils::Blob::factory_string("Fg=/F76UztD/fU64rcUZgI/Tö9oHHZvUTRd+Ug8=HKJZViztF)UVgjGOU;FUTZgkhBU");

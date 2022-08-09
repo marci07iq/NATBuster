@@ -99,6 +99,11 @@ namespace NATBuster::Transport {
         //Safe to call from any thread, even during a callback
         virtual void close() = 0;
 
+        inline void close_error(ErrorCode code) {
+            _callback_error(code);
+            close();
+        }
+
         virtual ~OPTBase() {
 
         }

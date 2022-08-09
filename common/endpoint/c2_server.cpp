@@ -17,7 +17,7 @@ namespace NATBuster::Endpoint {
     }
 
     void C2ServerRoute::on_error(ErrorCode code) {
-        std::cout << (uint32_t)code << std::endl;
+        std::cout << code << std::endl;
     }
 
     void C2ServerRoute::on_close_a() {

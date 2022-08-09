@@ -12,6 +12,5 @@ file(GLOB_RECURSE CLIENT_HDRS CONFIGURE_DEPENDS *.h)
 ADD_EXECUTABLE(Client ${CLIENT_SRCS} ${CLIENT_HDRS})
 
 target_link_libraries(Client PRIVATE OpenSSL::SSL OpenSSL::Crypto Common)
-#target_link_libraries(Client PRIVATE jsoncpp_lib jsoncpp_object JsonCpp::JsonCpp)
 
 include_directories(Client ${ROOT_INCLUDE_DIRS})

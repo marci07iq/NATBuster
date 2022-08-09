@@ -71,12 +71,8 @@ namespace NATBuster::Transport {
 
         std::shared_ptr<Identity::User> getUser() override;
 
-        inline uint32_t get_mtu_normal() {
-            return Utils::clamped_sub<uint32_t>(_underlying->_underlying->get_mtu_normal(), 5);
-        }
-        inline uint32_t get_mtu_raw() {
-            return Utils::clamped_sub<uint32_t>(_underlying->_underlying->get_mtu_raw(), 5);
-        }
+        uint32_t get_mtu_normal();
+        uint32_t get_mtu_raw();
 
         virtual ~OPTPipe();
     };

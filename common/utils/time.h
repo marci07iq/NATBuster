@@ -14,7 +14,6 @@ namespace NATBuster::Time
 
     time_type_us earlier(time_type_us a, time_type_us b);
 
-#ifdef WIN32
     struct Timeout {
         const time_delta_type_us _timeout_us;
 
@@ -25,5 +24,4 @@ namespace NATBuster::Time
             return _timeout_us < 0;
         }
     };
-#endif
 }

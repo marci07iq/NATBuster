@@ -79,7 +79,19 @@ namespace NATBuster::Transport {
     //Called when a packet can be read
     void OPTSession::on_raw(const Utils::ConstBlobView& data) {
         if (_flags._first_kex_ok) {
-            _callback_raw(data);
+            //Decrypt data if there is encyption
+            Utils::Blob data_decrypted;
+            Utils::Blob no_aad;
+
+            if (_flags._enc_on_ib && _flags._enc_raw) {
+                //Decryption may fail, if packet was sent with the previous kex.
+                if (_inbound.decrypt_standalone(data, data_decrypted, no_aad)) {
+                    _callback_raw(data_decrypted);
+                }
+            }
+            else {
+                _callback_raw(data);
+            }
         }
     }
     //Called when a socket error occurs
@@ -106,7 +118,7 @@ namespace NATBuster::Transport {
             _outbound.encrypt(packet_full, packet_encryped, no_aad);
         }
 
-        Utils::BlobView& to_send = (_flags._enc_on_ob) ? packet_encryped : packet_full;
+        Utils::ConstBlobView& to_send = (_flags._enc_on_ob) ? packet_encryped : packet_full;
 
         _underlying->send(to_send);
     }
@@ -148,7 +160,17 @@ namespace NATBuster::Transport {
 
     //Send raw fasttrack packet, passed stright to the underlying inderface
     void OPTSession::sendRaw(const Utils::ConstBlobView& packet) {
-        _underlying->sendRaw(packet);
+        //Decrypt data if there is encyption
+        Utils::Blob packet_encryped;
+        Utils::Blob no_aad;
+
+        if (_flags._enc_on_ob && _flags._enc_raw) {
+            _outbound.encrypt_standalone(packet, packet_encryped, no_aad);
+        }
+
+        Utils::ConstBlobView& to_send = (_flags._enc_on_ob) ? packet_encryped : packet;
+
+        _underlying->sendRaw(to_send);
     }
 
     void OPTSession::close() {

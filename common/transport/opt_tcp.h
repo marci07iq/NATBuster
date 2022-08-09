@@ -180,6 +180,13 @@ namespace NATBuster::Transport {
         void send(const Utils::ConstBlobView& data);
         void sendRaw(const Utils::ConstBlobView& data);
 
+        inline uint32_t get_mtu_normal() {
+            return max_packet_size;
+        }
+        inline uint32_t get_mtu_raw() {
+            return max_packet_size;
+        }
+
         void close();
 
         virtual ~OPTTCP() {

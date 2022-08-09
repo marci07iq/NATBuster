@@ -15,16 +15,18 @@ if (MSVC)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
 
-    add_compile_options (/W4)
+    string(REGEX REPLACE "/W[1-3]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     add_compile_options (/WX)
 
     if (${CMAKE_BUILD_TYPE} STREQUAL "Release")
         add_compile_options(/Ox)
     endif()
+else()
+    add_compile_options(-Wall -Wextra -Werror)
 endif()
 
 find_package(OpenSSL REQUIRED)
-find_package(jsoncpp CONFIG REQUIRED)
+#find_package(jsoncpp CONFIG REQUIRED)
 
 # Client
 add_subdirectory ("client")

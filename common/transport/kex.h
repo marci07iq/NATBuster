@@ -1,8 +1,9 @@
 #pragma once
 
+#include <array>
 #include <cassert>
 #include <cstdint>
-#include <array>
+#include <string>
 
 #include "../utils/copy_protection.h"
 #include "../utils/blob.h"
@@ -48,7 +49,6 @@ namespace NATBuster::Proto {
         }
 
         Time::time_type_us _last_kex;
-
 
     public:
         inline Time::time_type_us last_kex() {

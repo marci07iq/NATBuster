@@ -7,6 +7,7 @@
 #include "../utils/callbacks.h"
 #include "../utils/copy_protection.h"
 #include "../utils/event.h"
+#include "../utils/math.h"
 
 #include "../identity/identity.h"
 
@@ -87,6 +88,9 @@ namespace NATBuster::Transport {
         inline bool is_client() const {
             return _is_client;
         }
+
+        virtual uint32_t get_mtu_normal() = 0;
+        virtual uint32_t get_mtu_raw() = 0;
 
         virtual void start() = 0;
 

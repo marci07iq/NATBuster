@@ -14,7 +14,7 @@
 
 namespace NATBuster::Transport {
     struct OPTUDPSettings {
-        uint16_t _max_mtu = 1500; //Max MTU of the UDP packet to send
+        uint16_t _max_mtu = 1454; //Max MTU of the UDP packet to send
         bool _fec_on = false; //Enable forward error correction
         Time::time_delta_type_us ping_interval = 2000000; //2sec
         Time::time_delta_type_us max_pong = 30000000; //30sec
@@ -209,6 +209,16 @@ namespace NATBuster::Transport {
 
         void send(const Utils::ConstBlobView& data);
         void sendRaw(const Utils::ConstBlobView& data);
+
+        inline uint32_t get_mtu_normal() {
+            //Completely arbitrary
+            //TODO: Implement limits in the packet chunker/reassambler
+            return (1<<24);
+        }
+        inline uint32_t get_mtu_raw() {
+            //Common router size
+            return _settings._max_mtu;
+        }
 
         void close();
 

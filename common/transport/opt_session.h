@@ -68,7 +68,7 @@ namespace NATBuster::Transport {
             //If false, remote side can't turn off encryption
             bool _enc_off_enable : 1 = false;
             //Encrypt raw data stream
-            //TODO
+            //TODO: Fix packet loss around kex
             bool _enc_raw : 1 = false;
         } _flags;
 
@@ -119,6 +119,13 @@ namespace NATBuster::Transport {
 
         std::shared_ptr<Identity::User> getUser() {
             return _kex->get_user();
+        }
+
+        inline uint32_t get_mtu_normal() {
+            return Utils::clamped_sub<uint32_t>(_underlying->get_mtu_normal(), 1 + _outbound.max_size_increase());
+        }
+        inline uint32_t get_mtu_raw() {
+            return Utils::clamped_sub<uint32_t>(_underlying->get_mtu_raw(), _outbound.max_size_increase());
         }
 
         virtual ~OPTSession() {

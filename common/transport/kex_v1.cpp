@@ -1,6 +1,8 @@
 #include "kex_v1.h"
 #include "opt_session.h"
 
+#include "../utils/version.h"
+
 namespace NATBuster::Proto {
     KEXV1_A::KEXV1_A(
         const std::shared_ptr<const Crypto::PrKey> self,
@@ -238,7 +240,7 @@ namespace NATBuster::Proto {
             //Set packet type
             *((uint8_t*)_m1.getw()) = (uint8_t)PacketType::KEXC_VERSION;
 
-            *((uint32_t*)(_m1.getw() + 1)) = 0x01000000;
+            *((uint32_t*)(_m1.getw() + 1)) = Utils::current_version.num;
 
             out->send_kex(_m1);
             _state = KEXV1::S1_M1;
@@ -282,7 +284,7 @@ namespace NATBuster::Proto {
             //Set packet type
             *((uint8_t*)_m2.getw()) = (uint8_t)PacketType::KEXS_VERSION;
 
-            *((uint32_t*)(_m2.getw() + 1)) = 0x01000000;
+            *((uint32_t*)(_m2.getw() + 1)) = Utils::current_version.num;
 
             out->send_kex(_m2);
             _state = S2_M2;

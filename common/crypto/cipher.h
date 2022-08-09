@@ -8,6 +8,7 @@
 
 #include "../utils/copy_protection.h"
 #include "../utils/blob.h"
+#include "../utils/math.h"
 
 namespace NATBuster::Crypto {
     /*enum class CipherAlgo : uint8_t {
@@ -35,6 +36,7 @@ namespace NATBuster::Crypto {
         //Set key bytes
         virtual void set_key(const uint8_t* key, uint32_t size) = 0;
 
+        virtual uint32_t max_size_increase() = 0;
 
         //Size of encypted data of raw_size plaintext
         virtual uint32_t enc_size(uint32_t raw_size) = 0;
@@ -53,6 +55,18 @@ namespace NATBuster::Crypto {
             const Utils::ConstBlobView& aad
         ) = 0;
 
+        virtual bool encrypt_standalone(
+            const Utils::ConstBlobView& in,
+            Utils::BlobView& out,
+            const Utils::ConstBlobView& aad
+        ) = 0;
+
+        virtual bool decrypt_standalone(
+            const Utils::ConstBlobView& in,
+            Utils::BlobView& out,
+            const Utils::ConstBlobView& aad
+        ) = 0;
+
         virtual ~CipherPacketStream();
     };
 
@@ -62,6 +76,12 @@ namespace NATBuster::Crypto {
     //Set up one of these classes with identical parameters on both ends
     class CipherAES256GCMPacketStream : public CipherPacketStream {
         uint8_t _key[32];
+
+        const uint8_t _tag_size = 16;
+        const uint8_t _tag_standalone_size = 10;
+
+        uint64_t _sequential_packet_counter;
+        uint64_t _standalone_packet_counter;
 
 #pragma pack(push, 1)
         struct {
@@ -85,10 +105,13 @@ namespace NATBuster::Crypto {
         uint32_t iv_size();
         void set_iv(const uint8_t* bytes, uint32_t size);
         void set_iv_common(uint32_t common);
-        void set_iv_packet(uint64_t packet);
+        void set_iv_packet_normal(uint64_t packet);
+        void set_iv_packet_standalone(uint64_t packet);
 
         uint32_t key_size();
         void set_key(const uint8_t* key, uint32_t size);
+
+        uint32_t max_size_increase();
 
         uint32_t enc_size(uint32_t raw_size);
         uint32_t dec_size(uint32_t enc_size);
@@ -100,6 +123,18 @@ namespace NATBuster::Crypto {
         );
 
         bool decrypt(
+            const Utils::ConstBlobView& in,
+            Utils::BlobView& out,
+            const Utils::ConstBlobView& aad
+        );
+
+        bool encrypt_standalone(
+            const Utils::ConstBlobView& in,
+            Utils::BlobView& out,
+            const Utils::ConstBlobView& aad
+        );
+
+        bool decrypt_standalone(
             const Utils::ConstBlobView& in,
             Utils::BlobView& out,
             const Utils::ConstBlobView& aad

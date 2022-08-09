@@ -8,10 +8,6 @@
 #include "../utils/blob.h"
 #include "../network/network.h"
 
-//Terminology used in this part of the project
-//Packet: Logical blocks of data
-//Frame: Induvidual 
-
 namespace NATBuster::Endpoint {
     class RouterTCPRoute;
     class RouterTCPS;
@@ -61,21 +57,6 @@ namespace NATBuster::Endpoint {
         std::list<std::shared_ptr<RouterTCPRoute>> _open_routes;
         friend class RouterTCPRoute;
         std::mutex _route_lock;
-
-        
-
-        //Collection of TCP server sockets that need to be forwareded
-        /*Network::SocketHWNDPool<Network::TCPSHandle> _tcp_server_sockets;
-        //Event emitter for TCP server sockets
-        Utils::PollEventEmitter<
-            Network::SocketHWNDPool<Network::TCPSHandle>,
-            Network::TCPSHandle
-        > _tcp_server_emitter;
-
-        static std::list<Network::TCPSHandle> create_servers(std::map<uint16_t, uint16_t> port_maps) {
-            std::list<Network::TCPSHandle> res;
-            for
-        }*/
 
         void on_open();
         void on_pipe(Transport::OPTPipeOpenData pipe_req);

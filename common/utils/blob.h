@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <cstdint>
+#include <cstring>
 #include <initializer_list>
 #include <string>
 #include <map>
@@ -268,6 +269,7 @@ namespace NATBuster::Utils {
             _blob = src._blob;
             _start = src._start;
             _len = src._len;
+            return *this;
         }
 
         void resize(uint32_t new_len) {

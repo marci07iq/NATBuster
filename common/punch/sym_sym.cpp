@@ -110,7 +110,7 @@ namespace NATBuster::Punch {
                     //Must have at least one bucket
                     if (
                         socket_buckets.size() == 0 ||
-                        Network::SocketEventEmitterProvider::MAX_SOCKETS <= (socket_buckets.back()->count() + 2)
+                        Network::SocketEventEmitterProvider::MAX_SOCKETS_INST <= (socket_buckets.back()->count() + 2)
                         ) {
                         Utils::shared_unique_ptr provider = Network::SocketEventEmitterProvider::create();
                         provider->bind();

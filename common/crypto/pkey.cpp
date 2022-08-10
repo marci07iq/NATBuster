@@ -1,7 +1,9 @@
 #include "pkey.h"
 
+#ifdef WIN32
 //Inject the BIO-WinAPI binding
 #include <openssl/applink.c>
+#endif
 
 namespace NATBuster::Crypto {
     int PKey::key_password_cb(char* buf, int size, int rwflag, void* u)

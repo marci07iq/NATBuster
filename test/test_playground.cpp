@@ -1,4 +1,4 @@
-#ifndef UNICODE
+/*#ifndef UNICODE
 #define UNICODE
 #endif
 
@@ -134,9 +134,6 @@ int main()
 
     WSAEventSelect(AcceptSocket, EventArray[EventTotal], FD_READ | FD_CLOSE);
 
-    /*ZeroMemory(&AcceptOverlapped, sizeof(WSAOVERLAPPED));
-    AcceptOverlapped.hEvent = EventArray[EventTotal];*/
-
     DataBuf.len = DATA_BUFSIZE;
     DataBuf.buf = buffer;
 
@@ -163,12 +160,6 @@ int main()
         //-----------------------------------------
         // Call WSARecv to receive data into DataBuf on 
         // the accepted socket in overlapped I/O mode
-        /*if (WSARecv(AcceptSocket, &DataBuf, 1, &RecvBytes, &Flags, &AcceptOverlapped, NULL) ==
-            SOCKET_ERROR) {
-            iResult = WSAGetLastError();
-            if (iResult != WSA_IO_PENDING)
-                wprintf(L"WSARecv failed with error = %d\n", iResult);
-        }*/
 
 
         //Index = WaitForMultipleObjectsEx(EventTotal, EventArray, FALSE, 10000, TRUE);
@@ -231,4 +222,8 @@ int main()
 
     return 0;
 }
+*/
 
+int main() {
+    return 0;
+}

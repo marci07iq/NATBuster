@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/eventfd.h>
+#include <sys/resource.h>
 
 #include <cstring>
 
@@ -176,11 +177,11 @@ namespace NATBuster::Network {
         return _socket == INVALID_SOCKET;
     }
 
-    void SocketOSData::set_events(pollfd& hwnd) {
+    /*void SocketOSData::set_events(pollfd& hwnd) {
         hwnd.fd = _socket;
         //Pollin triggers for a read, close, and accept
         hwnd.events = POLLIN;
-    }
+    }*/
 
     inline void SocketOSData::close() {
         if (is_valid()) {
@@ -417,7 +418,10 @@ namespace NATBuster::Network {
                 }
                 return ErrorCode::NETWORK_ERROR_CREATE_SOCKET;
             }
-            _socket->set_events(*event_binder_wrapper);
+            event_binder_wrapper->fd = _socket->get();
+            //Pollin triggers for a read, close, and accept
+            //Pollout for connect
+            event_binder_wrapper->events = POLLIN | POLLOUT;
         }
 
         // Connect to server.
@@ -426,7 +430,7 @@ namespace NATBuster::Network {
             _addr_current->ai_addr,
             (int)_addr_current->ai_addrlen);
         //Store connected address
-        *_remote_address._impl->sizew() = (int)_addr_current->ai_addrlen;
+        *_remote_address._impl->sizew() = _addr_current->ai_addrlen;
         memcpy(
             _remote_address._impl->get_dataw(),
             _addr_current->ai_addr,
@@ -518,7 +522,17 @@ namespace NATBuster::Network {
 
     void SocketEventEmitterProviderImpl::bind() {
         std::lock_guard _lg(_system_lock);
-        _waker_fd = eventfd(0, 0);
+        if (_socket_events.size() == 0) {
+            assert(_waker_fd == -1);
+            _waker_fd = eventfd(0, 0);
+            
+            EventHandleOSData new_event;
+            new_event.fd = _waker_fd;
+            new_event.events = 0;
+            new_event.revents = 0;
+
+            _socket_events.push_back(new_event);
+        }
     }
     void SocketEventEmitterProviderImpl::wait(Time::time_delta_type_us delay) {
         std::lock_guard _lg(_sockets_lock);
@@ -551,6 +565,7 @@ namespace NATBuster::Network {
             for (int index = 0; index < _socket_objects.size(); index++) {
                 short set_events = _socket_events[index + 1].revents;
 
+                //Skip this socket
                 if (set_events == 0) continue;
 
                 std::shared_ptr<SocketEventHandle> socket_hwnd = _socket_objects[index];
@@ -561,19 +576,24 @@ namespace NATBuster::Network {
                     std::cout << "Event reset error" << std::endl;
                 }*/
 
-                if (set_events & FD_CONNECT) {
-                    int error = set_events.iErrorCode[FD_CONNECT_BIT];
+                //Writeable (used to check for TCP Client connection)
+                if (set_events & POLLOUT) {
                     if (socket_hwnd->_type == SocketEventHandle::Type::TCPC) {
+                        int error;
+                        socklen_t error_len = sizeof(error);
+                        getsockopt(socket, SOL_SOCKET, SO_ERROR, &error, &error_len);
+
                         if (error == 0) {
                             std::cout << "Connect success" << std::endl;
+                            //Stop listening for write
+                            _socket_events[index + 1].events = POLLIN;
                             _socket_objects[index]->_callback_connect();
                         }
                         else {
                             std::cout << "Connect error " << error << std::endl;
                             std::cout << "Next attempt..." << std::endl;
-                            EventHandleOSData hwnd_wrapper;
-                            hwnd_wrapper.hwnd = _socket_events[index];
-                            ErrorCode code = socket_hwnd->next_connect_attempt(&hwnd_wrapper);
+                            //_socket_events[index + 1].events = POLLIN | POLLOUT;
+                            ErrorCode code = socket_hwnd->next_connect_attempt((EventHandleOSData*)&_socket_events[index + 1]);
                             if (ErrorCodes::is_error(code)) {
                                 socket_hwnd->_callback_error(code);
                                 _closed_socket_objects.push_back(socket_hwnd);
@@ -585,28 +605,25 @@ namespace NATBuster::Network {
                     }
                 }
 
-                if (set_events & FD_READ) {
+                //Readable (also used for accept and close
+                if (set_events & POLLIN) {
                     //std::cout << "Readable" << std::endl;
                     if (socket_hwnd->_type == SocketEventHandle::Type::TCPC) {
                         Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
-                        WSABUF buffer;
-                        buffer.buf = (CHAR*)data.getw();
-                        buffer.len = data.size();
-                        DWORD received;
-                        DWORD flags = 0;
-                        int res3 = WSARecv(
+                        ssize_t received = recv(
                             socket,
-                            &buffer,
-                            1,
-                            &received,
-                            &flags,
-                            NULL,
-                            NULL);
-                        //TODO
-                        (void)res3;
-
-                        //Closed
-                        if (received == 0) {
+                            data.getw(),
+                            data.size(),
+                            0);
+                        //Error
+                        if (received == -1) {
+                            //Todo
+                            int wsa_error = errno;
+                            std::cout << wsa_error << std::endl;
+                            assert(false);
+                        }
+                        //Read 0: closed
+                        else if (received == 0) {
                             std::lock_guard _lg2(_system_lock);
                             _closed_socket_objects.push_back(socket_hwnd);
                         }
@@ -619,63 +636,51 @@ namespace NATBuster::Network {
                         Utils::Blob data = Utils::Blob::factory_empty(socket_hwnd->_recvbuf_len);
                         NetworkAddress source;
 
-                        WSABUF buffer;
-                        buffer.buf = (CHAR*)data.getw();
-                        buffer.len = data.size();
-                        DWORD received;
-                        DWORD flags = 0;
-                        int res3 = WSARecvFrom(
+                        ssize_t received = recvfrom(
                             socket,
-                            &buffer,
-                            1,
-                            &received,
-                            &flags,
+                            data.getw(),
+                            data.size(),
+                            0,
                             (sockaddr*)source.get_impl()->get_dataw(),
-                            source.get_impl()->sizew(),
-                            NULL,
-                            NULL
+                            source.get_impl()->sizew()
                         );
 
-                        if (res3 == 0) {
-                            //Closed
-                            if (received == 0) {
-                                std::lock_guard _lg2(_system_lock);
-                                _closed_socket_objects.push_back(socket_hwnd);
-                            }
-                            else {
-                                data.resize(received);
-                                if (source == socket_hwnd->_remote_address) {
-                                    socket_hwnd->_callback_packet(data);
-                                }
-                                socket_hwnd->_callback_unfiltered_packet(data, source);
-                            }
+                        if (received == -1) {
+                            int wsa_error = errno;
+                            //if (wsa_error != WSAECONNRESET) {
+                            std::cout << wsa_error << std::endl;
+                            assert(false);
+                            //}
+                        }
+                        else if (received == 0) {
+                            std::lock_guard _lg2(_system_lock);
+                            _closed_socket_objects.push_back(socket_hwnd);
                         }
                         else {
-                            int wsa_error = WSAGetLastError();
-                            if (wsa_error != WSAECONNRESET) {
-                                std::cout << wsa_error << std::endl;
-                                assert(false);
+                            data.resize(received);
+                            if (source == socket_hwnd->_remote_address) {
+                                socket_hwnd->_callback_packet(data);
                             }
+                            socket_hwnd->_callback_unfiltered_packet(data, source);
                         }
                     }
-                    else {
-                        assert(false);
-                    }
-                }
-
-                if (set_events & FD_ACCEPT) {
-                    if (socket_hwnd->_type == SocketEventHandle::Type::TCPS) {
+                    else if (socket_hwnd->_type == SocketEventHandle::Type::TCPS) {
                         std::cout << "Accept" << std::endl;
                         NetworkAddress remote_address;
 
                         // Accept a client socket
                         int len = remote_address.get_impl()->size();
-                        SOCKET client = WSAAccept(socket, (sockaddr*)remote_address.get_impl()->get_dataw(), &len, NULL, NULL);
-                        *remote_address.get_impl()->sizew() = len;
+                        SOCKET client = accept(
+                            socket,
+                            (sockaddr*)remote_address.get_impl()->get_dataw(),
+                            remote_address.get_impl()->sizew()
+                        );
 
-                        if (client == INVALID_SOCKET) {
-                            int error = WSAGetLastError();
-                            if (error != WSAEWOULDBLOCK && error != WSAECONNRESET) {
+                        if (client == -1) {
+                            int error = errno;
+                            if (error != EAGAIN && error != EWOULDBLOCK && error != ECONNABORTED) {
+                                std::cout << error << std::endl;
+                                assert(false);
                                 close_socket(socket_hwnd);
                             }
                         }
@@ -689,12 +694,6 @@ namespace NATBuster::Network {
                     else {
                         assert(false);
                     }
-                }
-
-                if (set_events & FD_CLOSE) {
-                    std::cout << "Close" << std::endl;
-                    std::lock_guard _lg2(_system_lock);
-                    _closed_socket_objects.push_back(socket_hwnd);
                 }
             }
 
@@ -754,10 +753,6 @@ namespace NATBuster::Network {
                             _lg2.lock();
                             continue;
                         }
-                    }
-                    else {
-                        //Bind to socket
-                        add_socket->_socket->set_events(new_event);
                     }
 
                     _socket_events.push_back(new_event);
@@ -828,7 +823,17 @@ namespace NATBuster::Network {
 
     //SocketEventEmitterProvider
 
-    const int SocketEventEmitterProvider::MAX_SOCKETS = MAXIMUM_WAIT_OBJECTS;
+    int get_socket_limit_total() {
+        rlimit lim;
+        getrlimit(RLIMIT_NOFILE, &lim);
+        return lim.rlim_cur;
+    }
+    int get_socket_limit_instance() {
+        return get_socket_limit_total();
+    }
+
+    const int SocketEventEmitterProvider::MAX_SOCKETS_TOTAL = get_socket_limit_total();
+    const int SocketEventEmitterProvider::MAX_SOCKETS_INST = get_socket_limit_instance();
 
     SocketEventEmitterProvider::SocketEventEmitterProvider() : _impl(new SocketEventEmitterProviderImpl()) {
 

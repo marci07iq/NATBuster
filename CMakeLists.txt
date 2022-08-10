@@ -22,7 +22,7 @@ if (MSVC)
         add_compile_options(/Ox)
     endif()
 else()
-    add_compile_options(-Wall -Wextra -Werror)
+    #add_compile_options(-Wall -Wextra -Werror)
 endif()
 
 find_package(OpenSSL REQUIRED)

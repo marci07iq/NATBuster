@@ -2,6 +2,7 @@
 
 #include <map>
 #include <stdint.h>
+#include <cmath>
 
 #include "opt_base.h"
 #include "../network/network.h"
@@ -110,6 +111,7 @@ namespace NATBuster::Transport {
             transmit_packet& operator=(transmit_packet&& other) noexcept {
                 transmits = std::move(other.transmits);
                 packet = std::move(other.packet);
+                return *this;
             }
 
             std::vector<Time::time_type_us> transmits;

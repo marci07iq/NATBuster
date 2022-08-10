@@ -11,42 +11,6 @@ namespace NATBuster::Crypto {
         const char* value;
     };*/
 
-    /*struct cipher_algo_params {
-        const char* openssl_name;
-        //cipher_ossl_param* openssl_params = nullptr;
-    };
-
-    //Same order as the CipherAlgo
-    const cipher_algo_params CipherAlgoNames[] = {
-        {
-            .openssl_name = "AES-256-GCM",
-            //.openssl_params = {}
-        },
-        /*{
-            .openssl_name = "AES-256-CBC",
-            .iv_len = 16,
-            .openssl_params = {cipher_ossl_param{
-                .key = OSSL_CIPHER_PARAM_CTS_MODE, .value = "CS3"
-            }}
-        },
-    };
-
-    Cipher::Cipher(CipherAlgo algo) {
-        _ctx = EVP_CIPHER_CTX_new();
-
-        _algo = EVP_CIPHER_fetch(nullptr, CipherAlgoNames[(uint8_t)algo].openssl_name, nullptr);
-    }
-
-    Cipher::~Cipher() {
-        if (_algo != nullptr) {
-            EVP_CIPHER_free(_algo);
-        }
-
-        if (_ctx != nullptr) {
-            EVP_CIPHER_CTX_free(_ctx);
-        }
-    }*/
-
     CipherPacketStream::CipherPacketStream(EVP_CIPHER_CTX* ctx, EVP_CIPHER* algo) :
         _ctx(ctx),
         _algo(algo) {

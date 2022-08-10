@@ -5,7 +5,7 @@
 
 #include <algorithm>
 #include <random>
-
+#include <thread>
 
 namespace NATBuster::Punch {
     //Class to perform the punch between two symmetric NATs
@@ -32,6 +32,10 @@ namespace NATBuster::Punch {
 
             //Total max time
             Time::time_delta_type_us timeout = 40000000; //40 sec: 30 for opening + 10 for waiting for remote
+
+            HolepunchSymSettings() {
+
+            }
         };
     private:
         

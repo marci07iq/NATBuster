@@ -1,4 +1,5 @@
 #include "blob.h"
+#include <limits>
 
 namespace NATBuster::Utils {
     

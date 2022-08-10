@@ -12,6 +12,6 @@ file(GLOB_RECURSE COMMON_HDRS CONFIGURE_DEPENDS *.h)
 add_library(Common STATIC ${COMMON_HDRS} ${COMMON_SRCS})
 
 target_link_libraries(Common PRIVATE OpenSSL::SSL OpenSSL::Crypto)
-target_link_libraries(Common PRIVATE jsoncpp_lib jsoncpp_object jsoncpp)
+target_link_libraries(Common PRIVATE jsoncpp_lib jsoncpp)
 
 include_directories(Common ${ROOT_INCLUDE_DIRS})

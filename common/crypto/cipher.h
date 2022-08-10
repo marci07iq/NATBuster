@@ -6,6 +6,8 @@
 
 #include <openssl/evp.h>
 
+//static_assert(OPENSSL_VERSION_MAJOR >= 3);
+
 #include "../utils/copy_protection.h"
 #include "../utils/blob.h"
 #include "../utils/math.h"

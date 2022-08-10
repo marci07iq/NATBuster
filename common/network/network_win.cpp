@@ -470,7 +470,7 @@ namespace NATBuster::Network {
             _addr_current->ai_addr,
             (int)_addr_current->ai_addrlen);
 
-        if(iResult == 0) {
+        if (iResult == 0) {
             //Success, wipe addrinfo
             _addr_current = nullptr;
             if (_addrs != nullptr) {
@@ -889,7 +889,8 @@ namespace NATBuster::Network {
 
     //SocketEventEmitterProvider
 
-    const int SocketEventEmitterProvider::MAX_SOCKETS = MAXIMUM_WAIT_OBJECTS;
+    const int SocketEventEmitterProvider::MAX_SOCKETS_INST = MAXIMUM_WAIT_OBJECTS;
+    const int SocketEventEmitterProvider::MAX_SOCKETS_TOTAL = -1;
 
     SocketEventEmitterProvider::SocketEventEmitterProvider() : _impl(new SocketEventEmitterProviderImpl()) {
 

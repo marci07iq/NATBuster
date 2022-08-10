@@ -52,11 +52,11 @@ namespace NATBuster::Network {
 
         ErrorCode resolve(const std::string& name, uint16_t port);
 
-        inline Type get_type() const;
-        inline std::string get_addr() const;
-        inline uint16_t get_port() const;
-        inline std::string get_full_addr() const;
-        inline NetworkAddressOSData* get_impl() const;
+        Type get_type() const;
+        std::string get_addr() const;
+        uint16_t get_port() const;
+        std::string get_full_addr() const;
+        NetworkAddressOSData* get_impl() const;
 
         inline bool operator==(const NetworkAddress& rhs) const;
         inline bool operator!=(const NetworkAddress& rhs) const;
@@ -65,7 +65,7 @@ namespace NATBuster::Network {
     };
     std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr);
 
-    
+
 
 
     class SocketBase : Utils::NonCopyable {
@@ -122,7 +122,7 @@ namespace NATBuster::Network {
         } _type;
 
     protected:
-        
+
         StartCallback _callback_start;
         ConnectCallback _callback_connect;
         AcceptCallback _callback_accept;
@@ -146,7 +146,7 @@ namespace NATBuster::Network {
 
         uint16_t _recvbuf_len = 4000;
 
-        
+
         inline void set_callback_connect(ConnectCallback::raw_type callback_connect) {
             _callback_connect = callback_connect;
         }
@@ -305,7 +305,10 @@ namespace NATBuster::Network {
 
         std::mutex _sockets_lock;
     public:
-        static const int MAX_SOCKETS;
+        //Total sockets that can be opened by the process
+        static const int MAX_SOCKETS_TOTAL;
+        //Total sockets that can be given to one instance
+        static const int MAX_SOCKETS_INST;
 
         SocketEventEmitterProvider();
 

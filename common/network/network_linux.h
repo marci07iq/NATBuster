@@ -23,7 +23,7 @@ namespace NATBuster::Network {
     static_assert(sizeof(EventHandleOSData) == sizeof(pollfd));
 
     struct AddrInfoOSData : public addrinfo {
-        
+
     };
     static_assert(sizeof(AddrInfoOSData) == sizeof(addrinfo));
 
@@ -34,7 +34,7 @@ namespace NATBuster::Network {
     public:
         sockaddr_storage _address;
 
-        int _address_length = sizeof(_address);
+        socklen_t _address_length = sizeof(_address);
 
         NetworkAddressOSData();
         NetworkAddressOSData(NetworkAddressOSData& other);
@@ -47,10 +47,10 @@ namespace NATBuster::Network {
             return (sockaddr_storage*)&_address;
         }
 
-        inline const int size() const {
+        inline const socklen_t size() const {
             return _address_length;
         }
-        inline int* sizew() {
+        inline socklen_t* sizew() {
             return &_address_length;
         }
     };
@@ -71,7 +71,7 @@ namespace NATBuster::Network {
         inline bool is_valid() const;
         inline bool is_invalid() const;
 
-        void set_events(pollfd& hwnd);
+        //void set_events(pollfd& hwnd);
 
         inline void close();
         ~SocketOSData();

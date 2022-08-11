@@ -161,7 +161,7 @@ namespace NATBuster::Crypto {
         }
 
         //Allocate output space
-        out.resize(in.size() + 16);
+        out.resize(in.size() + _tag_size);
         //View for the checksum
         Utils::BlobSliceView checksum = out.slice(0, _tag_size);
         //View for the cipher text

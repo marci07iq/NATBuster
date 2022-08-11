@@ -15,6 +15,10 @@ int main() {
 
         if (!NATBuster::Crypto::random_u64(iv_packet_0)) goto error;
 
+        uint8_t key[32];
+
+        if (!NATBuster::Crypto::random(key, 32)) goto error;
+
         NATBuster::Crypto::CipherAES256GCMPacketStream encrypt;
         NATBuster::Crypto::CipherAES256GCMPacketStream decrypt;
 
@@ -23,6 +27,9 @@ int main() {
 
         encrypt.set_iv_packet_normal(iv_packet_0);
         decrypt.set_iv_packet_normal(iv_packet_0);
+
+        encrypt.set_key(key, 32);
+        decrypt.set_key(key, 32);
 
         {
             const NATBuster::Utils::Blob data = NATBuster::Utils::Blob::factory_string("Fg=/F76UztD/fU64rcUZgI/Tö9oHHZvUTRd+Ug8=HKJZViztF)UVgjGOU;FUTZgkhBU");

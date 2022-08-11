@@ -29,8 +29,8 @@ namespace NATBuster::Proto {
         {
             if (packet_type != PacketType::KEXS_VERSION) return fail(KEX_Event::ErrorState);
             if (packet_data.size() != 4) return fail(KEX_Event::ErrorMalformed);
-            uint32_t version = *(uint32_t*)packet_data.getr();
-            if(version != 0x01000000) return fail(KEX_Event::ErrorMalformed);
+            Utils::version version_v(*(uint32_t*)packet_data.getr());
+            if(version_v.field.major != 1) return fail(KEX_Event::ErrorMalformed);
             //Clean memory garbage
             kex_reset();
 
@@ -274,8 +274,8 @@ namespace NATBuster::Proto {
         {
             if (packet_type != PacketType::KEXC_VERSION) return fail(KEX_Event::ErrorState);
             if (packet_data.size() != 4) return fail(KEX_Event::ErrorMalformed);
-            uint32_t version = *(uint32_t*)packet_data.getr();
-            if (version != 0x01000000) return fail(KEX_Event::ErrorMalformed);
+            Utils::version version_v(*(uint32_t*)packet_data.getr());
+            if (version_v.field.major != 1) return fail(KEX_Event::ErrorMalformed);
 
             _m1.copy_from(packet, 0);
 

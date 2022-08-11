@@ -528,7 +528,7 @@ namespace NATBuster::Network {
             
             EventHandleOSData new_event;
             new_event.fd = _waker_fd;
-            new_event.events = 0;
+            new_event.events = POLLIN;
             new_event.revents = 0;
 
             _socket_events.push_back(new_event);
@@ -753,6 +753,10 @@ namespace NATBuster::Network {
                             _lg2.lock();
                             continue;
                         }
+                    }
+                    else {
+                        new_event.fd = add_socket->_socket->get();
+                        new_event.events = POLLIN;
                     }
 
                     _socket_events.push_back(new_event);

@@ -219,7 +219,7 @@ int main() {
             punch(client_private_key, remote);
         }
         else {
-            std::cout << "Unknown command. Type help" << std::endl;
+            std::cout << "Unknown command... Type help" << std::endl;
         }
     }
 }

@@ -11,9 +11,9 @@ namespace NATBuster::Utils {
         union {
             uint32_t num;
             struct {
-                uint8_t major;
-                uint8_t minor;
                 uint16_t build;
+                uint8_t minor;
+                uint8_t major;
             } field;
 
         };
@@ -28,9 +28,9 @@ namespace NATBuster::Utils {
 
 
     static_assert(offsetof(version, num) == 0);
-    static_assert(offsetof(version, field.major) == 0);
-    static_assert(offsetof(version, field.minor) == 1);
-    static_assert(offsetof(version, field.build) == 2);
+    static_assert(offsetof(version, field.build) == 0);
+    static_assert(offsetof(version, field.minor) == 2);
+    static_assert(offsetof(version, field.major) == 3);
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0

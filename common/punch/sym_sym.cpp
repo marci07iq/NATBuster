@@ -155,11 +155,11 @@ namespace NATBuster::Punch {
                     std::this_thread::sleep_for(std::chrono::microseconds(next_socket - now));
                 }
 
-                float new_fail_chance = fail_chance * (1.f - open_ports / 65535.f);
-                if (int(fail_chance * 20) > int(new_fail_chance * 20)) {
+                float new_fail_chance = fail_chance * (1.f - open_ports / 65535.f) * (1.f - open_ports / 65535.f);
+                if (int(fail_chance * 50) > int(new_fail_chance * 50)) {
                     std::string res = "Punch progress: [";
-                    for (int i = 0; i < 20; i++) {
-                        res += (i < int((1.f - new_fail_chance) * 20)) ? '=' : ' ';
+                    for (int i = 0; i < 50; i++) {
+                        res += (i < int((1.f - new_fail_chance) * 50)) ? '=' : ' ';
                     }
                     res += "]";
                     std::cout << res << std::endl;

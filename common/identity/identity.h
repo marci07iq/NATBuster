@@ -3,7 +3,11 @@
 #include <list>
 #include <vector>
 
+#ifdef WIN32
+#include <json/json.h>
+#else
 #include <jsoncpp/json/json.h>
+#endif
 
 #include "../crypto/pkey.h"
 #include "../crypto/hash.h"
@@ -156,4 +160,6 @@ namespace NATBuster::Identity {
         }
     };
 
+    std::string get_os_machine_name();
+    std::string get_os_user_name();
 }

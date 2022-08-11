@@ -34,9 +34,6 @@ namespace NATBuster::Endpoint {
 
                     std::cout << "Request accepted" << std::endl;
                     puncher->start();
-
-                    //Accet the pipe from a known user
-                    //pipe_req.pipe->start();
                 }
             }
         }

@@ -56,7 +56,7 @@ void get_ip(std::shared_ptr<UserGroup> auth_servers, std::shared_ptr<PrKey> self
         std::cout << "Success, self identity is: " << query->get_my_ip().value() << ":" << query->get_my_port().value() << std::endl;
     }
     else {
-        std::cout << "ERROR" << std::endl;
+        std::cout << "Fetching identity failed" << std::endl;
     }
 }
 
@@ -123,6 +123,8 @@ void forward() {
 
 
 int main() {
+    std::cout << NATBuster::Identity::get_os_user_name() << "@" << NATBuster::Identity::get_os_machine_name() << std::endl;
+
     //Keys for testing the features
     std::string client1_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGJOEK8OBASAmL7LKy0L5r4Md18JzK5jO9x5rNBXJHa1\n-----END PRIVATE KEY-----";
     std::string client2_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIC96lygW3jpzwL7tpDydgRtIySnPX8ISLiGZD/0y3R38\n-----END PRIVATE KEY-----";

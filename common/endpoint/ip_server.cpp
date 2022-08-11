@@ -62,7 +62,7 @@ namespace NATBuster::Endpoint {
         _underlying->set_callback_close(new Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_close));
 
         //Set the timeout delay
-        _underlying->add_delay(new Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_timeout), 100000000000);
+        _underlying->add_delay(new Utils::MemberWCallback<IPServerEndpoint, void>(weak_from_this(), &IPServerEndpoint::on_timeout), 10000000);
 
         _underlying->start();
     }
@@ -102,7 +102,7 @@ namespace NATBuster::Endpoint {
     ) :
         _port(port),
         _authorised_users(authorised_users),
-        _self(std::move(self)) {
+        _self(self) {
     }
 
     void IPServer::start() {

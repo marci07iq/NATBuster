@@ -53,6 +53,10 @@ namespace NATBuster::Utils {
             res->init();
             return res;
         }
+
+        virtual ~SharedOnly() {
+
+        }
     };
 
 

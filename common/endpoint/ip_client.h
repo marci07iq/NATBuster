@@ -49,5 +49,9 @@ namespace NATBuster::Endpoint {
         std::optional<uint16_t> get_my_port();
 
         bool get_success();
+
+        ~IPClient() {
+            std::cout << "IPClient dtor" << std::endl;
+        }
     };
 }

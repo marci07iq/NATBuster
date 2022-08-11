@@ -11,11 +11,15 @@
 #include <windows.h>
 
 #include <winsock2.h>
-#include <mswsock.h>
 #include <ws2tcpip.h>
+#include <ws2ipdef.h>
+#include <windns.h>
+#include <mswsock.h>
+
 #include <iphlpapi.h>
 
 #pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "Iphlpapi.lib")
 
 #undef NOMINMAX
 

@@ -83,7 +83,7 @@ namespace NATBuster::Endpoint {
         }
 
         std::shared_ptr<Punch::Puncher> punch(const std::shared_ptr<const Crypto::PrKey> self, std::shared_ptr<Identity::User> remote_user) {
-            std::shared_ptr<NATBuster::Transport::OPTPipe> pipe = openPipe(*remote_user->key.get());
+            std::shared_ptr<NATBuster::Transport::OPTPipe> pipe = openPipe(*remote_user->get_key().get());
 
             
             std::shared_ptr<Identity::UserGroup> remote_userg = std::make_shared<Identity::UserGroup>();

@@ -3,12 +3,7 @@
 #include <list>
 #include <vector>
 
-#ifdef WIN32
-#include <json/json.h>
-#else
-#include <jsoncpp/json/json.h>
-#endif
-
+#include "../config/parse.h"
 #include "../crypto/pkey.h"
 #include "../crypto/hash.h"
 #include "../utils/hex.h"
@@ -61,34 +56,59 @@ namespace NATBuster::Identity {
             uint16_t port_max;
         };
         std::vector<PortSettings> ports;
+
+        void store(Json::Value& node) const;
+        Config::parse_status parse(const Json::Value& node);
     };
 
     class PermGroup : public Permissions {
-        std::shared_ptr<PermGroup> _base;
-    public:
+        //std::shared_ptr<PermGroup> _base;
         std::string name;
-        PermGroup(const std::string& name, std::shared_ptr<PermGroup> base) : name(name), _base(base) {
+    public:
+        PermGroup() {
 
         }
+
+        PermGroup(const std::string& name) : name(name) {
+
+        }
+        /*PermGroup(const std::string& name, std::shared_ptr<PermGroup> base) : name(name), _base(base) {
+
+        }*/
+
+        inline const std::string& get_name() const {
+            return name;
+        }
+        void store(Json::Value& node) const;
+        Config::parse_status parse(const Json::Value& node);
     };
 
     class User : public PermGroup {
+        std::shared_ptr<const Crypto::PuKey> key;
     public:
         static std::shared_ptr<User> Anonymous;
 
-        const std::shared_ptr<const Crypto::PuKey> key;
+        User() {
+
+        }
 
         User(
             const std::string& name,
-            const std::shared_ptr<const Crypto::PuKey> key,
-            std::shared_ptr<PermGroup> base = std::shared_ptr<PermGroup>()) :
-            PermGroup(name, base), key(key) {
+            const std::shared_ptr<const Crypto::PuKey> key) :
+            PermGroup(name), key(key) {
 
         }
 
-        bool isAnonymous() {
+        inline std::shared_ptr<const Crypto::PuKey> get_key() const {
+            return key;
+        }
+
+        inline bool isAnonymous() {
             return key->has_key();
         }
+
+        void store(Json::Value& node) const;
+        Config::parse_status parse(const Json::Value& node);
     };
 
     std::ostream& operator<<(std::ostream& os, const User& user);
@@ -135,7 +155,7 @@ namespace NATBuster::Identity {
         bool isMember(const Crypto::PuKey& key) const {
             if (!key.has_key()) return false;
             for (const auto& it : _identites) {
-                if (it.second->key->is_same(key)) {
+                if (it.second->get_key()->is_same(key)) {
                     return true;
                 }
             }
@@ -144,11 +164,11 @@ namespace NATBuster::Identity {
 
         bool addUser(std::shared_ptr<User> identity) {
             //Anonymous key can't be added
-            if (!identity->key->has_key()) {
+            if (!identity->get_key()->has_key()) {
                 return false;
             }
             Utils::Blob fingerprint;
-            identity->key->fingerprint(fingerprint);
+            identity->get_key()->fingerprint(fingerprint);
             std::shared_ptr<User> known = findUser(fingerprint);
             if (known) {
                 return false;
@@ -158,6 +178,9 @@ namespace NATBuster::Identity {
                 return true;
             }
         }
+
+        void store(Json::Value& node) const;
+        Config::parse_status parse(const Json::Value& node);
     };
 
     std::string get_os_machine_name();

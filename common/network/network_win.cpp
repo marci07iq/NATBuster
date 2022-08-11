@@ -2,6 +2,7 @@
 
 #include "network_win.h"
 #include "network.h"
+#include "../utils/text.h"
 
 namespace NATBuster::Network {
     //WSA wrapper
@@ -12,7 +13,6 @@ namespace NATBuster::Network {
             WSADATA _wsa_data;
 
             WSAWrapper(uint8_t major = 2, uint8_t minor = 2) {
-                std::cout << "WSA INIT" << std::endl;
                 //Create an instance of winsock
                 int iResult = WSAStartup(MAKEWORD(major, minor), &_wsa_data);
                 if (iResult != 0) {
@@ -31,7 +31,6 @@ namespace NATBuster::Network {
 
         public:
             ~WSAWrapper() {
-                std::cout << "WSA CLEAN" << std::endl;
                 WSACleanup();
             }
 
@@ -156,6 +155,54 @@ namespace NATBuster::Network {
     }
     NetworkAddressOSData* NetworkAddress::get_impl() const {
         return _impl;
+    }
+
+    ErrorCode NetworkAddress::split_network_string(const std::string& full_name, std::string& name, uint16_t& port) {
+        std::wstring full_wname = Utils::convert_app2os(full_name);
+
+        NET_ADDRESS_INFO address_val;
+        USHORT port_val;
+
+        DWORD res = ParseNetworkString(full_wname.c_str(), NET_STRING_ANY_SERVICE, &address_val, &port_val, NULL);
+
+        if (res == ERROR_SUCCESS) {
+            port = port_val;
+            switch (address_val.Format)
+            {
+            case NET_ADDRESS_DNS_NAME:
+            {
+                std::wstring namew = std::wstring(address_val.NamedAddress.Address);
+                name = Utils::convert_os2app(namew);
+                //assert(port == address_val.NamedAddress.Port);
+            }
+                break;
+            case NET_ADDRESS_IPV4:
+            {
+                std::array<wchar_t, 16> res_arr;
+                InetNtopW(AF_INET, &address_val.Ipv4Address.sin_addr, res_arr.data(), res_arr.size());
+                std::wstring namew = std::wstring(res_arr.data());
+                name = Utils::convert_os2app(namew);
+                assert(port == address_val.Ipv4Address.sin_port);
+            }
+                break;
+            case NET_ADDRESS_IPV6:
+            {
+                std::array<wchar_t, 46> res_arr;
+                InetNtopW(AF_INET6, &address_val.Ipv6Address.sin6_addr, res_arr.data(), res_arr.size());
+                std::wstring namew = std::wstring(res_arr.data());
+                name = Utils::convert_os2app(namew);
+                assert(port == address_val.Ipv6Address.sin6_port);
+            }
+                break;
+            default:
+                return ErrorCode::NETWORK_ERROR_PARSE_FULL_HOST;
+                break;
+            }
+
+            return ErrorCode::OK;
+        }
+
+        return ErrorCode::NETWORK_ERROR_PARSE_FULL_HOST;
     }
 
     bool NetworkAddress::operator==(const NetworkAddress& rhs) const {

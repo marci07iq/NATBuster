@@ -87,7 +87,7 @@ namespace NATBuster::Endpoint {
         //Identity is now available
         //Insert into lookup table
         std::shared_ptr<Identity::User> user = _underlying->getUser();
-        if (!user->key->fingerprint(_identity_fingerprint)) {
+        if (!user->get_key()->fingerprint(_identity_fingerprint)) {
             //Can't have an anon
             _underlying->close();
         }
@@ -125,7 +125,7 @@ namespace NATBuster::Endpoint {
                 const Utils::ConstBlobSliceView dst_fingerprint = pipe_req.content.cslice_right(1);
                 //Source fingerprint
                 Utils::Blob src_fingerprint;
-                if (pipe_req.pipe->getUser()->key->fingerprint(src_fingerprint)) {
+                if (pipe_req.pipe->getUser()->get_key()->fingerprint(src_fingerprint)) {
                     std::cout << "Pipe request from " << *pipe_req.pipe->getUser() << std::endl;
 
                     if (dst_fingerprint.size() == 32) {

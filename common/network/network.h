@@ -58,14 +58,14 @@ namespace NATBuster::Network {
         std::string get_full_addr() const;
         NetworkAddressOSData* get_impl() const;
 
+        static ErrorCode split_network_string(const std::string& full_name, std::string& name, uint16_t& port);
+
         inline bool operator==(const NetworkAddress& rhs) const;
         inline bool operator!=(const NetworkAddress& rhs) const;
 
         ~NetworkAddress();
     };
     std::ostream& operator<<(std::ostream& os, const NetworkAddress& addr);
-
-
 
 
     class SocketBase : Utils::NonCopyable {

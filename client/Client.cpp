@@ -123,7 +123,7 @@ void forward() {
 
 
 int main() {
-    std::cout << NATBuster::Identity::get_os_user_name() << "@" << NATBuster::Identity::get_os_machine_name() << std::endl;
+    //std::cout << NATBuster::Identity::get_os_user_name() << "@" << NATBuster::Identity::get_os_machine_name() << std::endl;
 
     //Keys for testing the features
     std::string client1_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGJOEK8OBASAmL7LKy0L5r4Md18JzK5jO9x5rNBXJHa1\n-----END PRIVATE KEY-----";

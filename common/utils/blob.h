@@ -163,7 +163,6 @@ namespace NATBuster::Utils {
         static Blob factory_copy(const ConstBlobView& view, uint32_t pre_gap = 0, uint32_t end_gap = 0);
         //Factory from std::string. Doesn't stop at null, termination, stops at str.size()
         static Blob factory_string(const std::string& str);
-
         //Concat views into one. Optionally add a pre and post gap in capacity.
         static Blob factory_concat(std::initializer_list<ConstBlobView*> list, uint32_t pre_gap = 0, uint32_t end_gap = 0);
 
@@ -233,6 +232,10 @@ namespace NATBuster::Utils {
         }
         inline const uint32_t size() const {
             return _size;
+        }
+
+        inline std::string to_string() const {
+            return std::string((const char*)getr(), size());
         }
 
         void clear();

@@ -42,10 +42,14 @@ namespace NATBuster {
         NETWORK_ERROR_SERVER_LISTEN = TYPE_ERROR | SYSTEM_NETWORK | 0x0005,
         //Can't connect
         NETWORK_ERROR_CONNECT = TYPE_ERROR | SYSTEM_NETWORK | 0x0006,
-        //Can't connect
+        //Connection started but in progress
         NETWORK_WARN_CONNECTING = TYPE_WARNING | SYSTEM_NETWORK | 0x0007,
-        //Can't connect
+        //Can not parse full host + port string
         NETWORK_ERROR_PARSE_FULL_HOST = TYPE_ERROR | SYSTEM_NETWORK | 0x0008,
+        //Timeout
+        NETWORK_ERROR_TIMEOUT = TYPE_ERROR | SYSTEM_NETWORK | 0x0009,
+        //Malformed packet
+        NETWORK_ERROR_MALFORMED = TYPE_ERROR | SYSTEM_NETWORK | 0x000a,
 
         SYSTEM_OPT = 0x00030000,
         //Invalid ping packet received

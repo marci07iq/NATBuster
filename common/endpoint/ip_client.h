@@ -51,7 +51,6 @@ namespace NATBuster::Endpoint {
         bool get_success();
 
         ~IPClient() {
-            std::cout << "IPClient dtor" << std::endl;
         }
     };
 }

@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include "../common/config/config.h"
+
 #include "../common/crypto/pkey.h"
 #include "../common/utils/blob.h"
 
@@ -124,6 +126,55 @@ void forward() {
 
 int main() {
     //std::cout << NATBuster::Identity::get_os_user_name() << "@" << NATBuster::Identity::get_os_machine_name() << std::endl;
+
+    NATBuster::Config::ClientProfile profile = NATBuster::Config::load_client_config(NATBuster::Config::find_config_file());
+    if (!profile.settings) {
+        std::cout << "Didn't find profile. Create one." << std::endl;
+        profile.settings = NATBuster::Config::ClientSettings();
+        NATBuster::Config::ClientSettings& settings = profile.settings.value();
+        settings.name = "Default";
+
+        settings.prkey = std::make_shared<NATBuster::Crypto::PrKey>();
+        settings.prkey->generate_ed25519();
+        
+        std::cout << "Generated new key with public key:" << std::endl;
+        NATBuster::Utils::Blob key_blob;
+        settings.prkey->export_public(key_blob);
+        std::cout << key_blob.to_string() << std::endl;
+
+        settings.prkey->fingerprint(key_blob);
+        std::cout << "Fingerprint: ";
+        NATBuster::Utils::print_hex(key_blob);
+        std::cout << std::endl;
+
+        {
+            std::cout << "Enter C2 server address: ";
+            std::string full_addr;
+            std::cin >> full_addr;
+
+            std::string addr;
+            uint16_t port;
+            NATBuster::ErrorCode code = NATBuster::Network::NetworkAddress::split_network_string(full_addr, addr, port);
+            if (code != NATBuster::ErrorCode::OK) {
+                std::cout << code << std::endl;
+            }
+            else {
+                settings.c2_server.host.host_name = addr;
+                settings.c2_server.host.port = port;
+            }
+        }
+
+        NATBuster::Config::save_client_config(profile);
+    };
+
+    {
+        std::cout << "Loaded user with fingerprint key:" << std::endl;
+        NATBuster::Utils::Blob key_blob;
+        profile.settings.value().prkey->fingerprint(key_blob);
+        std::cout << "Fingerprint: ";
+        NATBuster::Utils::print_hex(key_blob);
+        std::cout << std::endl;
+    };
 
     //Keys for testing the features
     std::string client1_private_key_s = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIGJOEK8OBASAmL7LKy0L5r4Md18JzK5jO9x5rNBXJHa1\n-----END PRIVATE KEY-----";

@@ -5,8 +5,6 @@ namespace NATBuster::Endpoint {
 
     }
     void IPClient::on_packet(const Utils::ConstBlobView& data) {
-        std::cout << "RESP" << std::endl;
-
         Utils::PackedBlobReader reader(data);
 
         Utils::ConstBlobSliceView ip;

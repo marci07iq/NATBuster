@@ -80,7 +80,7 @@ namespace NATBuster::Punch {
             auto on_packet = [&](
                 Network::UDPHandleS socket,
                 const Utils::ConstBlobView& data,
-                Network::NetworkAddress& src) -> void {
+                const Network::NetworkAddress& src) -> void {
                     if (data == _magic_ib) {
                         Network::NetworkAddress src_cpy(src);
                         socket->set_remote(std::move(src_cpy));
@@ -131,7 +131,7 @@ namespace NATBuster::Punch {
                             new_socket_s->set_callback_unfiltered_packet(new Utils::FunctionalCallback<
                                 void,
                                 const Utils::ConstBlobView&,
-                                Network::NetworkAddress&
+                                const Network::NetworkAddress&
                             >(std::bind(on_packet, new_socket_s, std::placeholders::_1, std::placeholders::_2)));
 
                             if (remote == ErrorCode::OK) {
@@ -171,7 +171,7 @@ namespace NATBuster::Punch {
     done:
         found_socket->set_callback_unfiltered_packet(new Utils::NoCallback<
             const Utils::ConstBlobView&,
-            Network::NetworkAddress&>());
+            const Network::NetworkAddress&>());
 
         _punch_callback(std::move(found_socket));
 

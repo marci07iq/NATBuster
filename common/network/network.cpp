@@ -78,15 +78,140 @@ namespace NATBuster::Network {
             (std::move(res), code);
     }
 
+    void UDP::send(const Utils::ConstBlobView& data) {
+        sendto(data, _remote_address);
+    }
+
+
     //Set remote socket
-    ErrorCode UDP::set_remote(NetworkAddress&& remote) {
+    void UDP::set_remote(const NetworkAddress& remote) {
+        _remote_address = remote;
+    }
+    void UDP::set_remote(NetworkAddress&& remote) {
         _remote_address = std::move(remote);
-        return ErrorCode::OK;
     }
     ErrorCode UDP::set_remote(const std::string& name, uint16_t port) {
         NetworkAddress address;
         ErrorCode code = address.resolve(name, port);
         if (code != ErrorCode::OK) return code;
-        return set_remote(std::move(address));
+        set_remote(std::move(address));
+        return ErrorCode::OK;
     }
+
+    //UDPMultiplexed
+
+    void UDPMultiplexed::on_start() {
+        std::lock_guard _lg(_routes_lock);
+        auto it = _routes.begin();
+        while (it != _routes.end()) {
+            auto itold = it++;
+            std::shared_ptr<UDPMultiplexedRoute> its = itold->lock();
+            if (its) {
+                its->_callback_start();
+            }
+            else {
+                _routes.erase(itold);
+            }
+        }
+        _callback_start();
+    }
+    void UDPMultiplexed::on_packet(const Utils::ConstBlobView& data) {
+        _callback_packet(data);
+    }
+    void UDPMultiplexed::on_unfiltered_packet(const Utils::ConstBlobView& data, const NetworkAddress& remote_address) {
+        std::lock_guard _lg(_routes_lock);
+        auto it = _routes.begin();
+        while (it != _routes.end()) {
+            auto itold = it++;
+            std::shared_ptr<UDPMultiplexedRoute> its = itold->lock();
+            if (its) {
+                if (its->_remote_address == remote_address) {
+                    its->_callback_packet(data);
+                }
+                its->_callback_unfiltered_packet(data, remote_address);
+            }
+            else {
+                _routes.erase(itold);
+            }
+        }
+        _callback_unfiltered_packet(data, remote_address);
+    }
+    void UDPMultiplexed::on_error(ErrorCode code) {
+        std::lock_guard _lg(_routes_lock);
+        auto it = _routes.begin();
+        while (it != _routes.end()) {
+            auto itold = it++;
+            std::shared_ptr<UDPMultiplexedRoute> its = itold->lock();
+            if (its) {
+                its->_callback_error(code);
+            }
+            else {
+                _routes.erase(itold);
+            }
+        }
+        _callback_error(code);
+    }
+    void UDPMultiplexed::on_close() {
+        std::lock_guard _lg(_routes_lock);
+        auto it = _routes.begin();
+        while (it != _routes.end()) {
+            auto itold = it++;
+            std::shared_ptr<UDPMultiplexedRoute> its = itold->lock();
+            if (its) {
+                its->_callback_close();
+            }
+            else {
+                _routes.erase(itold);
+            }
+        }
+        _callback_close();
+    }
+
+    //Set remote socket
+    Utils::shared_unique_ptr<UDPMultiplexedRoute> UDPMultiplexed::add_remote(const NetworkAddress& remote) {
+        std::lock_guard _lg(_routes_lock);
+        Utils::shared_unique_ptr<UDPMultiplexedRoute> res = UDPMultiplexedRoute::create(shared_from_this(), remote);
+        _routes.push_back(res.get_shared());
+        return res;
+    }
+    Utils::shared_unique_ptr<UDPMultiplexedRoute> UDPMultiplexed::add_remote(NetworkAddress&& remote) {
+        std::lock_guard _lg(_routes_lock);
+        Utils::shared_unique_ptr<UDPMultiplexedRoute> res = UDPMultiplexedRoute::create(shared_from_this(), std::move(remote));
+        _routes.push_back(res.get_shared());
+        return res;
+    }
+    Utils::shared_unique_ptr<UDPMultiplexedRoute> UDPMultiplexed::add_remote(const std::string& name, uint16_t port) {
+        NetworkAddress address;
+        ErrorCode code = address.resolve(name, port);
+        if (code != ErrorCode::OK) return Utils::shared_unique_ptr<UDPMultiplexedRoute>();
+        return add_remote(std::move(address));
+    }
+
+    void UDPMultiplexed::start() {
+        _socket->set_callback_start(new Utils::MemberWCallback<UDPMultiplexed, void>(weak_from_this(), &UDPMultiplexed::on_start));
+        _socket->set_callback_packet(new Utils::MemberWCallback<UDPMultiplexed, void, const Utils::ConstBlobView&>(weak_from_this(), &UDPMultiplexed::on_packet));
+        _socket->set_callback_unfiltered_packet(new Utils::MemberWCallback<UDPMultiplexed, void, const Utils::ConstBlobView&, const NetworkAddress&>(weak_from_this(), &UDPMultiplexed::on_unfiltered_packet));
+        _socket->set_callback_error(new Utils::MemberWCallback<UDPMultiplexed, void, ErrorCode>(weak_from_this(), &UDPMultiplexed::on_error));
+        _socket->set_callback_close(new Utils::MemberWCallback<UDPMultiplexed, void>(weak_from_this(), &UDPMultiplexed::on_close));
+
+        _socket->start();
+    }
+    bool UDPMultiplexed::close() {
+        return _socket->close();
+    }
+
+
+
+
+    void UDPMultiplexedRoute::send(const Utils::ConstBlobView& data) {
+        _multiplexer->_socket->sendto(data, _remote_address);
+    }
+
+    void UDPMultiplexedRoute::start() {
+
+    }
+    bool UDPMultiplexedRoute::close() {
+        return false;
+    }
+
 }

@@ -8,6 +8,7 @@
 #include "../common/utils/hex.h"
 
 #include "../common/endpoint/ip_server.h"
+#include "../common/endpoint/ip_server_udp.h"
 
 using NATBuster::Crypto::PKey;
 using NATBuster::Crypto::PuKey;
@@ -16,13 +17,14 @@ using NATBuster::Utils::Blob;
 using NATBuster::Identity::User;
 using NATBuster::Identity::UserGroup;
 using NATBuster::Endpoint::IPServer;
+using NATBuster::Endpoint::IPServerUDP;
 //usingg namespace NATBuster::Network;
 //using namespace NATBuster::Transport;
 //using NATBuster::Utils::Void;
 //using NATBuster::Utils::MemberCallback;
 
 
-std::shared_ptr<IPServer> server;
+//std::shared_ptr<IPServer> server;
 
 int main() {
     //Keys for testing the features
@@ -59,17 +61,36 @@ int main() {
     authorised_users2->addUser(client1);
     authorised_users2->addUser(client2);
 
-    server = std::make_shared<IPServer>(5987, authorised_users2, std::move(ipserver_private_key));
-    server->start();
+    //server = std::make_shared<IPServer>((uint16_t)5987, authorised_users2, std::move(ipserver_private_key));
 
-    int x;
+    /*int x;
     do {
         std::cin >> x;
     } while (x != 0);
 
     server->_server_emitter->stop();
 
-    server->_server_emitter->join();
+    server->_server_emitter->join();*/
+
+
+    std::shared_ptr<IPServerUDP> server1 = IPServerUDP::create((uint16_t)5987);
+    std::shared_ptr<IPServerUDP> server2 = IPServerUDP::create((uint16_t)5988);
+
+    server1->start();
+    server2->start();
+
+    int x;
+    do {
+        std::cout << "Type 42 to exit: " << std::endl;
+        std::cin >> x;
+    } while (x != 42);
+
+
+    server1->stop();
+    server2->stop();
+
+    server1->wait();
+    server2->wait();
 
     return 0;
 }

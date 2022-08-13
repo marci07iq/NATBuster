@@ -29,7 +29,7 @@ namespace NATBuster::Identity {
     void Permissions::store(Json::Value& node) const {
         assert(node.empty());
         node.clear();
-        auto ports_val = Json::Value();
+        auto ports_val = Json::Value(Json::arrayValue);
         for (auto&& it : ports) {
             Json::Value it_val;
             it_val["pull"] = it.dir_pull;
@@ -184,8 +184,12 @@ namespace NATBuster::Identity {
         assert(node.empty());
         PermGroup::store(node);
         Utils::Blob key_blob;
-        key->export_public(key_blob);
-        node["pukey"] = key_blob.to_string();
+        if (key && key->export_public(key_blob)) {
+            node["pukey"] = key_blob.to_string();
+        }
+        else {
+            node["pukey"] = "PLACEHOLDER";
+        }
 
     }
     Config::parse_status User::parse(const Json::Value& node) {
@@ -212,7 +216,7 @@ namespace NATBuster::Identity {
     void UserGroup::store(Json::Value& node) const {
         assert(node.empty());
         node.clear();
-        auto users_val = Json::Value();
+        auto users_val = Json::Value(Json::arrayValue);
         for (auto&& it : _identites) {
             Json::Value it_val;
             it.second->store(it_val);

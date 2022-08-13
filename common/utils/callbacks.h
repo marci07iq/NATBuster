@@ -157,10 +157,14 @@ namespace NATBuster::Utils {
         //It is only to make sure things are fast
         static_assert(decltype(_cb)::is_always_lock_free);
 
+        inline static bool valid(raw_type cb) {
+            return (cb != nullptr && cb != checkout_ptr);
+        }
+
         //Helper to dispose of unneeded raw ptrs
         //Safe to call with null or checkout
         inline static void dispose(raw_type cb) {
-            if (cb != nullptr && cb != checkout_ptr) {
+            if (valid(cb)) {
                 delete cb;
             }
         }
@@ -249,6 +253,10 @@ namespace NATBuster::Utils {
             checkback(cb);
         }
 
+        bool has() {
+            return valid(_cb);
+        }
+
         //Complety threadsafe
         inline void operator()(ARGS... args) {
             call(std::forward<ARGS>(args)...);
@@ -263,140 +271,4 @@ namespace NATBuster::Utils {
     NoCallback<ARGS...> Callback<ARGS...>::checkout_cb = NoCallback<ARGS...>();
     template <typename... ARGS>
     const typename Callback<ARGS...>::raw_type Callback<ARGS...>::checkout_ptr = &Callback<ARGS...>::checkout_cb;
-    /*
-    template <typename... ARGS>
-    class Callback : Utils::NonCopyable {
-    public:
-        using raw_type = CallbackBase<ARGS...>*;
-    private:
-        //Callback to run, if no _new_cb set
-        raw_type _cb = nullptr;
-        //To replace _cb with before the next run
-        std::atomic<raw_type> _new_cb = nullptr;
-
-        //If you cant compile on your platform, you can remove this line
-        //It is only to make sure things are fast
-        static_assert(decltype(_new_cb)::is_always_lock_free);
-
-        inline void update_cb_from_new() {
-            //Check out new cb
-            raw_type new_cb = _new_cb.exchange(nullptr);
-            //New callback has been set
-            if (new_cb != nullptr) {
-                //Remove old one
-                if (_cb != nullptr) {
-                    delete _cb;
-                }
-                //Set new one
-                _cb = new_cb;
-            }
-        }
-
-        void replace(raw_type cb) {
-            //Set new callback
-            raw_type old_new_cb = _new_cb.exchange(cb);
-            //Remove if there was a previos new callback (replaced multiple times between calls)
-            if (old_new_cb != nullptr) {
-                delete old_new_cb;
-            }
-
-        }
-    public:
-        //Set to null
-
-        Callback() {
-            _cb = nullptr;
-        }
-        Callback(const std::nullptr_t& null) {
-            _cb = nullptr;
-        }
-
-        //Set to user set fn
-
-        //Pass in a new pointer, and do NOT keep any other refernce to it.
-        Callback(raw_type cb) {
-            _cb = cb;
-        }
-        //Completely thread safe
-        //Pass in a new pointer, and do NOT keep any other refernce to it.
-        //Note: passing in nullptr is undefined behaviour
-        Callback& operator=(raw_type cb) {
-            assert(cb != nullptr);
-            replace(cb);
-            return *this;
-        }
-
-        //Completely threadsafe for *this
-        //data must not currently be executing the callback
-        void move_from_safe_other(Callback& data)  {
-            //Update data to the latest state
-            data.update_cb_from_new();
-            //Move into self
-            replace(data._cb);
-            data._cb = nullptr;
-        }
-
-        //Not threadsafe, must not be called together with:
-        //clear, call, call_and_clear, operator()
-        void clear() {
-            if (this != nullptr) {
-                update_cb_from_new();
-
-                //Check out cb
-                raw_type cb = _cb;
-                _cb = nullptr;
-                if (cb != nullptr) {
-                    delete cb;
-                }
-            }
-        }
-
-        //Not threadsafe, must not be called together with:
-        //clear, call, call_and_clear, operator()
-        void call_and_clear(ARGS... args) {
-            if (this != nullptr) {
-                update_cb_from_new();
-
-                //Check out cb
-                raw_type cb = _cb;
-                _cb = nullptr;
-                if (cb != nullptr) {
-                    cb->operator()(std::forward<ARGS>(args)...);
-                    delete cb;
-                }
-            }
-        }
-
-        //Not threadsafe, must not be called together with:
-        //clear, call, call_and_clear, operator()
-        void call(ARGS... args) {
-            if (this != nullptr) {
-                update_cb_from_new();
-
-                //Call
-                if (_cb != nullptr) {
-                    _cb->operator()(std::forward<ARGS>(args)...);
-                }
-            }
-        }
-
-        //Not threadsafe, must not be called together with:
-        //clear, call, call_and_clear, operator()
-        inline void operator()(ARGS... args) {
-            call(std::forward<ARGS>(args)...);
-        }
-
-    ~Callback() {
-        if (_cb != nullptr) {
-            delete _cb;
-            _cb = nullptr;
-        }
-
-        raw_type new_cb = _new_cb.load();
-        if (new_cb != nullptr) {
-            delete new_cb;
-            new_cb = nullptr;
-        }
-    }
-    }; */
 }

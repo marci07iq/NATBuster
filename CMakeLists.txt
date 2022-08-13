@@ -31,6 +31,7 @@ find_package(jsoncpp CONFIG REQUIRED)
 
 # Client
 add_subdirectory ("client")
+add_subdirectory ("client_ip_udp")
 add_subdirectory ("common")
 add_subdirectory ("server_c2")
 add_subdirectory ("server_ip")

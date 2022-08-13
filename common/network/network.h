@@ -45,9 +45,9 @@ namespace NATBuster::Network {
         };
 
         NetworkAddress();
-        NetworkAddress(NetworkAddress& other);
+        NetworkAddress(const NetworkAddress& other);
         NetworkAddress(NetworkAddress&& other) noexcept;
-        NetworkAddress& operator=(NetworkAddress& other);
+        NetworkAddress& operator=(const NetworkAddress& other);
         NetworkAddress& operator=(NetworkAddress&& other) noexcept;
 
         ErrorCode resolve(const std::string& name, uint16_t port);
@@ -108,7 +108,7 @@ namespace NATBuster::Network {
         //Called from TCPC and UDP when packet received
         using PacketCallback = Utils::Callback<const Utils::ConstBlobView&>;
         //Called from UDP when any packet is received
-        using UnfilteredPacketCallback = Utils::Callback<const Utils::ConstBlobView&, NetworkAddress&>;
+        using UnfilteredPacketCallback = Utils::Callback<const Utils::ConstBlobView&, const NetworkAddress&>;
         //Called from any socket, when an error occurs
         using ErrorCallback = Utils::Callback<ErrorCode>;
         //Called from any socket, when closed by remote or local.
@@ -243,7 +243,7 @@ namespace NATBuster::Network {
         static std::pair<Utils::shared_unique_ptr<TCPC>, ErrorCode>
             create_resolve(const std::string& name, uint16_t port);
 
-        void send(Utils::ConstBlobView& data);
+        void send(const Utils::ConstBlobView& data);
 
         void start() override;
         bool close() override;
@@ -284,13 +284,123 @@ namespace NATBuster::Network {
             create_bind(const std::string& local_name, uint16_t local_port);
 
         //Set remote socket
-        ErrorCode set_remote(NetworkAddress&& remote);
+        void set_remote(const NetworkAddress& remote);
+        void set_remote(NetworkAddress&& remote);
         ErrorCode set_remote(const std::string& name, uint16_t port);
 
-        void send(Utils::ConstBlobView& data);
+        inline const NetworkAddress& get_local() {
+            return _local_address;
+        }
+
+        void send(const Utils::ConstBlobView& data);
+        void sendto(const Utils::ConstBlobView& data, const NetworkAddress& remote_address);
 
         void start() override;
         bool close() override;
+    };
+
+    class UDPMultiplexedRoute;
+    class UDPMultiplexed : public Utils::SharedOnly<UDPMultiplexed> {
+        friend class Utils::SharedOnly<UDPMultiplexed>;
+
+        std::list<std::weak_ptr<UDPMultiplexedRoute>> _routes;
+        std::mutex _routes_lock;
+
+        std::shared_ptr<UDP> _socket;
+
+        SocketEventHandle::StartCallback _callback_start;
+        SocketEventHandle::PacketCallback _callback_packet;
+        SocketEventHandle::UnfilteredPacketCallback _callback_unfiltered_packet;
+        SocketEventHandle::ErrorCallback _callback_error;
+        SocketEventHandle::CloseCallback _callback_close;
+
+        friend class UDPMultiplexedRoute;
+
+        UDPMultiplexed(std::shared_ptr<UDP> socket) : _socket(socket) {
+
+        }
+
+    public:
+        void on_start();
+        void on_packet(const Utils::ConstBlobView& data);
+        void on_unfiltered_packet(const Utils::ConstBlobView& data, const NetworkAddress& remote_address);
+        void on_error(ErrorCode);
+        void on_close();
+
+        //Set remote socket
+        Utils::shared_unique_ptr<UDPMultiplexedRoute> add_remote(const NetworkAddress& remote);
+        Utils::shared_unique_ptr<UDPMultiplexedRoute> add_remote(NetworkAddress&& remote);
+        Utils::shared_unique_ptr<UDPMultiplexedRoute> add_remote(const std::string& name, uint16_t port);
+
+        inline void set_callback_start(SocketEventHandle::StartCallback::raw_type callback_start) {
+            _callback_start = callback_start;
+        }
+        inline void set_callback_packet(SocketEventHandle::PacketCallback::raw_type callback_packet) {
+            _callback_packet = callback_packet;
+        }
+        inline void set_callback_unfiltered_packet(SocketEventHandle::UnfilteredPacketCallback::raw_type callback_unfiltered_packet) {
+            _callback_unfiltered_packet = callback_unfiltered_packet;
+        }
+        inline void set_callback_error(SocketEventHandle::ErrorCallback::raw_type callback_error) {
+            _callback_error = callback_error;
+        }
+        inline void set_callback_close(SocketEventHandle::CloseCallback::raw_type callback_close) {
+            _callback_close = callback_close;
+        }
+
+        void start();
+        bool close();
+    };
+
+    class UDPMultiplexedRoute : public Utils::SharedOnly<UDPMultiplexedRoute> {
+        friend class Utils::SharedOnly<UDPMultiplexedRoute>;
+
+        NetworkAddress _remote_address;
+        std::shared_ptr<UDPMultiplexed> _multiplexer;
+
+        SocketEventHandle::StartCallback _callback_start;
+        SocketEventHandle::PacketCallback _callback_packet;
+        SocketEventHandle::UnfilteredPacketCallback _callback_unfiltered_packet;
+        SocketEventHandle::ErrorCallback _callback_error;
+        SocketEventHandle::CloseCallback _callback_close;
+
+        UDPMultiplexedRoute(std::shared_ptr<UDPMultiplexed> multiplexer, const NetworkAddress& remote_address) :
+            _multiplexer(multiplexer),
+            _remote_address(remote_address) {
+
+        }
+        UDPMultiplexedRoute(std::shared_ptr<UDPMultiplexed> multiplexer, NetworkAddress&& remote_address) :
+        _multiplexer(multiplexer),
+            _remote_address(std::move(remote_address)) {
+
+        }
+
+        friend class UDPMultiplexed;
+    public:
+        inline const std::shared_ptr<UDP> get_socket() {
+            return _multiplexer->_socket;
+        }
+
+        inline void set_callback_start(SocketEventHandle::StartCallback::raw_type callback_start) {
+            _callback_start = callback_start;
+        }
+        inline void set_callback_packet(SocketEventHandle::PacketCallback::raw_type callback_packet) {
+            _callback_packet = callback_packet;
+        }
+        inline void set_callback_unfiltered_packet(SocketEventHandle::UnfilteredPacketCallback::raw_type callback_unfiltered_packet) {
+            _callback_unfiltered_packet = callback_unfiltered_packet;
+        }
+        inline void set_callback_error(SocketEventHandle::ErrorCallback::raw_type callback_error) {
+            _callback_error = callback_error;
+        }
+        inline void set_callback_close(SocketEventHandle::CloseCallback::raw_type callback_close) {
+            _callback_close = callback_close;
+        }
+
+        void send(const Utils::ConstBlobView& data);
+
+        void start();
+        bool close();
     };
 
     //EventEmitterProvider with socket watching capability

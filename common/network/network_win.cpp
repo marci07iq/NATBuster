@@ -63,12 +63,12 @@ namespace NATBuster::Network {
 
     NetworkAddress::NetworkAddress() : _impl(new NetworkAddressOSData()) {
     }
-    NetworkAddress::NetworkAddress(NetworkAddress& other) : _impl(new NetworkAddressOSData(*other._impl)) {
+    NetworkAddress::NetworkAddress(const NetworkAddress& other) : _impl(new NetworkAddressOSData(*other._impl)) {
     }
     NetworkAddress::NetworkAddress(NetworkAddress&& other) noexcept : _impl(other._impl) {
         other._impl = new NetworkAddressOSData();
     }
-    NetworkAddress& NetworkAddress::operator=(NetworkAddress& other) {
+    NetworkAddress& NetworkAddress::operator=(const NetworkAddress& other) {
         _impl->operator=(*other._impl);
         return *this;
     }
@@ -94,6 +94,7 @@ namespace NATBuster::Network {
             }
 
             ((sockaddr_in*)&_impl->_address)->sin_addr.s_addr = *(u_long*)server_ip->h_addr_list[0];
+            _impl->_address_length = sizeof(sockaddr_in);
         }
         else {
             //Any address
@@ -466,7 +467,7 @@ namespace NATBuster::Network {
         return ErrorCode::OK;
     }
 
-    void TCPC::send(Utils::ConstBlobView& data) {
+    void TCPC::send(const Utils::ConstBlobView& data) {
         ::send(_socket->get(), (const char*)data.getr(), data.size(), 0);
     }
 
@@ -582,8 +583,12 @@ namespace NATBuster::Network {
         return ErrorCode::OK;
     }
 
-    void UDP::send(Utils::ConstBlobView& data) {
-        ::sendto(_socket->get(), (const char*)data.getr(), data.size(), 0, (sockaddr*)_remote_address.get_impl()->get_data(), _remote_address.get_impl()->size());
+    void UDP::sendto(const Utils::ConstBlobView& data, const NetworkAddress& remote_address) {
+        ::sendto(
+            _socket->get(),
+            (const char*)data.getr(), data.size(),
+            0,
+            (sockaddr*)remote_address.get_impl()->get_data(), remote_address.get_impl()->size());
     }
 
     void UDP::start() {

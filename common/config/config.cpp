@@ -1,6 +1,12 @@
 #include "config.h"
 
+#include <fstream>
+
 #include "../network/network.h"
+
+#ifdef WIN32
+#include <shlobj.h>
+#endif
 
 namespace NATBuster::Config {
     void Host::store(Json::Value& node) const {
@@ -19,7 +25,7 @@ namespace NATBuster::Config {
         //Proper object
         else {
             Json::Value field;
-            
+
             if (node.isMember("host_name") && (field = node["host_name"]).isString()) {
                 host_name = field.asString();
             }
@@ -39,7 +45,7 @@ namespace NATBuster::Config {
             else {
                 return parse_status::error(".port: Expected integer field");
             }
-            
+
             return parse_status::success();
         }
     }
@@ -115,29 +121,74 @@ namespace NATBuster::Config {
             return parse_status::error(".auto_reconnect: Expected bool field");
         }
 
-        if (node.isMember("reconnect_interval") && (field = node["reconnect_interval"]).isIntegral()) {
-            reconnect_interval = field.asInt();
-            if (reconnect_interval < 5) {
-                return parse_status::error(".reconnect_interval: Expected >=5 seconds");
+        if (auto_reconnect) {
+            if (node.isMember("reconnect_interval") && (field = node["reconnect_interval"]).isIntegral()) {
+                reconnect_interval = field.asInt();
+                if (reconnect_interval < 5) {
+                    return parse_status::error(".reconnect_interval: Expected >=5 seconds");
+                }
+            }
+            else {
+                return parse_status::error(".reconnect_interval: Expected int field");
             }
         }
         else {
-            return parse_status::error(".reconnect_interval: Expected int field");
+            reconnect_interval = -1;
+        }
+
+        return parse_status::success();
+    }
+
+    void BaseSettings::store(Json::Value& node) const {
+        assert(node.empty());
+        node.clear();
+        {
+            node["name"] = name;
+        }
+        {
+            Utils::Blob key_blob;
+            if (prkey && prkey->export_private(key_blob)) {
+                node["prkey"] = key_blob.to_string();
+            }
+            else {
+                node["prkey"] = "PLACEHOLDER";
+            }
+        }
+    }
+    parse_status BaseSettings::parse(const Json::Value& node) {
+        Json::Value field;
+
+        if (node.isMember("name") && (field = node["name"]).isString()) {
+            name = field.asString();
+        }
+        else {
+            return parse_status::error(".name: Expected string field");
+        }
+
+        if (node.isMember("prkey") && (field = node["prkey"]).isString()) {
+            Utils::Blob key_blob = Utils::Blob::factory_string(field.asString());
+            std::shared_ptr<Crypto::PrKey> nkey = std::make_shared<Crypto::PrKey>();
+            if (!nkey->load_private(key_blob)) {
+                return parse_status::error(".prkey: Could not parse key");
+            }
+            prkey = nkey;
+        }
+        else {
+            return parse_status::error(".name: Expected string field");
         }
 
         return parse_status::success();
     }
 
     void ClientSettings::store(Json::Value& node) const {
-        assert(node.empty());
-        node.clear();
+        BaseSettings::store(node);
         {
             Json::Value field;
             c2_server.store(field);
             node["c2_server"] = field;
         }
         {
-            auto ip_servers_val = Json::Value();
+            auto ip_servers_val = Json::Value(Json::arrayValue);
             for (auto&& it : ip_servers) {
                 Json::Value it_val;
                 it.store(it_val);
@@ -145,16 +196,13 @@ namespace NATBuster::Config {
             }
             node["ip_servers"] = ip_servers_val;
         }
-        {
-            node["name"] = name;
-        }
-        {
-            Utils::Blob key_blob;
-            prkey->export_public(key_blob);
-            node["prkey"] = key_blob.to_string();
-        }
     }
     parse_status ClientSettings::parse(const Json::Value& node) {
+        {
+            parse_status res = BaseSettings::parse(node);
+            if (!res) return res;
+        }
+
         Json::Value field;
 
         if (node.isMember("c2_server")) {
@@ -190,25 +238,114 @@ namespace NATBuster::Config {
             return parse_status::error(".ip_servers: Expected array or object");
         }
 
-        if (node.isMember("name") && (field = node["name"]).isString()) {
-            name = field.asString();
-        }
-        else {
-            return parse_status::error(".name: Expected string field");
-        }
+        return parse_status::success();
+    }
 
-        if (node.isMember("prkey") && (field = node["prkey"]).isString()) {
-            Utils::Blob key_blob = Utils::Blob::factory_string(field.asString());
-            std::shared_ptr<Crypto::PrKey> nkey = std::make_shared<Crypto::PrKey>();
-            if (!nkey->load_private(key_blob)) {
-                return parse_status::error(".prkey: Could not parse key");
+    void ServerSettings::store(Json::Value& node) const {
+        BaseSettings::store(node);
+        node["port"] = port;
+    }
+    parse_status ServerSettings::parse(const Json::Value& node) {
+        parse_status res = BaseSettings::parse(node);
+        if (!res) return res;
+
+        Json::Value field;
+
+        if (node.isMember("port") && (field = node["port"]).isIntegral()) {
+            uint64_t port_res = field.asUInt64();
+            if (0 < port_res && port_res < 65536) {
+                port = (uint16_t)port_res;
             }
-            prkey = nkey;
+            else {
+                return parse_status::error(".port: Port out of range");
+            }
         }
         else {
-            return parse_status::error(".name: Expected string field");
+            return parse_status::error(".port: Expected integer field");
         }
 
         return parse_status::success();
+    }
+
+
+#ifdef WIN32
+    std::filesystem::path get_config_folder() {
+        std::filesystem::path path;
+        PWSTR path_tmp;
+
+        auto get_folder_path_ret = SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &path_tmp);
+
+        /* Error check */
+        if (get_folder_path_ret != S_OK) {
+            CoTaskMemFree(path_tmp);
+            //Fatal error
+            throw 1;
+        }
+
+        path = path_tmp;
+
+        CoTaskMemFree(path_tmp);
+
+        path = path / "NATBuster/";
+
+        return path;
+    }
+#elif __linux__
+    std::filesystem::path get_config_folder() {
+        return "~/.natbuster/";
+    }
+#else
+#error "Unsupported OS"
+#endif
+
+    std::filesystem::path find_config_file(std::optional<std::filesystem::path> hint) {
+        if (hint) {
+            std::filesystem::path path = std::filesystem::current_path() / hint.value();
+            if (std::filesystem::is_regular_file(path)) return path;
+        }
+
+        return get_config_folder() / "client.json";
+    }
+
+    ClientProfile load_client_config(std::filesystem::path path) {
+        ClientProfile profile;
+        profile.path = path;
+        profile.settings = std::nullopt;
+
+        if (std::filesystem::is_regular_file(profile.path)) {
+            Json::Value root;
+            std::ifstream ifs(profile.path);
+
+            Json::CharReaderBuilder builder;
+            builder["collectComments"] = true;
+            JSONCPP_STRING errs;
+            if (!parseFromStream(builder, ifs, &root, &errs)) {
+                std::cout << errs << std::endl;
+                return profile;
+            }
+
+            profile.settings = ClientSettings();
+            parse_status stat = profile.settings.value().parse(root);
+            if (!stat) {
+                std::cout << stat.message << std::endl;
+                profile.settings = std::nullopt;
+            }
+
+        }
+        return profile;
+    }
+    void save_client_config(const ClientProfile& profile) {
+        if (profile.settings) {
+            Json::Value root;
+            Json::StreamWriterBuilder builder;
+            const std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+
+            std::filesystem::create_directories(profile.path.parent_path());
+            std::ofstream ofs(profile.path);
+
+            profile.settings.value().store(root);
+            writer->write(root, &ofs);
+        }
+
     }
 };

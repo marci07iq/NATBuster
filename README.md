@@ -24,12 +24,13 @@ Barebones functionality working
 - Currently only Windows socket wrapper available.
 ## Prerequisites:
 - CMake
-- C++20 compatible compiler
-- OpenSSL dev library. 
+- C++20 compatible compiler (MSVC and gcc tested)
+- OpenSSL 3.0+ library. 
+  - On Windows/Visual Studio, recommended to use vcpkg to install this.
+- jsoncpp library.
   - On Windows/Visual Studio, recommended to use vcpkg to install this.
 - wxWidgets library
   - On Windows/Visual Studio, recommended to use vcpkg to install this.
 
 # Todo:
-- Create socket wrapper for linux
 - Add faster hole punching for less restrictive NATs

@@ -41,6 +41,9 @@ namespace NATBuster::ErrorCodes {
         {ErrorCode::NETWORK_ERROR_SERVER_LISTEN, "Can't listen socket"},
         {ErrorCode::NETWORK_ERROR_CONNECT, "Can't connect"},
         {ErrorCode::NETWORK_WARN_CONNECTING, "Connection in progress"},
+        {ErrorCode::NETWORK_ERROR_PARSE_FULL_HOST, "Can't parse host"},
+        {ErrorCode::NETWORK_ERROR_TIMEOUT, "Timeout"},
+        {ErrorCode::NETWORK_ERROR_MALFORMED, "Malformed network data"},
 
         {ErrorCode::OPT_UDP_INVALID_PING, "Invalid ping received"},
         {ErrorCode::OPT_UDP_INVALID_PONG, "Invalid pong received"},
@@ -50,6 +53,8 @@ namespace NATBuster::ErrorCodes {
     };
 
     std::string description(ErrorCode code) {
+        if (code == ErrorCode::OK) { return "[OK]"; };
+
         ErrorCode type = code & ErrorCode::MASK_TYPE;
 
         auto type_it = code_type_lookup.find(type);

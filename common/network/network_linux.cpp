@@ -52,29 +52,45 @@ namespace NATBuster::Network {
         memset(&_impl->_address, 0, sizeof(sockaddr_storage));
 
         if (name.length()) {
-            //Resolve host name to IP
-            hostent* server_ip = gethostbyname(name.c_str());
+            int iResult;
 
-            if (server_ip == nullptr) {
+            // Protocol
+            struct addrinfo hints;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_flags = 0;
+            hints.ai_family = AF_UNSPEC;
+            //hints.ai_socktype = 0;
+            //hints.ai_protocol = IPPROTO_TCP;
+
+            // Resolve the server address and port
+            std::string port_s = std::to_string(port);
+            addrinfo* result = nullptr;
+
+            iResult = ::getaddrinfo((name.size() == 0) ? nullptr : name.c_str(), port_s.c_str(), &hints, &result);
+            if (iResult != 0) {
                 return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
             }
 
-            if ((server_ip->h_addrtype != AF_INET) || (server_ip->h_addr_list[0] == 0)) {
+            if (result != nullptr) {
+                if (result->ai_family == AF_INET || result->ai_family == AF_INET6) {
+                    memcpy(&_impl->_address, result->ai_addr, result->ai_addrlen);
+                    _impl->_address_length = result->ai_addrlen;
+                }
+                else {
+                    return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
+                }
+            }
+            else {
                 return ErrorCode::NETWORK_ERROR_RESOLVE_HOSTNAME;
             }
-
-            ((sockaddr_in*)&_impl->_address)->sin_addr.s_addr = *(u_long*)server_ip->h_addr_list[0];
         }
         else {
-            //Any address
+            //Any ipv4 address
+            _impl->_address.ss_family = AF_INET;
             ((sockaddr_in*)&_impl->_address)->sin_addr.s_addr = INADDR_ANY;
+            ((sockaddr_in*)&_impl->_address)->sin_port = htons(port);
         }
-
-        //Address
-        _impl->_address.ss_family = AF_INET;
-        ((sockaddr_in*)&_impl->_address)->sin_family = AF_INET;
-        ((sockaddr_in*)&_impl->_address)->sin_port = htons(port);
-
+        
         return ErrorCode::OK;
     }
 
@@ -125,6 +141,20 @@ namespace NATBuster::Network {
     }
     NetworkAddressOSData* NetworkAddress::get_impl() const {
         return _impl;
+    }
+
+    ErrorCode NetworkAddress::split_network_string(const std::string& full_name, std::string& name, uint16_t& port) {
+        std::size_t pos = full_name.find_last_of(':');
+        //No port separator
+        if (pos == std::string::npos) {
+            return ErrorCode::NETWORK_ERROR_PARSE_FULL_HOST;
+        }
+        //TODO: Need to validate Much better
+        std::string sub_name = full_name.substr(0, pos);
+        name = sub_name;
+
+        std::string sub_port = full_name.substr(pos + 1);
+        port = std::stoi(sub_port);
     }
 
     bool NetworkAddress::operator==(const NetworkAddress& rhs) const {
@@ -487,7 +517,7 @@ namespace NATBuster::Network {
         _local_address = std::move(local);
 
         // Create the UDP socket
-        _socket->set(::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+        _socket->set(::socket(_local_address.get_impl()->get_data()->ss_family, SOCK_DGRAM, IPPROTO_UDP));
         if (_socket->is_invalid()) {
             return ErrorCode::NETWORK_ERROR_CREATE_SOCKET;
         }
@@ -498,6 +528,13 @@ namespace NATBuster::Network {
             _socket->close();
             return ErrorCode::NETWORK_ERROR_SERVER_BIND;
         }
+
+
+        //Get bound address
+        NetworkAddress bound;
+        ::getsockname(_socket->get(), (sockaddr*)bound.get_impl()->get_dataw(), bound.get_impl()->sizew());
+        _local_address = bound;
+
         return ErrorCode::OK;
     }
 

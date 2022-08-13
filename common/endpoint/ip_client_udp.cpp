@@ -85,7 +85,7 @@ namespace NATBuster::Endpoint {
         std::pair<
             Utils::shared_unique_ptr<Network::UDP>,
             ErrorCode
-        > create_resp = Network::UDP::create_bind("", 0);
+        > create_resp = Network::UDP::create_bind("0.0.0.0", 0);
 
         if (create_resp.second != ErrorCode::OK) {
             std::cout << "Can not create server socket " << (uint32_t)create_resp.second << std::endl;

@@ -8,7 +8,7 @@
 #include "../common/utils/hex.h"
 
 #include "../common/endpoint/ip_server.h"
-#include "../common/endpoint/ip_server_udp.h"
+#include "../common/endpoint/nat_server.h"
 
 using NATBuster::Crypto::PKey;
 using NATBuster::Crypto::PuKey;
@@ -17,7 +17,7 @@ using NATBuster::Utils::Blob;
 using NATBuster::Identity::User;
 using NATBuster::Identity::UserGroup;
 using NATBuster::Endpoint::IPServer;
-using NATBuster::Endpoint::IPServerUDP;
+using NATBuster::Endpoint::NATServer;
 //usingg namespace NATBuster::Network;
 //using namespace NATBuster::Transport;
 //using NATBuster::Utils::Void;
@@ -73,11 +73,11 @@ int main() {
     server->_server_emitter->join();*/
 
 
-    std::shared_ptr<IPServerUDP> server1 = IPServerUDP::create((uint16_t)5987);
-    std::shared_ptr<IPServerUDP> server2 = IPServerUDP::create((uint16_t)5988);
+    std::shared_ptr<NATServer> server1 = NATServer::create((uint16_t)5989, std::vector<uint16_t>{5987, 5988});
+    //std::shared_ptr<NATServer> server2 = NATServer::create((uint16_t)5988);
 
     server1->start();
-    server2->start();
+    //server2->start();
 
     int x;
     do {
@@ -87,10 +87,10 @@ int main() {
 
 
     server1->stop();
-    server2->stop();
+    //server2->stop();
 
     server1->wait();
-    server2->wait();
+    //server2->wait();
 
     return 0;
 }

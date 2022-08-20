@@ -6,8 +6,8 @@
 #include "../utils/waker.h"
 
 namespace NATBuster::Endpoint {
-    class IPClientUDP : public Utils::SharedOnly<IPClientUDP> {
-        friend class Utils::SharedOnly<IPClientUDP>;
+    class NATClient : public Utils::SharedOnly<NATClient> {
+        friend class Utils::SharedOnly<NATClient>;
         //The underlying comms layer
     public:
         struct host_data {
@@ -28,6 +28,7 @@ namespace NATBuster::Endpoint {
             Network::NetworkAddress _my_address;
             //State
             bool _done = false;
+            bool _foreign = false;
             ErrorCode _code = ErrorCode::NETWORK_ERROR_TIMEOUT;
         };
         std::list<std::shared_ptr<LookupResult>> _results;
@@ -43,11 +44,12 @@ namespace NATBuster::Endpoint {
         void on_open();
         void on_timeout();
 
-        static void on_packet(std::weak_ptr<IPClientUDP> self, std::shared_ptr<LookupResult> route, const Utils::ConstBlobView& data);
+        static void on_packet(std::weak_ptr<NATClient> self, std::shared_ptr<LookupResult> route, const Utils::ConstBlobView& data);
+        static void on_unknown_packet(std::weak_ptr<NATClient> self, const Utils::ConstBlobView& data, const Network::NetworkAddress& addr);
         //void on_error(std::shared_ptr<Network::UDPMultiplexedRoute> route, ErrorCode code);
         //void on_close(std::shared_ptr<Network::UDPMultiplexedRoute> route);
 
-        IPClientUDP(
+        NATClient(
             std::list<host_data> query_addrs,
             std::shared_ptr<Network::SocketEventEmitterProvider> provider,
             std::shared_ptr<Utils::EventEmitter> emitter

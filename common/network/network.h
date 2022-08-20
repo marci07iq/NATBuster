@@ -311,6 +311,7 @@ namespace NATBuster::Network {
         SocketEventHandle::StartCallback _callback_start;
         SocketEventHandle::PacketCallback _callback_packet;
         SocketEventHandle::UnfilteredPacketCallback _callback_unfiltered_packet;
+        SocketEventHandle::UnfilteredPacketCallback _callback_unknown_packet;
         SocketEventHandle::ErrorCallback _callback_error;
         SocketEventHandle::CloseCallback _callback_close;
 
@@ -340,6 +341,9 @@ namespace NATBuster::Network {
         }
         inline void set_callback_unfiltered_packet(SocketEventHandle::UnfilteredPacketCallback::raw_type callback_unfiltered_packet) {
             _callback_unfiltered_packet = callback_unfiltered_packet;
+        }
+        inline void set_callback_unknown_packet(SocketEventHandle::UnfilteredPacketCallback::raw_type callback_unknown_packet) {
+            _callback_unknown_packet = callback_unknown_packet;
         }
         inline void set_callback_error(SocketEventHandle::ErrorCallback::raw_type callback_error) {
             _callback_error = callback_error;

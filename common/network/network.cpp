@@ -121,11 +121,13 @@ namespace NATBuster::Network {
     void UDPMultiplexed::on_unfiltered_packet(const Utils::ConstBlobView& data, const NetworkAddress& remote_address) {
         std::lock_guard _lg(_routes_lock);
         auto it = _routes.begin();
+        bool found = false;
         while (it != _routes.end()) {
             auto itold = it++;
             std::shared_ptr<UDPMultiplexedRoute> its = itold->lock();
             if (its) {
                 if (its->_remote_address == remote_address) {
+                    found = true;
                     its->_callback_packet(data);
                 }
                 its->_callback_unfiltered_packet(data, remote_address);
@@ -133,6 +135,9 @@ namespace NATBuster::Network {
             else {
                 _routes.erase(itold);
             }
+        }
+        if (!found) {
+            _callback_unknown_packet(data, remote_address);
         }
         _callback_unfiltered_packet(data, remote_address);
     }

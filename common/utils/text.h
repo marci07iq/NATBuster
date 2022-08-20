@@ -31,11 +31,11 @@ namespace NATBuster::Utils {
     //On linux, everything is utf8
     typedef std::string string_os;
 
-    inline std::u8string convert_os2app(const string_os& data) {
+    inline std::string convert_os2app(const string_os& data) {
         return data;
 }
 
-    inline string_os convert_app2os(const std::u8string& data) {
+    inline string_os convert_app2os(const std::string& data) {
         return data;
     }
 #else

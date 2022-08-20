@@ -580,7 +580,7 @@ namespace NATBuster::Network {
         std::lock_guard _lg(_sockets_lock);
 
         timespec delay_ns;
-        delay_ns.tv_sec = delay / 1000;
+        delay_ns.tv_sec = delay / 1000000;
         delay_ns.tv_nsec = 1000 * (delay % 1000000);
 
         //0th event is the event_fd
